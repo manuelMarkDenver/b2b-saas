@@ -25,6 +25,16 @@ export default function Home() {
             /t/beacon
           </Link>
         </div>
+
+        <div className="mt-6 flex flex-wrap gap-3 text-sm">
+          <Link className="text-primary" href="/login">
+            Login
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <Link className="text-primary" href="/register">
+            Register
+          </Link>
+        </div>
       </main>
     </div>
   );

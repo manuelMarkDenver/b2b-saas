@@ -1,3 +1,4 @@
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { Logger as PinoLogger } from 'pino';
@@ -15,6 +16,14 @@ async function bootstrap() {
   app.use(requestIdMiddleware);
   app.use(requestLoggerMiddleware(logger));
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.enableCors({ origin: true });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidUnknownValues: true,
+    }),
+  );
 
   const port = config.get<number>('port') ?? 3001;
   await app.listen(port);

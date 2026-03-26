@@ -10,3 +10,7 @@ process.env.DATABASE_URL =
 
 process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'fatal';
 process.env.LOG_PRETTY = process.env.LOG_PRETTY ?? '0';
+process.env.JWT_SECRET =
+  process.env.JWT_SECRET ?? 'test_secret_32_chars_minimum';
+process.env.JWT_EXPIRES_IN_SECONDS =
+  process.env.JWT_EXPIRES_IN_SECONDS ?? '3600';

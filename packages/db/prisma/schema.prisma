@@ -14,3 +14,56 @@ model AppMeta {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+model User {
+  id              String             @id @default(uuid()) @db.Uuid
+  email           String             @unique
+  passwordHash    String
+  status          UserStatus         @default(ACTIVE)
+  isPlatformAdmin Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  memberships     TenantMembership[]
+  tenantsCreated  Tenant[]           @relation("TenantCreatedBy")
+}
+
+model Tenant {
+  id              String             @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String             @unique
+  createdByUserId String             @db.Uuid
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  createdByUser   User               @relation("TenantCreatedBy", fields: [createdByUserId], references: [id])
+  memberships     TenantMembership[]
+}
+
+model TenantMembership {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @db.Uuid
+  userId    String           @db.Uuid
+  status    MembershipStatus @default(ACTIVE)
+  isOwner   Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@index([tenantId])
+}

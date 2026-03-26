@@ -10,6 +10,8 @@ export const envSchema = z.object({
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
     .default('info'),
   LOG_PRETTY: z.coerce.boolean().optional().default(false),
+  JWT_SECRET: z.string().min(16),
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(604800),
 });
 
 export type Env = z.infer<typeof envSchema>;
