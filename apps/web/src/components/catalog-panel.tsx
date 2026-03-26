@@ -4,6 +4,31 @@ import * as React from "react";
 
 import { apiFetch } from "@/lib/api";
 
+async function readApiError(res: Response): Promise<string> {
+  try {
+    const data = (await res.json()) as unknown;
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      "message" in data &&
+      typeof (data as { message?: unknown }).message === "string"
+    ) {
+      return (data as { message: string }).message;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const text = await res.text();
+    if (text) return text;
+  } catch {
+    // ignore
+  }
+
+  return "";
+}
+
 type Category = {
   id: string;
   name: string;
@@ -32,7 +57,9 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [products, setProducts] = React.useState<Product[]>([]);
   const [skus, setSkus] = React.useState<Sku[]>([]);
-  const [status, setStatus] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(
+    null,
+  );
 
   const [newProductName, setNewProductName] = React.useState("");
   const [newProductCategoryId, setNewProductCategoryId] = React.useState<string>("");
@@ -44,7 +71,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [newSkuLowStock, setNewSkuLowStock] = React.useState<number>(0);
 
   async function loadAll() {
-    setStatus("Loading catalog...");
+    setStatus({ kind: "info", text: "Loading catalog..." });
     try {
       const [catsRes, productsRes, skusRes] = await Promise.all([
         apiFetch("/categories"),
@@ -67,7 +94,10 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       setSkus(skus);
       setStatus(null);
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Unable to load catalog");
+      setStatus({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Unable to load catalog",
+      });
     }
   }
 
@@ -77,7 +107,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   }, [tenantSlug]);
 
   async function createProduct() {
-    setStatus("Creating product...");
+    setStatus({ kind: "info", text: "Creating product..." });
     const res = await apiFetch("/products", {
       tenantSlug,
       method: "POST",
@@ -88,7 +118,11 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     });
 
     if (!res.ok) {
-      setStatus(`Create product failed: ${res.status}`);
+      const msg = await readApiError(res);
+      setStatus({
+        kind: "error",
+        text: `Create product failed: ${res.status}${msg ? ` (${msg})` : ""}`,
+      });
       return;
     }
 
@@ -97,7 +131,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   async function createSku() {
-    setStatus("Creating SKU...");
+    setStatus({ kind: "info", text: "Creating SKU..." });
     const res = await apiFetch("/skus", {
       tenantSlug,
       method: "POST",
@@ -111,8 +145,11 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      setStatus(`Create SKU failed: ${res.status} ${text}`.trim());
+      const msg = await readApiError(res);
+      setStatus({
+        kind: "error",
+        text: `Create SKU failed: ${res.status}${msg ? ` (${msg})` : ""}`,
+      });
       return;
     }
 
@@ -152,8 +189,14 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       </div>
 
       {status ? (
-        <div className="mt-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-          {status}
+        <div
+          className={
+            status.kind === "error"
+              ? "mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              : "mt-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
+          }
+        >
+          {status.text}
         </div>
       ) : null}
 
