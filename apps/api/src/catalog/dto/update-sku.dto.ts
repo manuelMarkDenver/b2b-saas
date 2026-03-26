@@ -1,0 +1,27 @@
+import { IsBoolean, IsInt, IsOptional, IsString, MinLength, Min } from 'class-validator';
+
+export class UpdateSkuDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  priceCents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stockOnHand?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  lowStockThreshold?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
