@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { AuthStatus } from "@/components/auth-status";
 import { ModeToggle } from "@/components/mode-toggle";
 import { getTenantTheme } from "@/lib/tenant-theme";
 
@@ -33,7 +34,10 @@ export default async function TenantLayout({
             <div className="text-sm font-semibold tracking-wide">{theme.brandName}</div>
             <div className="text-xs text-muted-foreground">/t/{tenantSlug}</div>
           </div>
-          <ModeToggle />
+          <div className="flex items-center gap-2">
+            <AuthStatus />
+            <ModeToggle />
+          </div>
         </div>
       </header>
 

@@ -65,6 +65,9 @@ async function main() {
       isOwner: true,
     },
   });
+
+  console.log("Seeded admin user:", admin.email);
+  console.log("Seeded tenant:", tenant.slug);
 }
 
 main()
