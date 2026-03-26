@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { MembershipsModule } from './memberships/memberships.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
+import { TenantModule } from './tenant/tenant.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -20,6 +21,7 @@ import { AppService } from './app.service';
     AuthModule,
     TenantsModule,
     MembershipsModule,
+    TenantModule,
   ],
   controllers: [AppController],
   providers: [AppService],

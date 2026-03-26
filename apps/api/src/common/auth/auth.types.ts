@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import type { Tenant } from '@prisma/client';
+import type { TenantMembership } from '@prisma/client';
 
 export type AuthUser = {
   id: string;
@@ -11,4 +12,5 @@ export type AuthUser = {
 export type RequestWithUser = Request & {
   user: AuthUser;
   tenant?: Tenant;
+  membership?: TenantMembership;
 };
