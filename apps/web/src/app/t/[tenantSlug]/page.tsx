@@ -1,3 +1,4 @@
+import { MembershipsPanel } from "@/components/memberships-panel";
 import { getTenantTheme } from "@/lib/tenant-theme";
 
 type Props = {
@@ -67,6 +68,7 @@ export default async function TenantHome({ params }: Props) {
             <div>3) Add marketplace browse scaffold in Milestone 5.</div>
           </div>
         </div>
+        <MembershipsPanel />
       </section>
     </div>
   );
