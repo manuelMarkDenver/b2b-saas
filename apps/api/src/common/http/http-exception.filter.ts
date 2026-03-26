@@ -4,9 +4,9 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-} from "@nestjs/common";
-import type { Request, Response } from "express";
-import { REQUEST_ID_HEADER } from "./request-id.middleware";
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { REQUEST_ID_HEADER } from './request-id.middleware';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -20,13 +20,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const response = exception.getResponse();
-      const message =
-        typeof response === "string"
-          ? response
-          : (response as any)?.message ?? exception.message;
+      let message: string = exception.message;
+
+      if (typeof response === 'string') {
+        message = response;
+      } else if (response && typeof response === 'object') {
+        const maybe = response as Record<string, unknown>;
+        const msg = maybe['message'];
+        if (typeof msg === 'string') message = msg;
+        if (Array.isArray(msg)) message = msg.join(', ');
+      }
 
       res.status(status).json({
-        code: "HTTP_EXCEPTION",
+        code: 'HTTP_EXCEPTION',
         message,
         requestId,
         path: req.originalUrl,
@@ -35,8 +41,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-      code: "INTERNAL_ERROR",
-      message: "Internal server error",
+      code: 'INTERNAL_ERROR',
+      message: 'Internal server error',
       requestId,
       path: req.originalUrl,
     });
