@@ -47,6 +47,8 @@ MUST
 - Keep `main` green (lint/typecheck/tests passing) before merge.
 - Multiple PRs per milestone are allowed if each PR is labeled with the milestone
   and its purpose is clearly described in the title/body.
+- Start new branches from an up-to-date `main` unless intentionally stacking PRs.
+- Do not branch from another feature branch unless you want to carry its commits.
 
 SHOULD
 
