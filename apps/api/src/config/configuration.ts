@@ -1,4 +1,4 @@
-import type { Env } from "./env.validation";
+import type { Env } from './env.validation';
 
 export function configuration(env: Env) {
   return {

@@ -1,11 +1,11 @@
-import { NestFactory } from "@nestjs/core";
-import { ConfigService } from "@nestjs/config";
-import type { Logger as PinoLogger } from "pino";
-import { AppModule } from "./app.module";
-import { PINO } from "./common/logging/logger.module";
-import { HttpExceptionFilter } from "./common/http/http-exception.filter";
-import { requestIdMiddleware } from "./common/http/request-id.middleware";
-import { requestLoggerMiddleware } from "./common/http/request-logger.middleware";
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import type { Logger as PinoLogger } from 'pino';
+import { HttpExceptionFilter } from './common/http/http-exception.filter';
+import { requestIdMiddleware } from './common/http/request-id.middleware';
+import { requestLoggerMiddleware } from './common/http/request-logger.middleware';
+import { PINO } from './common/logging/logger.module';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,8 +16,12 @@ async function bootstrap() {
   app.use(requestLoggerMiddleware(logger));
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const port = config.get<number>("port") ?? 3001;
+  const port = config.get<number>('port') ?? 3001;
   await app.listen(port);
-  logger.info({ port }, "API listening");
+  logger.info({ port }, 'API listening');
 }
-bootstrap();
+
+void bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
