@@ -3,19 +3,21 @@
 This file is given to agentic coding agents (like OpenCode) that operate in this repo.
 It should reflect the repo's actual tooling and conventions.
 
-Current state: the repo has not been scaffolded yet, so commands are placeholders.
+Current state: Milestone 1 foundation is scaffolded.
 
 ---
 
 ## Quick Start (Once Tooling Exists)
 
-- Install deps: `<TBD>`
-- Start local dev: `<TBD>`
-- Build: `<TBD>`
-- Lint: `<TBD>`
-- Format: `<TBD>`
-- Test (all): `<TBD>`
-- Test (single): `<TBD>`
+- Install deps: `pnpm i`
+- Start Postgres: `pnpm infra:up`
+- Run migrations + seed: `pnpm db:migrate && pnpm db:seed`
+- Start local dev (api+web): `pnpm dev`
+- Build: `pnpm build`
+- Lint: `pnpm lint`
+- Typecheck: `pnpm typecheck`
+- Tests (api): `pnpm --filter api test`
+- Single test (api): `pnpm --filter api test:one "Test name"`
 
 Common single-test patterns (examples only):
 

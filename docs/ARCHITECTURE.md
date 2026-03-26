@@ -23,3 +23,9 @@
 
 - Tenant context in path: `/t/:tenantSlug/...`.
 - Shared marketplace still spans tenants; tenant slug used for seller views and tenant-branded flows.
+
+## White-Label Considerations
+
+- Treat branding as data (tenant settings) and apply via theme tokens.
+- Keep platform name and tenant name separate in UI copy.
+- Do not bake tenant assumptions into API modules; always require explicit tenant context.

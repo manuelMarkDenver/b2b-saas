@@ -1,25 +1,24 @@
 # AGENTS.md
 
-This repository directory is currently empty (no source code or config files detected).
-As a result, there are no repo-specific build/lint/test commands or code-style rules to
-extract.
+This file is intended for agentic coding agents operating in this repo.
 
-Use this file as a starter. Once you add the real project files (or if you point the
-agent at the actual repo root), update the sections below to match the tooling and
-conventions that exist in-code.
+Canonical project docs live in `docs/` (especially `docs/RULES.md` and `docs/MILESTONES.md`).
 
 ---
 
-## Quick Start (Fill In Once Tooling Exists)
+## Quick Start
 
-- Install dependencies: `<TBD>`
-- Build: `<TBD>`
-- Lint: `<TBD>`
-- Format: `<TBD>`
-- Test (all): `<TBD>`
-- Test (single): `<TBD>`
+- Install deps: `pnpm i`
+- Start Postgres: `pnpm infra:up`
+- Run migrations + seed: `pnpm db:migrate && pnpm db:seed`
+- Start local dev (api+web): `pnpm dev`
+- Build: `pnpm build`
+- Lint: `pnpm lint`
+- Typecheck: `pnpm typecheck`
+- Tests (api): `pnpm --filter api test`
+- Single test (api): `pnpm --filter api test:one "Test name"`
 
-Common single-test patterns by ecosystem (replace with your actual commands):
+Common single-test patterns by ecosystem (reference only):
 
 - JavaScript/TypeScript (Vitest): `vitest path/to/test.test.ts -t "test name"`
 - JavaScript/TypeScript (Jest): `jest path/to/test.test.ts -t "test name"`
@@ -33,7 +32,7 @@ Common single-test patterns by ecosystem (replace with your actual commands):
 
 ---
 
-## Code Style (Starter Guidance)
+## Code Style
 
 Until the repo defines its own conventions, prefer these safe defaults:
 
@@ -94,11 +93,7 @@ If you add them later, summarize the key constraints here and link to the files.
 
 ---
 
-## When You Populate This Repo
+## Notes
 
-Update this file by:
-
-- Listing the exact commands from `package.json` scripts, `Makefile`, `pyproject.toml`, etc.
-- Adding the canonical “single test” invocation used by the repo.
-- Extracting style rules from linters/formatters (ESLint/Prettier, Ruff/Black, etc.).
-- Capturing any architectural rules (layering, module boundaries, API patterns).
+- Multi-tenant is path-based in web: `/t/:tenantSlug/...`.
+- Light/dark mode is implemented in web via `next-themes`.
