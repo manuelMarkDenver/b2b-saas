@@ -39,6 +39,26 @@ NOT in Phase 1
 - Tenant selection is path-based: `/t/:tenantSlug/...`.
 - No custom domains in Phase 1.
 
+## Git Workflow Rules
+
+MUST
+
+- Do all work on a new branch (fix/feat/chore/docs) and merge to `main` via PR.
+- Keep `main` green (lint/typecheck/tests passing) before merge.
+
+SHOULD
+
+- Use branch prefixes: `milestone-<n>/...`, `feat/...`, `fix/...`, `chore/...`.
+- Squash merge PRs to keep history readable.
+
+## White-Label Rule
+
+MUST
+
+- Avoid hard-coding tenant-specific business names, copy, or assets in shared components.
+- Tenant branding is token-driven (CSS variables + settings), and must be overrideable per tenant.
+- URLs, email templates, and UI strings should be designed to be tenant-aware later.
+
 ## API Conventions (Baseline)
 
 - REST only.

@@ -10,18 +10,21 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "dev": "dotenv -e .env -- pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "db:generate": "pnpm --filter @repo/db run generate",
-    "db:migrate": "pnpm --filter @repo/db run migrate:dev",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @repo/db run migrate:dev",
     "db:deploy": "pnpm --filter @repo/db run migrate:deploy",
-    "db:reset": "pnpm --filter @repo/db run prisma migrate reset",
-    "db:seed": "pnpm --filter @repo/db run seed",
+    "db:reset": "dotenv -e .env -- pnpm --filter @repo/db run prisma migrate reset",
+    "db:seed": "dotenv -e .env -- pnpm --filter @repo/db run seed",
     "db:studio": "pnpm --filter @repo/db run studio"
   },
   "devDependencies": {
+    "dotenv-cli": "^7.4.4",
     "prisma": "^6.16.0",
     "tsx": "^4.20.5"
   },
