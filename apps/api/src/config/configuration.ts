@@ -9,5 +9,9 @@ export function configuration(env: Env) {
       level: env.LOG_LEVEL,
       pretty: env.LOG_PRETTY,
     },
+    auth: {
+      jwtSecret: env.JWT_SECRET,
+      jwtExpiresInSeconds: env.JWT_EXPIRES_IN_SECONDS,
+    },
   };
 }

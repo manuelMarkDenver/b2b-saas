@@ -15,6 +15,8 @@ API
 - `DATABASE_URL`
 - `LOG_LEVEL`
 - `LOG_PRETTY` (local only)
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN_SECONDS`
 
 WEB
 
