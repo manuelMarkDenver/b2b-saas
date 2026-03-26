@@ -63,6 +63,19 @@ MUST
 - Explicitly confirm the plan with the user before proceeding with code changes.
 - If anything material is ambiguous (scope, approach, security posture, data model): ask the user first before continuing.
 
+## Seed Data Rules
+
+MUST
+
+- If upcoming changes benefit from better seed data (roles, permissions, test tenants/users), prioritize updating the seeder early.
+- When seed data changes, remind the user to re-run `pnpm db:seed` (and `pnpm db:migrate` if a migration is included).
+
+## Quality Loop Rules
+
+MUST
+
+- After making a behavior change (API or web), remind the user to manually test the change locally before we commit/push, to avoid churning on buggy commits.
+
 ## White-Label Rule
 
 MUST
