@@ -8,6 +8,7 @@ import { MembershipsModule } from './memberships/memberships.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
 import { TenantModule } from './tenant/tenant.module';
+import { CatalogModule } from './catalog/catalog.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -22,6 +23,7 @@ import { AppService } from './app.service';
     TenantsModule,
     MembershipsModule,
     TenantModule,
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

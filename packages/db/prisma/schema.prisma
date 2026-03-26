@@ -56,6 +56,57 @@ model Tenant {
 
   createdByUser   User               @relation("TenantCreatedBy", fields: [createdByUserId], references: [id])
   memberships     TenantMembership[]
+  products        Product[]
+  skus            Sku[]
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products  Product[]
+}
+
+model Product {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  categoryId  String   @db.Uuid
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id])
+  skus        Sku[]
+
+  @@index([tenantId])
+  @@index([categoryId])
+}
+
+model Sku {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @db.Uuid
+  productId         String   @db.Uuid
+  code              String
+  name              String
+  priceCents        Int?
+  stockOnHand       Int      @default(0)
+  lowStockThreshold Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  product           Product  @relation(fields: [productId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([productId])
 }
 
 model TenantMembership {
