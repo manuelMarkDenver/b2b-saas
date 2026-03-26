@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -35,7 +36,26 @@ export default function LoginPage() {
 
     const data = (await res.json()) as { token: string };
     setToken(data.token);
-    setStatus("Logged in. Token stored in localStorage.");
+    setStatus("Logged in. Redirecting...");
+
+    const membershipsRes = await apiFetch("/memberships");
+    if (!membershipsRes.ok) {
+      setStatus("Logged in, but no memberships found.");
+      return;
+    }
+
+    const memberships = (await membershipsRes.json()) as Array<{
+      tenant: { slug: string };
+      status: "ACTIVE" | "INVITED" | "DISABLED";
+    }>;
+
+    const active = memberships.find((m) => m.status === "ACTIVE");
+    if (!active) {
+      setStatus("Logged in, but no active tenant membership.");
+      return;
+    }
+
+    window.location.href = `/t/${active.tenant.slug}`;
   }
 
   return (
