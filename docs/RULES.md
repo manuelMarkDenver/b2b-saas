@@ -45,7 +45,8 @@ MUST
 
 - Do all work on a new branch (fix/feat/chore/docs) and merge to `main` via PR.
 - Keep `main` green (lint/typecheck/tests passing) before merge.
-- One PR per milestone. Multiple commits within the PR are OK.
+- Multiple PRs per milestone are allowed if each PR is labeled with the milestone
+  and its purpose is clearly described in the title/body.
 
 SHOULD
 

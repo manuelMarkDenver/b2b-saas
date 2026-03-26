@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { getToken } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
 type MeResponse = {
   user: {
@@ -23,9 +24,7 @@ export function AuthStatus() {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!base) return;
 
-    fetch(`${base}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    apiFetch("/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: MeResponse | null) => {
         if (!data?.user?.email) return;

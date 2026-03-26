@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AuthStatus } from "@/components/auth-status";
 import { ModeToggle } from "@/components/mode-toggle";
+import { TenantSwitcher } from "@/components/tenant-switcher";
 import { getTenantTheme } from "@/lib/tenant-theme";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default async function TenantLayout({
             <div className="text-xs text-muted-foreground">/t/{tenantSlug}</div>
           </div>
           <div className="flex items-center gap-2">
+            <TenantSwitcher currentSlug={tenantSlug} />
             <AuthStatus />
             <ModeToggle />
           </div>
