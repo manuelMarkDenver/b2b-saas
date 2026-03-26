@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AuthStatus } from "@/components/auth-status";
 import { ModeToggle } from "@/components/mode-toggle";
+import { TenantAuthGate } from "@/components/tenant-auth-gate";
 import { TenantSwitcher } from "@/components/tenant-switcher";
 import { getTenantTheme } from "@/lib/tenant-theme";
 
@@ -43,7 +44,10 @@ export default async function TenantLayout({
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-8">
+        <TenantAuthGate />
+        {children}
+      </main>
     </div>
   );
 }
