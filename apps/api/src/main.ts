@@ -16,6 +16,7 @@ async function bootstrap() {
   app.use(requestIdMiddleware);
   app.use(requestLoggerMiddleware(logger));
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.enableCors({ origin: true });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
