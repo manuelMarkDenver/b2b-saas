@@ -23,6 +23,13 @@ WEB
 - `PORT`
 - `NEXT_PUBLIC_API_BASE_URL`
 
+Seed
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `ADMIN_TENANT_NAME`
+- `ADMIN_TENANT_SLUG`
+
 ## Naming
 
 - Public client vars must be prefixed with `NEXT_PUBLIC_`.
