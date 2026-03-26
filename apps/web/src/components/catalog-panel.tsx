@@ -3,6 +3,8 @@
 import * as React from "react";
 
 import { apiFetch } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/toast";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -70,6 +72,8 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [newSkuStock, setNewSkuStock] = React.useState<number>(0);
   const [newSkuLowStock, setNewSkuLowStock] = React.useState<number>(0);
 
+  const { pushToast } = useToast();
+
   async function loadAll() {
     setStatus({ kind: "info", text: "Loading catalog..." });
     try {
@@ -127,6 +131,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     }
 
     setNewProductName("");
+    pushToast({ variant: "success", title: "Product created", message: newProductName });
     await loadAll();
   }
 
@@ -155,6 +160,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
 
     setNewSkuCode("");
     setNewSkuName("");
+    pushToast({ variant: "success", title: "SKU created", message: newSkuCode });
     await loadAll();
   }
 
@@ -189,14 +195,10 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       </div>
 
       {status ? (
-        <div
-          className={
-            status.kind === "error"
-              ? "mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-              : "mt-3 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
-          }
-        >
-          {status.text}
+        <div className="mt-3">
+          <Alert variant={status.kind === "error" ? "error" : "info"}>
+            {status.text}
+          </Alert>
         </div>
       ) : null}
 
