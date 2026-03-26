@@ -60,8 +60,19 @@ SHOULD
 MUST
 
 - Before starting a new milestone: re-read `docs/MILESTONES.md`, restate the milestone's definition of done, and propose a concrete plan of action.
+- "Definition of done" (DoD) means the explicit checklist under each milestone in `docs/MILESTONES.md`.
 - Explicitly confirm the plan with the user before proceeding with code changes.
 - If anything material is ambiguous (scope, approach, security posture, data model): ask the user first before continuing.
+
+## Enhancement Categorization
+
+MUST
+
+- Any proposed improvement during milestone work is categorized as one of:
+  - `DoD-required`: necessary to meet the milestone DoD/UX expectations or fix a bug introduced by milestone work.
+  - `Milestone-adjacent`: improves usability/paper cuts but not required for DoD; ask the user first.
+  - `Later`: out of scope; record and defer.
+- If an improvement changes milestone scope, update `docs/MILESTONES.md` first (docs PR), then implement.
 
 ## Seed Data Rules
 
