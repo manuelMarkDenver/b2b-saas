@@ -2,14 +2,43 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+
+type Membership = {
+  tenant: { id: string; name: string; slug: string };
+  status: "ACTIVE" | "INVITED" | "DISABLED";
+  isOwner: boolean;
+};
 
 export default function LoginPage() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [status, setStatus] = React.useState<string | null>(null);
+  const router = useRouter();
+
+  async function redirectToTenant() {
+    setStatus("Loading memberships...");
+    const res = await apiFetch("/memberships");
+
+    if (!res.ok) {
+      setStatus(`Unable to load memberships: ${res.status}`);
+      return;
+    }
+
+    const data = (await res.json()) as Membership[];
+    const active = data.find((membership) => membership.status === "ACTIVE");
+
+    if (!active) {
+      setStatus("No active memberships found.");
+      return;
+    }
+
+    router.push(`/t/${active.tenant.slug}`);
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,6 +65,7 @@ export default function LoginPage() {
     const data = (await res.json()) as { token: string };
     setToken(data.token);
     setStatus("Logged in. Token stored in localStorage.");
+    await redirectToTenant();
   }
 
   return (
