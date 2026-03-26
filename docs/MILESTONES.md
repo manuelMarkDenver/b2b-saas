@@ -54,6 +54,7 @@ Definition of done:
 
 Definition of done:
 
+- Shared UI feedback primitives (web): Alert variants (info/success/warning/error) + Toast system.
 - Shared marketplace browse/search across tenants.
 - Guest + logged-in buyer entry points.
 - Basic filters (category/tenant).
