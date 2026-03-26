@@ -1,4 +1,5 @@
 import { MembershipsPanel } from "@/components/memberships-panel";
+import { CatalogPanel } from "@/components/catalog-panel";
 import { getTenantTheme } from "@/lib/tenant-theme";
 
 type Props = {
@@ -70,6 +71,8 @@ export default async function TenantHome({ params }: Props) {
         </div>
         <MembershipsPanel />
       </section>
+
+      <CatalogPanel tenantSlug={tenantSlug} />
     </div>
   );
 }
