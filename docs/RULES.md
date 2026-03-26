@@ -55,6 +55,14 @@ SHOULD
 - Use branch prefixes: `milestone-<n>/...`, `feat/...`, `fix/...`, `chore/...`.
 - Squash merge PRs to keep history readable.
 
+## Milestone Execution Rules
+
+MUST
+
+- Before starting a new milestone: re-read `docs/MILESTONES.md`, restate the milestone's definition of done, and propose a concrete plan of action.
+- Explicitly confirm the plan with the user before proceeding with code changes.
+- If anything material is ambiguous (scope, approach, security posture, data model): ask the user first before continuing.
+
 ## White-Label Rule
 
 MUST
