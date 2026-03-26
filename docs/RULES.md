@@ -75,3 +75,5 @@ LATER (not Phase 1 unless explicitly pulled in)
 - OAuth/OIDC social login (Google, Facebook/Meta) for account creation and login.
 - Keep auth design compatible with multiple identity providers.
 - Do not block Phase 1 on social login; implement email/password or magic link first (Milestone 2).
+- Do not implement features that are not listed in `docs/MILESTONES.md`.
+- If a feature becomes necessary, update the milestone doc first, then implement.

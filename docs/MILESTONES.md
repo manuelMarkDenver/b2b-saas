@@ -21,6 +21,11 @@ Definition of done:
 - Auth baseline.
 - Active tenant context.
 
+UX expectations:
+
+- After login/register, redirect to the first active tenant `/t/:tenantSlug`.
+- Unauthenticated access to `/t/:tenantSlug` redirects to `/login`.
+
 Notes:
 
 - Social login (Google, Facebook/Meta) is LATER; Phase 1 auth should not depend on it.
