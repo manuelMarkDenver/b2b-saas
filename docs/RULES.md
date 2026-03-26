@@ -76,6 +76,7 @@ MUST
 
 - After making a behavior change (API or web), remind the user to manually test the change locally before we commit/push, to avoid churning on buggy commits.
 - When reminding to test, always include: scope (what changed), exact test steps/commands, and expected behavior.
+- If the manual testing is not UI-doable, label it `API-only` and include `curl` examples.
 
 ## White-Label Rule
 
