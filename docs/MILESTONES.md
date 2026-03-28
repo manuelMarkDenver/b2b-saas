@@ -152,7 +152,37 @@ Definition of done:
 
 ### UI overhaul (replace scaffolding panels with production UI)
 
-- Proper application shell: sidebar navigation, top header, breadcrumbs.
+**App shell and navigation:**
+- Sidebar navigation with sections: Dashboard, Inventory, Orders, Payments, Catalog, Settings.
+- Top header with tenant name, user avatar/menu, and notification bell.
+- Breadcrumbs for nested views.
+- Feature-flagged sidebar items — if `orders` is disabled for a tenant, the Orders item is hidden.
+
+**In-app notification center (bell icon):**
+- Bell icon in the top header with an unread badge count (e.g. `3`).
+- Clicking opens a dropdown panel: list of recent notifications, each showing title, body text, timestamp, and a clickable link to the related entity (order, payment, SKU).
+- Clicking a notification navigates to the entity and marks the notification as read.
+- Dismiss button (×) per notification to remove it from the list.
+- "Mark all as read" action at the top of the panel.
+- Badge clears when all notifications are read.
+- Panel fetches on open + polls every 60s when the page is active. No WebSocket in MVP.
+- Notifications are written server-side only — never from the frontend.
+
+**Settings section (in sidebar):**
+- **Tenant Profile** — name, slug (read-only), businessType display.
+- **Team & Permissions** — PBAC management UI (see below).
+- Notification Preferences — post-MVP, added when external delivery channels ship.
+
+**Team & Permissions (PBAC management UI):**
+- Accessible from Settings → Team & Permissions.
+- Two tabs: **Roles** (read-only reference) and **Members** (editable).
+- Roles tab: shows each role (OWNER, ADMIN, MEMBER, VIEWER) and its default permission bundle as a read-only tree grouped by module (Inventory, Orders, Payments, Catalog, Team). Informs tenant owners what each role can do before assigning it.
+- Members tab: lists all active tenant members. Expanding a member shows their role + all permissions as checkboxes. Overridden permissions (changed from role default) are visually highlighted.
+- Permission groups are feature-gated: if the `orders` module flag is disabled by the Super Admin, the Orders permission group shows "Module not enabled" — greyed out, not editable.
+- Edit rules: OWNER can edit ADMIN, MEMBER, VIEWER. ADMIN can edit MEMBER, VIEWER only. MEMBER/VIEWER see their own permissions as read-only (viewable in their profile).
+- Saving a membership permission override calls `PATCH /memberships/:id/permissions`.
+
+**Other UI items:**
 - Data tables with sorting, filtering, and pagination for orders, SKUs, inventory movements.
 - Modals for create/edit flows (orders, SKUs, products).
 - Tabs for switching between related views (e.g. Products / SKUs / Movements).
@@ -182,33 +212,69 @@ Notes on data retention and soft deletes:
 
 ---
 
-## Post-MVP: Notifications Module (after MS8)
+## Post-MVP: Notifications — External Delivery + Preferences UI (after MS8)
 
-Design a channel-agnostic `NotificationModule` that fires on business events.
+The in-app notification center (bell icon + panel) ships in MS8 and is always-on. This post-MVP module adds two things: **external delivery** of those same events to email/SMS/Messenger, and a **notification preferences control page** where users configure what they receive and on which channels.
 
-**Supported channels (in priority order):**
-1. **Email** — transactional email via Resend or Nodemailer + SMTP. Also required for password reset (MS8). Set up email first.
-2. **Meta Cloud API (Messenger + WhatsApp Business)** — send Messenger or WhatsApp messages to tenant owners/staff. Best fit for markets (PH/SEA) where Messenger/WhatsApp is primary business comms. Tenant configures their Page ID or WhatsApp Business number in tenant settings.
-3. **SMS** — Twilio or local SMS gateway. Lower priority than Messenger for target market.
+### Two-layer architecture
 
-**Events to notify:**
-| Event | Who receives | Why |
-|---|---|---|
-| `order.created` | Tenant owner/admin | New sale arrived |
-| `order.status_changed` (CONFIRMED) | Customer ref if stored | Order being processed |
-| `payment.submitted` | Tenant staff who can verify | Payment needs action |
-| `payment.verified` | Tenant owner | Sale confirmed |
-| `payment.rejected` | Tenant owner | Payment issue |
-| `stock.low` | Tenant owner/admin | SKU below `lowStockThreshold` — needs reorder |
-| `tenant.staff_added` | Tenant owner | New staff access granted |
+**Layer 1 — In-app (ships in MS8):**
+- `Notification` DB table written server-side on each event.
+- Bell icon dropdown UI consumes this table. Always on, no preferences needed.
 
-**Architecture:**
-- `NotificationModule` is channel-agnostic — each channel is a strategy implementation.
-- Per-tenant config: `notificationSettings` JSONB on `Tenant` — stores which channels are enabled + credentials (page ID, phone number).
-- Notification events are dispatched from existing service methods (orders, payments, inventory).
-- Fire-and-forget (do not block the main request). Use a job queue (BullMQ) or just async Promise — BullMQ preferred for reliability.
+**Layer 2 — External delivery (this module):**
+- Same events dispatched to external channels based on per-user preferences.
+- Fire-and-forget async via BullMQ job queue (never blocks the request).
+- Channel-agnostic strategy pattern — each channel is a swappable implementation.
 
-**Why deferred:** Requires email infrastructure to be set up (Resend/SMTP). Meta Cloud API requires Facebook App review for production. Better to ship this as a complete module post-MS8 than half-build it during hardening.
+### External channels (implement in this order)
+
+1. **Email** — SMTP already set up in MS8 for password reset. Cheapest channel to add first.
+2. **WhatsApp Business** — Meta Cloud API. Most important for B2B in PH/SEA — owners check WhatsApp constantly. Tenant provides their WhatsApp Business phone number.
+3. **Facebook Messenger** — Meta Cloud API (same API as WhatsApp). Tenant configures their Facebook Page ID. Requires Facebook App review for production.
+4. **SMS** — Twilio or Semaphore (PH local). Fallback for users not on Messenger/WhatsApp.
+
+### Events matrix
+
+| Event | Super Admin | Tenant Owner/Admin | Staff (Member) | Notes |
+|---|---|---|---|---|
+| `order.created` | — | ✓ | ✓ | New sale — staff may need to process |
+| `order.confirmed` | — | ✓ | ✓ | Order moving forward |
+| `order.cancelled` | — | ✓ | ✓ | May need to restock |
+| `payment.submitted` | — | ✓ | ✓ (if `can_verify_payments`) | Needs manual verification |
+| `payment.verified` | — | ✓ | — | Sale confirmed |
+| `payment.rejected` | — | ✓ | — | Customer must resubmit |
+| `stock.low` | — | ✓ | ✓ | Below `lowStockThreshold` — reorder needed |
+| `staff.added` | — | ✓ | — | New member granted access |
+| `tenant.suspended` | ✓ | ✓ (their tenant) | — | Platform action |
+| `platform.alert` | ✓ | — | — | System-level SA-only events |
+
+### Notification preferences control page
+
+Location: Settings → Notifications (added to the sidebar when this module ships).
+
+**Design: PBAC-mirrored matrix**
+
+Notification subscriptions are derived from permissions — you can only subscribe to events you have the permission to act on. If a staff member doesn't have `can_verify_payments`, the PAYMENT_SUBMITTED row is hidden from their preferences. If they must verify payments, PAYMENT_SUBMITTED is mandatory and the checkbox is locked on.
+
+Three-level hierarchy:
+1. **System defaults** — hardcoded per-role event map (OWNER gets everything, MEMBER gets operational events only)
+2. **Tenant role defaults** — OWNER can override defaults per role ("turn off ORDER_CREATED for all MEMBERs in my tenant")
+3. **Per-user overrides** — individual user can opt out of non-mandatory notifications, within what their role allows
+
+**UI shape:**
+- Tabs: **My Preferences** (current user) + **Team Defaults** (OWNER/ADMIN only)
+- My Preferences: rows = notification types, columns = channels (In-App always-on, Email, SMS, Messenger, WhatsApp). Checkboxes where enabled, greyed where locked or not applicable.
+- Team Defaults: same matrix but per role — changes apply as defaults for all members of that role.
+- Locked (mandatory) cells show a lock icon with tooltip: "Required for your role permissions."
+- Hidden rows: events outside the user's permission scope don't appear.
+
+**Who controls what:**
+- OWNER: full access — can edit their own prefs and set defaults for any role below OWNER.
+- ADMIN: can edit their own prefs and set defaults for MEMBER/VIEWER.
+- MEMBER/VIEWER: can only edit their own non-mandatory preferences.
+
+**Why deferred:** In-app is always-on so no preferences UI is needed for it. External channel preferences only matter once email/Messenger/WhatsApp are wired. Building the prefs UI before the channels exist is premature.
 
 ---
 

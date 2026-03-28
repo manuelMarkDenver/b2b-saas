@@ -208,6 +208,32 @@
 
 ---
 
+### Notification (platform/tenant-owned) — MS8
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| tenantId | UUID? | Null for Super Admin notifications; FK → Tenant for tenant-scoped events |
+| userId | UUID | Recipient — FK → User |
+| type | Enum | `ORDER_CREATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `PAYMENT_SUBMITTED`, `PAYMENT_VERIFIED`, `PAYMENT_REJECTED`, `LOW_STOCK`, `STAFF_ADDED`, `TENANT_SUSPENDED`, `PLATFORM_ALERT` |
+| title | String | Short label shown in the bell panel (e.g. "New order received") |
+| body | String | Detail line (e.g. "Order #abc for $850 is awaiting confirmation") |
+| entityType | String? | `order`, `payment`, `sku` — used to build the action link |
+| entityId | UUID? | ID of the related entity — click navigates to it |
+| isRead | Boolean | `false` by default. Set `true` when user opens or clicks the notification. |
+| createdAt | DateTime | |
+
+**Rules:**
+- Written server-side only when the triggering event occurs — never created from the frontend.
+- In-app notifications are always created; external channel dispatch is post-MVP and opt-in.
+- `GET /notifications` returns the list scoped to the authenticated user plus an unread count for the badge.
+- `PATCH /notifications/:id/read` marks one read. `PATCH /notifications/read-all` marks all read.
+- `DELETE /notifications/:id` dismisses (hard-deletes) one notification.
+- Notifications older than 90 days are purged on a scheduled job to prevent unbounded growth.
+- `entityType` + `entityId` together form the action link. Frontend constructs the route (e.g. `/t/:slug/orders/:entityId`).
+
+---
+
 ## Audit / Logging Events
 
 | Event | Trigger |
@@ -231,4 +257,4 @@
 | MarketplaceListing | Phase 7 (Marketplace) |
 | PosSession | Phase 6 (POS) |
 | AuditLog | Post-MVP (queryable audit trail) |
-| NotificationSettings | Post-MVP (per-tenant channel config for Messenger/email/SMS) |
+| UserNotificationPreferences | Post-MVP (per-user channel opt-in: email/SMS/WhatsApp/Messenger + contact details + per-event subscription overrides) |

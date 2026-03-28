@@ -132,6 +132,69 @@ Example capabilities: `can_manage_inventory`, `can_create_orders`, `can_verify_p
 
 ---
 
+## App Shell Structure (MS8)
+
+### Tenant sidebar
+
+```
+Dashboard
+Inventory          (hidden if inventory feature flag disabled)
+Orders             (hidden if orders feature flag disabled)
+Payments           (hidden if payments feature flag disabled)
+Catalog
+  └── Products / SKUs
+Settings
+  ├── Tenant Profile
+  ├── Team & Permissions    ← PBAC management UI
+  └── Notifications         ← post-MVP (external channels)
+```
+
+### Super Admin sidebar
+
+```
+Dashboard
+Tenants            (list, provision, suspend/reactivate)
+Feature Flags      (per-tenant flag toggles)
+Notifications      (platform-level alerts only)
+```
+
+### Team & Permissions page (PBAC UI)
+
+Two tabs:
+
+**Roles tab (read-only reference):**
+Displays the default permission bundle for each role (OWNER, ADMIN, MEMBER, VIEWER) as a collapsible tree grouped by module. Used as a reference before assigning roles to staff — not editable.
+
+**Members tab (editable):**
+Lists all active members. Each row expands to show the member's role and all permissions as checkboxes, grouped by module. Permissions that differ from the role default are highlighted.
+
+Permission group visibility:
+- If a module feature flag is disabled by Super Admin, that group shows "Module not enabled" and is greyed out.
+- Permissions outside the viewing user's scope are hidden (MEMBER can't see OWNER-only permissions).
+
+Edit access:
+| Acting role | Can edit |
+|---|---|
+| OWNER | ADMIN, MEMBER, VIEWER |
+| ADMIN | MEMBER, VIEWER only |
+| MEMBER / VIEWER | Read-only (own permissions visible in profile) |
+
+Saving a permission override calls `PATCH /memberships/:id/permissions`.
+
+### Notification center (in-app, MS8)
+
+- Bell icon in top header. Badge shows unread count.
+- Clicking opens a dropdown panel: title, body, timestamp, action link per notification.
+- Clicking a notification navigates to the related entity and marks it read.
+- Dismiss (×) removes a notification. "Mark all read" clears the badge.
+- Fetches on open, polls every 60s. No WebSocket in MVP.
+
+### Notification preferences (post-MVP)
+
+Added to Settings → Notifications when external delivery channels ship. PBAC-derived matrix: rows = event types, columns = channels. Mandatory events (tied to permissions) are locked on. Events outside the user's permission scope are hidden. See Post-MVP Notifications section in MILESTONES.md.
+
+---
+
 ## Inventory Integrity
 
 - `stockOnHand` on `Sku` must NEVER be mutated directly
