@@ -1,115 +1,223 @@
 # Rules
 
-This is the living rulebook for building the Phase 1 MVP.
+This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-## Scope Guardrails
+> Last updated: 2026-03-28 — Realigned to ERP-lite modular platform. Added scope control system,
+> inventory safety rules, feature flag rules, PBAC rules, and businessType rules.
 
-MUST (Phase 1)
+---
 
-- Modular monolith: Next.js (web) + NestJS (api) + Postgres.
-- Multi-tenant foundation: tenants, memberships, tenant-scoped RBAC.
-- Shared marketplace browsing across tenants.
-- Products only, with SKU support (unique per tenant).
-- Guest + logged-in buyer flows.
-- Single-tenant order-request / interest flow.
-- Light inventory only.
-- Tenant settings/branding foundation.
-- Audit logs (DB) + application logs (structured).
-- Future-ready notification event points only.
+## 0. Non-Negotiable Principles
 
-NOT in Phase 1
+1. Build in phases. Do NOT skip ahead.
+2. MVP first. Future features are strictly prohibited unless explicitly allowed.
+3. Backend is always the source of truth.
+4. Multi-tenant isolation must NEVER be broken.
+5. Inventory integrity must NEVER be compromised.
+6. Every change must update documentation.
+7. If a feature is not MVP-CRITICAL → DO NOT IMPLEMENT.
 
-- Billing/payments.
-- Self-serve tenant signup.
-- Multi-vendor cart.
-- Full inventory ledger.
-- Microservices/Kubernetes/CQRS/event sourcing.
+---
+
+## Scope Control System
+
+Every proposed change must be classified before implementation:
+
+| Class | Definition | Action |
+|---|---|---|
+| MVP-CRITICAL | Required for the system to function at its current phase | IMPLEMENT |
+| MVP-ENHANCEMENT | Improves UX/DX but not required for DoD | DEFER — ask user first |
+| FUTURE FEATURE | Belongs to Phase 5+ (mobile, POS, marketplace, AWS) | DO NOT IMPLEMENT |
+
+If not MVP-CRITICAL → document it, assign to the appropriate future phase, do not build.
+
+Use `/scope-check <feature>` to classify any proposed addition before touching code.
+
+---
+
+## MVP Boundary (Phase 1–4)
+
+**MVP INCLUDES:**
+
+- Authentication (email/password)
+- Tenant creation (Super Admin only)
+- Tenant memberships and roles
+- Product + SKU management (with `costCents`)
+- Inventory movement logging
+- Orders system
+- Payments (manual verification only)
+- Feature flags (enable/disable modules per tenant)
+- Basic Super Admin dashboard
+
+**MVP EXCLUDES (prohibited — DO NOT BUILD):**
+
+- Mobile app (React Native / Expo)
+- Offline support
+- POS system
+- Barcode scanning workflows
+- Marketplace / customer-facing UI
+- Advanced reporting or analytics
+- Automation systems
+- Accounting features
+- Payment gateway integrations (Stripe, PayMongo, etc.)
+- Self-serve tenant signup
+
+---
 
 ## Multi-Tenant Rules
 
 - Every row is explicitly owned by either the platform or a tenant.
-- Tenant ownership is represented by `tenantId` (UUID) on tenant-owned tables.
-- Platform-owned tables have no `tenantId` (e.g., platform categories).
+- Tenant ownership is represented by `tenantId` (UUID) on all tenant-owned tables.
+- Platform-owned tables have no `tenantId` (e.g., `Category`).
+- `tenantId` must NEVER come from client input (body, params, query). Always derive from authenticated session + membership check.
 - Never infer tenant from user without explicit membership checks.
+- All service methods on tenant-owned resources must include `tenantId` in the `where` clause.
+- Run `/tenant-audit` before merging any PR that touches service files.
 
-## Frontend Theming Rules
+---
 
-- Support light/dark mode via `next-themes`.
-- Tenant branding uses CSS variables (few tokens only in Phase 1).
-- Tenant selection is path-based: `/t/:tenantSlug/...`.
-- No custom domains in Phase 1.
+## Inventory Safety Rules
+
+- `stockOnHand` on `Sku` must NEVER be mutated directly.
+- Every stock change MUST create an `InventoryMovement` record first.
+- No silent stock updates — backend enforces this without exception.
+- `InventoryMovement` types: `IN`, `OUT`, `ADJUSTMENT`.
+- `referenceType` must be set: `ORDER` (automated) or `MANUAL` (staff action).
+- Negative stock prevention is optional in MVP — can be added in MS8 hardening.
+
+---
+
+## Feature Flag Rules
+
+- Feature flags are stored in `Tenant.features` as JSONB.
+- Flags: `inventory`, `orders`, `payments`, `marketplace`.
+- Controlled by Super Admin only — never by tenant staff or frontend directly.
+- All feature-gated routes must check the relevant flag via a guard.
+- Feature flags must NOT be hardcoded in business logic.
+- `marketplace` flag is stored now but its UI is not built until Phase 7.
+
+---
+
+## Business Type Rules
+
+- `businessType` allowed values: `general_retail`, `hardware`, `food_beverage`, `packaging_supply`.
+- Used ONLY for setting default feature flags when a tenant is created.
+- Must NOT control any business logic, routing, or behavior after tenant creation.
+- Do NOT add industry-specific logic to any module.
+
+---
+
+## PBAC Rules
+
+- Roles (OWNER, ADMIN, MEMBER, VIEWER) define default permission bundles.
+- Permissions can be overridden per membership without changing the role definition.
+- Do NOT hardcode role logic in business logic (e.g., `if role === 'ADMIN'`).
+- Use permission guards that read capabilities from membership.
+- Adding new capabilities must not require role changes.
+
+---
+
+## Documentation Requirements
+
+Every change MUST update the relevant docs before the PR is merged:
+
+| Change Type | Docs to Update |
+|---|---|
+| New model / schema change | `DATA_MODEL.md` |
+| New module / surface / flag | `ARCHITECTURE.md` |
+| Milestone DoD change | `MILESTONES.md` |
+| New rule / constraint | `RULES.md` |
+
+No change is complete without documentation. Use `/ms-done <n>` to verify before closing a milestone.
+
+---
 
 ## Git Workflow Rules
 
-MUST
+MUST:
 
-- Do all work on a new branch (fix/feat/chore/docs) and merge to `main` via PR.
+- Do all work on a new branch and merge to `main` via PR.
 - Keep `main` green (lint/typecheck/tests passing) before merge.
-- Multiple PRs per milestone are allowed if each PR is labeled with the milestone
-  and its purpose is clearly described in the title/body.
+- Multiple PRs per milestone are allowed if each PR is labeled with the milestone and purpose.
 - Start new branches from an up-to-date `main` unless intentionally stacking PRs.
-- Do not branch from another feature branch unless you want to carry its commits.
+- **Never commit or push without explicit confirmation from the user.** Always present the staged changes and ask "Ready to commit?" before running `git commit`. Never run `git push` — user handles all pushes manually via CLI.
 
-SHOULD
+SHOULD:
 
-- Use branch prefixes: `milestone-<n>/...`, `feat/...`, `fix/...`, `chore/...`.
+- Use branch prefixes: `milestone-<n>/...`, `feat/...`, `fix/...`, `chore/...`, `docs/...`.
 - Squash merge PRs to keep history readable.
+
+---
 
 ## Milestone Execution Rules
 
-MUST
+MUST:
 
-- Before starting a new milestone: re-read `docs/MILESTONES.md`, restate the milestone's definition of done, and propose a concrete plan of action.
-- "Definition of done" (DoD) means the explicit checklist under each milestone in `docs/MILESTONES.md`.
-- Explicitly confirm the plan with the user before proceeding with code changes.
-- If anything material is ambiguous (scope, approach, security posture, data model): ask the user first before continuing.
+- Before starting a new milestone: re-read `docs/MILESTONES.md`, restate the DoD, and propose a concrete plan.
+- Explicitly confirm the plan with the user before writing code.
+- If anything is ambiguous (scope, approach, data model): ask first, then act.
+- If a change affects milestone scope: update `docs/MILESTONES.md` first (docs PR), then implement.
+
+---
 
 ## Enhancement Categorization
 
-MUST
+Any proposed improvement during milestone work must be categorized as:
 
-- Any proposed improvement during milestone work is categorized as one of:
-  - `DoD-required`: necessary to meet the milestone DoD/UX expectations or fix a bug introduced by milestone work.
-  - `Milestone-adjacent`: improves usability/paper cuts but not required for DoD; ask the user first.
-  - `Later`: out of scope; record and defer.
-- If an improvement changes milestone scope, update `docs/MILESTONES.md` first (docs PR), then implement.
+- `DoD-required`: necessary to meet the milestone DoD or fix a bug introduced by milestone work → IMPLEMENT.
+- `Milestone-adjacent`: improves usability but not required for DoD → ask the user first.
+- `Later`: out of scope → record and defer to appropriate future phase.
+
+---
 
 ## Seed Data Rules
 
-MUST
+MUST:
 
-- If upcoming changes benefit from better seed data (roles, permissions, test tenants/users), prioritize updating the seeder early.
+- Seed 3 realistic businesses: hardware store, food supplier (pizza supplies style), retail shop.
+- Include realistic products, SKUs (with `costCents`), inventory movements, orders, and payments.
 - When seed data changes, remind the user to re-run `pnpm db:seed` (and `pnpm db:migrate` if a migration is included).
+
+---
 
 ## Quality Loop Rules
 
-MUST
+MUST:
 
-- After making a behavior change (API or web), remind the user to manually test the change locally before we commit/push, to avoid churning on buggy commits.
-- When reminding to test, always include: scope (what changed), exact test steps/commands, and expected behavior.
-- If the manual testing is not UI-doable, label it `API-only` and include `curl` examples.
+- After making a behavior change (API or web), remind the user to manually test the change locally before committing/pushing.
+- Testing is always UI + API only — no automated test suites. User tests via browser (UI) and curl/Postman (API).
+- When reminding to test, always provide both:
+  - **API test:** curl command or Postman instructions (method, URL, headers, body)
+  - **UI test:** exact steps in the browser (where to navigate, what to do, what to expect)
+- If a change is API-only (no UI yet), label it `API-only` and provide curl/Postman steps only.
 
-## White-Label Rule
+---
 
-MUST
-
-- Avoid hard-coding tenant-specific business names, copy, or assets in shared components.
-- Tenant branding is token-driven (CSS variables + settings), and must be overrideable per tenant.
-- URLs, email templates, and UI strings should be designed to be tenant-aware later.
-
-## API Conventions (Baseline)
+## API Conventions
 
 - REST only.
 - Consistent JSON error shape.
-- UUIDs for identifiers.
-- No PII/secrets in logs.
+- UUIDs for all identifiers.
+- No PII or secrets in logs.
+- All tenant-scoped endpoints derive `tenantId` from auth context, never from request body/params.
+
+---
+
+## Frontend Rules
+
+- Tenant-scoped routes: `/t/:tenantSlug/...`
+- Super Admin routes: `/admin/...`
+- No public marketplace routes in MVP.
+- Tenant branding is token-driven (CSS variables + tenant settings) — not hardcoded.
+- Support light/dark mode via `next-themes`.
+- No custom domains in MVP.
+
+---
 
 ## Authentication Roadmap
 
-LATER (not Phase 1 unless explicitly pulled in)
+LATER (not MVP unless explicitly pulled in):
 
-- OAuth/OIDC social login (Google, Facebook/Meta) for account creation and login.
+- OAuth/OIDC social login (Google, Facebook/Meta).
 - Keep auth design compatible with multiple identity providers.
-- Do not block Phase 1 on social login; implement email/password or magic link first (Milestone 2).
-- Do not implement features that are not listed in `docs/MILESTONES.md`.
-- If a feature becomes necessary, update the milestone doc first, then implement.
+- Do not block MVP on social login — email/password only for now.
