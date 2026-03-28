@@ -140,6 +140,7 @@ MUST:
 - Keep `main` green (lint/typecheck/tests passing) before merge.
 - Multiple PRs per milestone are allowed if each PR is labeled with the milestone and purpose.
 - Start new branches from an up-to-date `main` unless intentionally stacking PRs.
+- **Never commit or push without explicit confirmation from the user.** Always present the staged changes and ask "Ready to commit?" before running `git commit`. Never run `git push` — user handles all pushes manually via CLI.
 
 SHOULD:
 
@@ -184,8 +185,11 @@ MUST:
 MUST:
 
 - After making a behavior change (API or web), remind the user to manually test the change locally before committing/pushing.
-- When reminding to test, always include: scope (what changed), exact test steps/commands, and expected behavior.
-- If the manual test is not UI-doable, label it `API-only` and include `curl` examples.
+- Testing is always UI + API only — no automated test suites. User tests via browser (UI) and curl/Postman (API).
+- When reminding to test, always provide both:
+  - **API test:** curl command or Postman instructions (method, URL, headers, body)
+  - **UI test:** exact steps in the browser (where to navigate, what to do, what to expect)
+- If a change is API-only (no UI yet), label it `API-only` and provide curl/Postman steps only.
 
 ---
 
