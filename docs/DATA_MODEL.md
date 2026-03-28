@@ -1,7 +1,8 @@
 # Data Model
 
-> Last updated: 2026-03-28 — MS5: Order and OrderItem implemented. MS6: Payment implemented.
-> Added costCents + barcode to SKU. Added businessType + features to Tenant.
+> Last updated: 2026-03-29 — Bug fixes: negative stock prevention enforced for OUT movements and order confirmation;
+> CONFIRMED→CANCELLED now restores inventory. Added quantity cap (max 10,000/line) and totalCents overflow guard (~$21M).
+> Future: migrate totalCents to Decimal/BigInt for enterprise-scale orders.
 
 ---
 
@@ -128,7 +129,8 @@
 **Rules:**
 - Every stock change MUST create an `InventoryMovement` record.
 - Backend enforces this — no silent stock updates.
-- Negative stock prevention is optional validation (can be added in MS8 hardening).
+- `OUT` movements are rejected if `quantity > stockOnHand` — negative stock is prevented at the service layer.
+- `ADJUSTMENT` movements may produce negative stock intentionally (e.g. write-offs after a count). No guard on ADJUSTMENT.
 
 ---
 
@@ -139,9 +141,14 @@
 | id | UUID | PK |
 | tenantId | UUID | FK → Tenant |
 | status | Enum | `PENDING`, `CONFIRMED`, `COMPLETED`, `CANCELLED` |
-| totalCents | Int | Sum of all OrderItem (quantity × priceAtTime) |
+| totalCents | Int | Sum of all OrderItem (quantity × priceAtTime). Postgres `Int` — max ~$21M per order. |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
+
+**Rules:**
+- `totalCents` is computed at order creation and not updated afterward.
+- Orders with a computed `totalCents` exceeding 2,147,483,647 (~$21M) are rejected with a 400 before insert.
+- **Future:** migrate `totalCents` to `Decimal` or `BigInt` if enterprise-scale orders (>$21M) are required. Blocked on JSON serialization strategy for BigInt in NestJS responses.
 
 ---
 
@@ -152,12 +159,15 @@
 | id | UUID | PK |
 | orderId | UUID | FK → Order |
 | skuId | UUID | FK → Sku |
-| quantity | Int | |
+| quantity | Int | Max 10,000 per line item (DTO enforced) |
 | priceAtTime | Int | Snapshot of SKU priceCents at order creation |
 
 **Rules:**
 - `priceAtTime` is captured at order creation and never updated — preserves historical accuracy.
-- On order CONFIRMED, an `InventoryMovement` of type `OUT` is automatically logged per OrderItem.
+- `quantity` is capped at 10,000 per line item via DTO validation. Split large orders across multiple line items or orders if needed.
+- On order `CONFIRMED`, stock availability is checked inside a transaction before any movement is logged. Rejects if `stockOnHand < quantity` for any item.
+- On order `CONFIRMED`, an `InventoryMovement` of type `OUT` is automatically logged per item and `stockOnHand` is decremented.
+- On order `CANCELLED` from `CONFIRMED`, an `InventoryMovement` of type `IN` is automatically logged per item and `stockOnHand` is restored. Cancelling a `PENDING` order has no inventory effect.
 
 ---
 
