@@ -47,17 +47,18 @@ model User {
 }
 
 model Tenant {
-  id              String             @id @default(uuid()) @db.Uuid
-  name            String
-  slug            String             @unique
-  createdByUserId String             @db.Uuid
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id                 String              @id @default(uuid()) @db.Uuid
+  name               String
+  slug               String              @unique
+  createdByUserId    String              @db.Uuid
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
-  createdByUser   User               @relation("TenantCreatedBy", fields: [createdByUserId], references: [id])
-  memberships     TenantMembership[]
-  products        Product[]
-  skus            Sku[]
+  createdByUser      User                @relation("TenantCreatedBy", fields: [createdByUserId], references: [id])
+  memberships        TenantMembership[]
+  products           Product[]
+  skus               Sku[]
+  inventoryMovements InventoryMovement[]
 }
 
 model Category {
@@ -89,20 +90,23 @@ model Product {
 }
 
 model Sku {
-  id                String   @id @default(uuid()) @db.Uuid
-  tenantId          String   @db.Uuid
-  productId         String   @db.Uuid
-  code              String
-  name              String
-  priceCents        Int?
-  stockOnHand       Int      @default(0)
-  lowStockThreshold Int      @default(0)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String              @id @default(uuid()) @db.Uuid
+  tenantId           String              @db.Uuid
+  productId          String              @db.Uuid
+  code               String
+  name               String
+  priceCents         Int?
+  costCents          Int?
+  barcode            String?
+  stockOnHand        Int                 @default(0)
+  lowStockThreshold  Int                 @default(0)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
-  tenant            Tenant   @relation(fields: [tenantId], references: [id])
-  product           Product  @relation(fields: [productId], references: [id])
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  product            Product             @relation(fields: [productId], references: [id])
+  inventoryMovements InventoryMovement[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -125,4 +129,33 @@ model TenantMembership {
   @@unique([tenantId, userId])
   @@index([userId])
   @@index([tenantId])
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum ReferenceType {
+  ORDER
+  MANUAL
+}
+
+model InventoryMovement {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  skuId         String        @db.Uuid
+  type          MovementType
+  quantity      Int
+  referenceType ReferenceType
+  referenceId   String?
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  sku           Sku           @relation(fields: [skuId], references: [id])
+
+  @@index([tenantId])
+  @@index([skuId])
 }

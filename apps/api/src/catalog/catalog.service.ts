@@ -105,7 +105,8 @@ export class CatalogService {
     code: string;
     name: string;
     priceCents?: number;
-    stockOnHand?: number;
+    costCents?: number;
+    barcode?: string;
     lowStockThreshold?: number;
   }) {
     const product = await this.prisma.product.findUnique({
@@ -124,7 +125,9 @@ export class CatalogService {
           code,
           name: data.name.trim(),
           priceCents: data.priceCents ?? null,
-          stockOnHand: data.stockOnHand ?? 0,
+          costCents: data.costCents ?? null,
+          barcode: data.barcode?.trim() || null,
+          stockOnHand: 0,
           lowStockThreshold: data.lowStockThreshold ?? 0,
         },
       });
@@ -136,7 +139,8 @@ export class CatalogService {
   async updateSku(tenantId: string, skuId: string, data: {
     name?: string;
     priceCents?: number;
-    stockOnHand?: number;
+    costCents?: number;
+    barcode?: string;
     lowStockThreshold?: number;
     isActive?: boolean;
   }) {
@@ -152,10 +156,12 @@ export class CatalogService {
       data: {
         name: data.name?.trim(),
         priceCents: data.priceCents === undefined ? undefined : data.priceCents ?? null,
-        stockOnHand: data.stockOnHand,
+        costCents: data.costCents === undefined ? undefined : data.costCents ?? null,
+        barcode: data.barcode === undefined ? undefined : data.barcode?.trim() || null,
         lowStockThreshold: data.lowStockThreshold,
         isActive: data.isActive,
       },
     });
   }
+
 }
