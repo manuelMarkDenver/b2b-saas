@@ -2,8 +2,7 @@
 
 This project is delivered milestone-by-milestone. Do not pull work forward.
 
-> Last updated: 2026-03-28 — Realigned from marketplace-first to ERP-lite modular platform.
-> Marketplace, mobile, and POS are future phases (Phase 5+). Do NOT implement.
+> Last updated: 2026-03-28 — Audit pass: added production-critical items to MS8, moved UI overhaul into MS8, added Post-MVP notification, OAuth, low-stock, audit-log, and order-reference sections.
 
 ---
 
@@ -59,7 +58,7 @@ Definition of done:
 
 ---
 
-## Milestone 4 - Inventory Movement
+## Milestone 4 - Inventory Movement ✅
 
 Definition of done:
 
@@ -75,7 +74,7 @@ Definition of done:
 
 ---
 
-## Milestone 5 - Orders
+## Milestone 5 - Orders ✅
 
 Definition of done:
 
@@ -91,7 +90,7 @@ Definition of done:
 
 ---
 
-## Milestone 6 - Payments (Manual Verification)
+## Milestone 6 - Payments (Manual Verification) ✅
 
 Definition of done:
 
@@ -108,7 +107,7 @@ Definition of done:
 
 ---
 
-## Milestone 7 - Feature Flags + Super Admin Controls
+## Milestone 7 - Feature Flags + Super Admin Controls ✅
 
 Definition of done:
 
@@ -123,38 +122,160 @@ Definition of done:
 
 ---
 
-## Milestone 8 - Hardening + Seed + QA + Staging/Prod Prep
+## Milestone 8 - Hardening + UI Overhaul + Prod Prep
 
 Definition of done:
 
-- Seed data expanded: 3 realistic businesses (hardware store, food supplier, retail shop) with products, SKUs, inventory, orders, payments.
+### Security + API hardening
+
+- **Password reset flow**: `POST /auth/forgot-password` + `POST /auth/reset-password`. Sends a time-limited token via email. Required before any real user can recover their account.
+- **Rate limiting**: `@nestjs/throttler` on all auth endpoints (`/auth/login`, `/auth/register`, `/auth/forgot-password`). Blocks brute force.
+- **Security headers**: Helmet middleware on the NestJS app. One-line add, production hygiene.
+- **CORS**: Explicit allowed origins configured for production (not wildcard). Coordinated with Vercel deployment URL.
+- **Negative stock prevention**: Enforce in `InventoryService` and `OrdersService` — reject movements or order confirmations that would push `stockOnHand` below zero.
+- **Order cancellation restores inventory**: When a `CONFIRMED` order is cancelled, automatically log an `IN` movement to restore stock. (Currently: stock deducted on CONFIRMED, but not restored on CANCELLED.)
+- **Pagination**: All list endpoints (`GET /orders`, `GET /payments`, `GET /inventory/movements`, `GET /catalog/skus`) must accept `?page=1&limit=20` and return paginated results. Unbounded list queries are a production performance risk.
+- **JWT expiry**: `JWT_EXPIRES_IN_SECONDS` already exists in env. Document and enforce a sensible default (86400 = 24h). No refresh tokens in MVP — users re-login after expiry. Revisit post-MVP.
+
+### Super Admin + Tenant lifecycle
+
+- **Super Admin tenant provisioning**: `POST /admin/tenants` — Super Admin creates tenants directly with businessType + default features. Currently only possible via seed.
+- **Tenant suspend/reactivate**: Add `status` enum (`ACTIVE`, `SUSPENDED`) to `Tenant` model (migration required). Super Admin can suspend or reactivate. Suspended tenants are blocked at the guard layer — all data preserved. Hard delete not supported.
+- **Super Admin user management**: Super Admin can promote another user to Super Admin via `PATCH /admin/users/:id` (currently only possible via seed/DB).
+- **Product/SKU archival**: Add `isArchived: boolean` to `Sku` (and optionally `Product`). Archived SKUs cannot receive new orders but remain on historical records. Exposed via Super Admin or tenant OWNER/ADMIN.
+
+### Deferred UX items from earlier milestones
+
+- Root `/` page: replace dev convenience landing page with a redirect to `/login`.
+- Tenant route guard: `/t/[tenantSlug]` shows API 403 for non-members instead of redirecting. Add page-level membership check that redirects to the user's tenant or `/login`.
+- Tenant staff invitation flow: UI for tenant owners to invite users as staff members (memberships API exists, invite flow does not).
+
+### UI overhaul (replace scaffolding panels with production UI)
+
+- Proper application shell: sidebar navigation, top header, breadcrumbs.
+- Data tables with sorting, filtering, and pagination for orders, SKUs, inventory movements.
+- Modals for create/edit flows (orders, SKUs, products).
+- Tabs for switching between related views (e.g. Products / SKUs / Movements).
+- Status badges, action menus, confirmation dialogs.
+- Wire toast/alert system consistently across all panels.
+- Orders: proper cards with SKU line-items, cleaner breakdown.
+- Payments: show order summary inline.
+- Mobile-responsive layout.
+- Use AI-generated + optimized images for product placeholders (`/generate-image`, `/optimize-images` skills).
+
+### QA + deployment
+
+- Seed data expanded: 3 realistic businesses with products, SKUs, inventory, orders, payments — all with `isArchived`, `status`, and pagination-friendly record counts.
 - Tenant isolation audit: run `/tenant-audit` and resolve all violations.
 - QA checklist completed.
-- Staging/prod readiness: env checklist, Vercel + Render + Neon Postgres deployment verified.
+- Staging/prod deployment verified: Vercel (web) + Render (API) + Neon Postgres (DB).
+- All env vars documented in `ENVIRONMENT.md` and `.env.example` current.
 - All docs reflect final state.
 
-Deferred UX items to resolve in this milestone:
-
-- Root `/` page: currently a dev convenience landing page (tenant picker + login/register links). Replace with a proper entry point or redirect to `/login`.
-- Tenant route guard: `/t/[tenantSlug]` renders the UI shell even for users without membership in that tenant — shows API 403 instead of redirecting. Add page-level membership check that redirects to the user's own tenant or `/login`.
+Notes on data retention and soft deletes:
+- `Order`, `Payment`, `InventoryMovement` are immutable financial records — no delete, no soft delete.
+- `Product` / `SKU` use `isArchived` flag — added in this milestone.
+- `Membership` records are deactivated (`status: INACTIVE`), not deleted.
+- `User` records are never deleted.
+- `Tenant` records use `SUSPENDED` status — never hard-deleted.
+- Full `deletedAt` soft-delete columns are NOT used — entity-specific patterns are cleaner.
 
 ---
 
-## Post-MVP: UI/UX Polish (after MS8)
+## Post-MVP: Notifications Module (after MS8)
 
-To be scoped after MS8 is complete. Do NOT implement during MS1–MS8.
+Design a channel-agnostic `NotificationModule` that fires on business events.
 
-- Replace dev-panel UI with a proper application shell: sidebar navigation, top header, breadcrumbs
-- Data tables with sorting, filtering, and pagination for orders, SKUs, inventory movements
-- Modals for create/edit flows (orders, SKUs, products)
-- Tabs for switching between related views (e.g. Products / SKUs / Movements)
-- Status badges, action menus, confirmation dialogs
-- Toast/alert system already in place — wire it consistently across all panels
-- Orders list: replace text rows with proper cards (SKU images placeholder, cleaner item breakdown)
-- Payments list: show order summary inline, clearer payment/order relationship
-- Mobile-responsive layout
+**Supported channels (in priority order):**
+1. **Email** — transactional email via Resend or Nodemailer + SMTP. Also required for password reset (MS8). Set up email first.
+2. **Meta Cloud API (Messenger + WhatsApp Business)** — send Messenger or WhatsApp messages to tenant owners/staff. Best fit for markets (PH/SEA) where Messenger/WhatsApp is primary business comms. Tenant configures their Page ID or WhatsApp Business number in tenant settings.
+3. **SMS** — Twilio or local SMS gateway. Lower priority than Messenger for target market.
 
-**Why deferred:** MS5–MS8 panels are scaffolding to verify API correctness. The final UI shape depends on knowing all module data and flows, which isn't finalized until MS8.
+**Events to notify:**
+| Event | Who receives | Why |
+|---|---|---|
+| `order.created` | Tenant owner/admin | New sale arrived |
+| `order.status_changed` (CONFIRMED) | Customer ref if stored | Order being processed |
+| `payment.submitted` | Tenant staff who can verify | Payment needs action |
+| `payment.verified` | Tenant owner | Sale confirmed |
+| `payment.rejected` | Tenant owner | Payment issue |
+| `stock.low` | Tenant owner/admin | SKU below `lowStockThreshold` — needs reorder |
+| `tenant.staff_added` | Tenant owner | New staff access granted |
+
+**Architecture:**
+- `NotificationModule` is channel-agnostic — each channel is a strategy implementation.
+- Per-tenant config: `notificationSettings` JSONB on `Tenant` — stores which channels are enabled + credentials (page ID, phone number).
+- Notification events are dispatched from existing service methods (orders, payments, inventory).
+- Fire-and-forget (do not block the main request). Use a job queue (BullMQ) or just async Promise — BullMQ preferred for reliability.
+
+**Why deferred:** Requires email infrastructure to be set up (Resend/SMTP). Meta Cloud API requires Facebook App review for production. Better to ship this as a complete module post-MS8 than half-build it during hardening.
+
+---
+
+## Post-MVP: Low Stock Threshold + Alerts (after MS8)
+
+- Add `lowStockThreshold: Int?` field to `Sku`.
+- When `stockOnHand` drops to or below `lowStockThreshold` after any `InventoryMovement`, fire a `stock.low` event.
+- Tenant OWNER/ADMIN can set `lowStockThreshold` per SKU.
+- Dashboard widget: "Low Stock SKUs" list per tenant.
+- Integrates with Notifications Module (`stock.low` → Messenger/email alert).
+
+**Why deferred:** `lowStockThreshold` on SKU is a schema addition with no value until the notification channel is in place. Ship together with the Notifications Module.
+
+---
+
+## Post-MVP: OAuth / Social Login (after MS8)
+
+- Google OAuth + Facebook/Meta OAuth.
+- Use `passport-google-oauth20` and `passport-facebook` strategies.
+- Auth design must NOT change — JWT is still issued after OAuth login. OAuth is just an alternative identity verification step.
+- Add `oauthProvider` + `oauthProviderId` fields to `User` — email/password and OAuth can coexist.
+- Do NOT require social login — it must be opt-in alongside email/password.
+
+**Why deferred:** Email/password is sufficient for MVP. Social login requires OAuth app registration, redirect URI configuration, and testing across providers. Not worth the complexity before MS8.
+
+---
+
+## Post-MVP: Queryable Audit Log Table (after MS8)
+
+- Replace logger-only audit events with a real `AuditLog` table.
+- Fields: `id`, `tenantId`, `userId`, `event`, `entityType`, `entityId`, `before` (JSONB), `after` (JSONB), `createdAt`.
+- Super Admin can query audit logs across tenants. Tenant admins can query their own.
+- Useful for: debugging, compliance, "who changed this order?" questions.
+
+**Why deferred:** Logger events are sufficient for MVP. A real audit table is high value for enterprise clients but adds write overhead to every mutation. Design after data model is stable.
+
+---
+
+## Post-MVP: Order Customer Reference (after MS8)
+
+- Add `customerRef: String?` and `note: String?` to `Order`.
+- `customerRef`: e.g. "PO #12345", "Acme Corp order". Staff-assigned reference for B2B order tracking.
+- `note`: free-text internal note.
+- Exposed in the order create/update flow.
+
+**Why deferred:** MVP proves the order flow works. Customer references are a UX improvement that doesn't affect correctness. Add when the UI overhaul is done (MS8) or immediately after.
+
+---
+
+## Post-MVP: Bulk Data Import (after MS8)
+
+- CSV upload for bulk Product + SKU creation per tenant.
+- Universal CSV shape (name, sku_code, price_cents, cost_cents, category_slug, low_stock_threshold) — same format regardless of `businessType`.
+- Validation: duplicate SKU codes, unknown categories, missing required fields reported per row.
+- S3 or local file handling for upload (coordinate with Phase 8 AWS work).
+- `businessType` does NOT change CSV shape — it only sets default feature flags on tenant creation.
+
+**Why deferred:** Not needed for platform to function. High value before real customer onboarding. Scope after MS8 when all data models are stable.
+
+---
+
+## Post-MVP: Advanced User Management (after MS8)
+
+- Super Admin PBAC: configurable permissions per platform admin (read-only admin, billing-only admin, etc.) — currently `isPlatformAdmin` is boolean only.
+- Cross-tenant relationships: tenant A granting tenant B specific access (supplier/reseller model) — needs design work before implementation; could overlap with Marketplace phase.
+
+**Why deferred:** Current Super Admin model (boolean `isPlatformAdmin`) is sufficient for MVP. Cross-tenant relationships need product design before engineering.
 
 ---
 
@@ -165,6 +286,6 @@ To be scoped after MS8 is complete. Do NOT implement during MS1–MS8.
 | Phase 5 | Mobile app (React Native / Expo) — staff-focused, offline-first |
 | Phase 6 | POS + Barcode scanning (mobile-based, uses Orders + Payments) |
 | Phase 7 | Marketplace — customer-facing UI, multi-tenant selling |
-| Phase 8 | AWS scaling — ECS, RDS, S3, CloudFront, subdomain routing |
+| Phase 8 | AWS scaling — ECS, RDS, S3, CloudFront, **subdomain routing per tenant** (e.g. `acme.yourplatform.com`) |
 
 If a feature belongs to Phase 5+, do NOT implement. Document it and assign to the appropriate future phase.

@@ -140,6 +140,30 @@ Example capabilities: `can_manage_inventory`, `can_create_orders`, `can_verify_p
 
 ---
 
+## Data Retention and Deletion Policy
+
+**Immutable records (never delete or soft-delete):**
+- `Order`, `OrderItem`, `Payment`, `InventoryMovement` — financial records. No delete endpoint, no `deletedAt`. Append-only by design.
+
+**Archival pattern (entity-specific flag, not `deletedAt`):**
+- `Product` / `Sku` — `isArchived: boolean` when introduced. Archived SKUs remain on historical orders but cannot be ordered again.
+
+**Deactivation pattern:**
+- `Membership` — `isActive: false` removes user access without destroying the record. Audit trail of who had access is preserved.
+- `User` — never deleted. Memberships are deactivated instead.
+
+**Tenant lifecycle:**
+- `Tenant.status` enum: `ACTIVE | SUSPENDED`. Super Admin can suspend or reactivate.
+- A suspended tenant is blocked at the guard layer — all data is preserved.
+- Hard delete of a tenant is NOT supported (would cascade-destroy orders, payments, movements).
+
+**Why not global soft deletes (`deletedAt` on every table):**
+- Most entities should not be deletable at all — adding `deletedAt` implies deletion is valid.
+- Requires `WHERE deletedAt IS NULL` on every query — easily forgotten, fragile over time.
+- Entity-specific patterns (archival, suspension, deactivation) are explicit and fit the domain.
+
+---
+
 ## White-Label Considerations
 
 - Treat branding as data (tenant settings: name, logo, theme tokens)
