@@ -1,6 +1,6 @@
 # Data Model
 
-> Last updated: 2026-03-28 — Added InventoryMovement, Order, OrderItem, Payment models.
+> Last updated: 2026-03-28 — MS5: Order and OrderItem implemented. InventoryMovement, Payment models documented.
 > Added costCents + barcode to SKU. Added businessType + features to Tenant.
 
 ---

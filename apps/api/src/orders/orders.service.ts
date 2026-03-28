@@ -1,0 +1,176 @@
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { OrderStatus, ReferenceType, MovementType } from '@prisma/client';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+
+@Injectable()
+export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createOrder(tenantId: string, dto: CreateOrderDto) {
+    const skuIds = dto.items.map((i) => i.skuId);
+
+    const skus = await this.prisma.sku.findMany({
+      where: { id: { in: skuIds }, tenantId },
+      select: { id: true, priceCents: true, isActive: true },
+    });
+
+    if (skus.length !== skuIds.length) {
+      throw new NotFoundException('One or more SKUs not found for this tenant');
+    }
+
+    const inactiveSkus = skus.filter((s) => !s.isActive);
+    if (inactiveSkus.length > 0) {
+      throw new BadRequestException('One or more SKUs are inactive');
+    }
+
+    const skuMap = new Map(skus.map((s) => [s.id, s]));
+
+    let totalCents = 0;
+    const itemsData = dto.items.map((item) => {
+      const sku = skuMap.get(item.skuId)!;
+      const priceAtTime = sku.priceCents ?? 0;
+      totalCents += priceAtTime * item.quantity;
+      return {
+        skuId: item.skuId,
+        quantity: item.quantity,
+        priceAtTime,
+      };
+    });
+
+    const order = await this.prisma.order.create({
+      data: {
+        tenantId,
+        totalCents,
+        items: { create: itemsData },
+      },
+      include: {
+        items: {
+          include: { sku: { select: { id: true, code: true, name: true } } },
+        },
+      },
+    });
+
+    this.logger.log(`order.created tenantId=${tenantId} orderId=${order.id}`);
+    return order;
+  }
+
+  listOrders(tenantId: string) {
+    return this.prisma.order.findMany({
+      where: { tenantId },
+      include: {
+        items: {
+          include: { sku: { select: { id: true, code: true, name: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getOrder(tenantId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { sku: { select: { id: true, code: true, name: true } } },
+        },
+      },
+    });
+
+    if (!order || order.tenantId !== tenantId) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
+  }
+
+  async updateOrderStatus(
+    tenantId: string,
+    orderId: string,
+    dto: UpdateOrderStatusDto,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order || order.tenantId !== tenantId) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+      CONFIRMED: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+      COMPLETED: [],
+      CANCELLED: [],
+    };
+
+    if (!validTransitions[order.status].includes(dto.status)) {
+      throw new BadRequestException(
+        `Cannot transition order from ${order.status} to ${dto.status}`,
+      );
+    }
+
+    if (dto.status === OrderStatus.CONFIRMED) {
+      return this.prisma.$transaction(async (tx) => {
+        for (const item of order.items) {
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId,
+              skuId: item.skuId,
+              type: MovementType.OUT,
+              quantity: item.quantity,
+              referenceType: ReferenceType.ORDER,
+              referenceId: order.id,
+            },
+          });
+
+          await tx.sku.update({
+            where: { id: item.skuId },
+            data: { stockOnHand: { decrement: item.quantity } },
+          });
+        }
+
+        const updated = await tx.order.update({
+          where: { id: orderId },
+          data: { status: dto.status },
+          include: {
+            items: {
+              include: {
+                sku: { select: { id: true, code: true, name: true } },
+              },
+            },
+          },
+        });
+
+        this.logger.log(
+          `order.status_changed tenantId=${tenantId} orderId=${orderId} status=${dto.status}`,
+        );
+        return updated;
+      });
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: dto.status },
+      include: {
+        items: {
+          include: { sku: { select: { id: true, code: true, name: true } } },
+        },
+      },
+    });
+
+    this.logger.log(
+      `order.status_changed tenantId=${tenantId} orderId=${orderId} status=${dto.status}`,
+    );
+    return updated;
+  }
+}

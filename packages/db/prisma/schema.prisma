@@ -59,6 +59,7 @@ model Tenant {
   products           Product[]
   skus               Sku[]
   inventoryMovements InventoryMovement[]
+  orders             Order[]
 }
 
 model Category {
@@ -107,6 +108,7 @@ model Sku {
   tenant             Tenant              @relation(fields: [tenantId], references: [id])
   product            Product             @relation(fields: [productId], references: [id])
   inventoryMovements InventoryMovement[]
+  orderItems         OrderItem[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -140,6 +142,41 @@ enum MovementType {
 enum ReferenceType {
   ORDER
   MANUAL
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id         String      @id @default(uuid()) @db.Uuid
+  tenantId   String      @db.Uuid
+  status     OrderStatus @default(PENDING)
+  totalCents Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  items      OrderItem[]
+
+  @@index([tenantId])
+}
+
+model OrderItem {
+  id          String @id @default(uuid()) @db.Uuid
+  orderId     String @db.Uuid
+  skuId       String @db.Uuid
+  quantity    Int
+  priceAtTime Int
+
+  order       Order  @relation(fields: [orderId], references: [id])
+  sku         Sku    @relation(fields: [skuId], references: [id])
+
+  @@index([orderId])
+  @@index([skuId])
 }
 
 model InventoryMovement {
