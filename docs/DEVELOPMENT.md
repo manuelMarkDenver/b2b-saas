@@ -97,8 +97,9 @@ Default password for all non-admin seed users: `Password123!` (overrideable via 
 ## Testing
 
 ### API Tests (Claude's responsibility)
-- Claude runs curl-based tests against the local API after every implementation
+- Claude writes and runs E2E tests (Jest + Supertest) after every API implementation
 - Tests are run before asking the user to commit
+- Do NOT use curl for API testing — use E2E tests only
 - See `RULES.md` for the full testing policy
 
 ### UI Tests (User's responsibility)
