@@ -256,6 +256,31 @@ See `docs/DEVELOPMENT.md` for how to run tests locally.
 
 ---
 
+## Image Rules
+
+MUST:
+
+- All images committed to the repo must be optimized. Run `/optimize-images` before any PR that includes new image assets.
+- Use WebP format for all product and UI images — 25–35% smaller than JPEG at equivalent quality.
+- Use the Next.js `<Image>` component (not raw `<img>`) for all images in the web app — handles lazy loading, format negotiation, and resizing automatically.
+- Maximum image dimensions: 1200×900 for product images, 1200×630 for OG/social images.
+- Target file size: ≤150KB per image after optimization.
+
+SHOULD:
+
+- Use the `/generate-image` skill to generate AI product images (FLUX Schnell via Replicate). Requires `REPLICATE_API_TOKEN` in env.
+- Use the `/optimize-images` skill to batch-optimize existing images before deployment.
+- Store product/UI images in `apps/web/public/images/` with a clear subfolder structure (e.g. `products/`, `ui/`, `generated/`).
+- Prefer AI-generated placeholder images over lorem picsum or generic stock photos for product demos.
+
+MUST NOT:
+
+- Commit unoptimized PNG/JPEG images directly — always convert to WebP first.
+- Store large images (>500KB) in the repo.
+- Use `<img>` tags directly in Next.js components — always use the `<Image>` component.
+
+---
+
 ## Authentication Roadmap
 
 LATER (not MVP unless explicitly pulled in):
