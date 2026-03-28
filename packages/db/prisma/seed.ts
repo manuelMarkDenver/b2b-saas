@@ -1,4 +1,4 @@
-import { PrismaClient, MovementType, OrderStatus, ReferenceType } from "@prisma/client";
+import { PrismaClient, MovementType, OrderStatus, PaymentStatus, ReferenceType } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -454,6 +454,69 @@ async function main() {
     items: [{ skuId: cleanerSku.id, quantity: 6, priceCents: cleanerSku.priceCents ?? 28500 }],
     status: OrderStatus.CANCELLED,
   });
+
+  // --- Seed Payments ---
+
+  async function seedPayment(opts: {
+    tenantId: string;
+    orderId: string;
+    amountCents: number;
+    status: PaymentStatus;
+    proofUrl?: string;
+  }) {
+    const existing = await prisma.payment.count({ where: { orderId: opts.orderId } });
+    if (existing > 0) return;
+
+    await prisma.payment.create({
+      data: {
+        tenantId: opts.tenantId,
+        orderId: opts.orderId,
+        amountCents: opts.amountCents,
+        status: opts.status,
+        proofUrl: opts.proofUrl ?? null,
+      },
+    });
+  }
+
+  // Get seeded orders to attach payments to
+  const hwConfirmed = await prisma.order.findFirst({
+    where: { tenantId: hardwareTenant.id, status: OrderStatus.CONFIRMED },
+  });
+  const foodCompleted = await prisma.order.findFirst({
+    where: { tenantId: foodTenant.id, status: OrderStatus.COMPLETED },
+  });
+  const retailPending = await prisma.order.findFirst({
+    where: { tenantId: retailTenant.id, status: OrderStatus.PENDING },
+  });
+
+  if (hwConfirmed) {
+    await seedPayment({
+      tenantId: hardwareTenant.id,
+      orderId: hwConfirmed.id,
+      amountCents: hwConfirmed.totalCents,
+      status: PaymentStatus.VERIFIED,
+      proofUrl: "https://example.com/receipts/peak-hw-001.jpg",
+    });
+  }
+
+  if (foodCompleted) {
+    await seedPayment({
+      tenantId: foodTenant.id,
+      orderId: foodCompleted.id,
+      amountCents: foodCompleted.totalCents,
+      status: PaymentStatus.VERIFIED,
+      proofUrl: "https://example.com/receipts/metro-pizza-001.jpg",
+    });
+  }
+
+  if (retailPending) {
+    await seedPayment({
+      tenantId: retailTenant.id,
+      orderId: retailPending.id,
+      amountCents: retailPending.totalCents,
+      status: PaymentStatus.PENDING,
+    });
+  }
 
   console.log("✓ Admin:", admin.email);
   console.log("✓ Tenants:", hardwareTenant.slug, "|", foodTenant.slug, "|", retailTenant.slug);

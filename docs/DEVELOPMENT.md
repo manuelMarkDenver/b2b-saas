@@ -109,7 +109,23 @@ Default password for all non-admin seed users: `Password123!` (overrideable via 
 - Located in `apps/api/test/`
 - Run with: `pnpm --filter api test:e2e`
 - Required for every new API endpoint before merging a PR
-- Use a dedicated test database (set `DATABASE_URL` to a test DB in test setup)
+- Tests run against a **separate test database** (`b2b_saas_test`) — never the dev DB
+
+**One-time test DB setup (run once after cloning):**
+```bash
+# Create the test database
+PGPASSWORD=postgres psql -h localhost -p 5442 -U postgres -c "CREATE DATABASE b2b_saas_test;"
+
+# Apply all migrations
+DATABASE_URL="postgresql://postgres:postgres@localhost:5442/b2b_saas_test?schema=public" \
+  npx prisma migrate deploy --schema=./packages/db/prisma/schema.prisma
+
+# Seed test data
+DATABASE_URL="postgresql://postgres:postgres@localhost:5442/b2b_saas_test?schema=public" \
+  npx prisma db seed --schema=./packages/db/prisma/schema.prisma
+```
+
+After each new migration, re-run migrate deploy + seed against the test DB.
 
 ---
 
