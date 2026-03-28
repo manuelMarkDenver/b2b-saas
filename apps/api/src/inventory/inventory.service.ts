@@ -36,6 +36,12 @@ export class InventoryService {
       throw new BadRequestException('Adjustment quantity cannot be zero');
     }
 
+    if (data.type === MovementType.OUT && sku.stockOnHand < data.quantity) {
+      throw new BadRequestException(
+        `Insufficient stock: available ${sku.stockOnHand}, requested ${data.quantity}`,
+      );
+    }
+
     const delta =
       data.type === MovementType.IN
         ? data.quantity

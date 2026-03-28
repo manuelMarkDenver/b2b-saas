@@ -4,6 +4,7 @@ import {
   IsArray,
   IsInt,
   IsUUID,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -14,6 +15,7 @@ export class OrderItemDto {
 
   @IsInt()
   @Min(1)
+  @Max(10000)
   quantity: number;
 }
 

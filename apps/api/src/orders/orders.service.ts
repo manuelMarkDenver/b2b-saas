@@ -46,6 +46,14 @@ export class OrdersService {
       };
     });
 
+    // Guard against Int overflow on the totalCents column (Postgres Int max ~2.1B cents = ~$21M)
+    const INT_MAX = 2_147_483_647;
+    if (totalCents > INT_MAX) {
+      throw new BadRequestException(
+        `Order total exceeds maximum allowed value ($${(INT_MAX / 100).toLocaleString()}). Split into multiple orders.`,
+      );
+    }
+
     const order = await this.prisma.order.create({
       data: {
         tenantId,
@@ -119,8 +127,26 @@ export class OrdersService {
       );
     }
 
+    // CONFIRMED: check stock availability then deduct
     if (dto.status === OrderStatus.CONFIRMED) {
       return this.prisma.$transaction(async (tx) => {
+        // Fetch current stock inside the transaction to prevent race conditions
+        const skuIds = order.items.map((i) => i.skuId);
+        const skus = await tx.sku.findMany({
+          where: { id: { in: skuIds } },
+          select: { id: true, name: true, stockOnHand: true },
+        });
+        const skuMap = new Map(skus.map((s) => [s.id, s]));
+
+        for (const item of order.items) {
+          const sku = skuMap.get(item.skuId)!;
+          if (sku.stockOnHand < item.quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for "${sku.name}": available ${sku.stockOnHand}, required ${item.quantity}`,
+            );
+          }
+        }
+
         for (const item of order.items) {
           await tx.inventoryMovement.create({
             data: {
@@ -158,6 +184,51 @@ export class OrdersService {
       });
     }
 
+    // CANCELLED from CONFIRMED: restore inventory
+    if (
+      dto.status === OrderStatus.CANCELLED &&
+      order.status === OrderStatus.CONFIRMED
+    ) {
+      return this.prisma.$transaction(async (tx) => {
+        for (const item of order.items) {
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId,
+              skuId: item.skuId,
+              type: MovementType.IN,
+              quantity: item.quantity,
+              referenceType: ReferenceType.ORDER,
+              referenceId: order.id,
+              note: 'Stock restored — order cancelled',
+            },
+          });
+
+          await tx.sku.update({
+            where: { id: item.skuId },
+            data: { stockOnHand: { increment: item.quantity } },
+          });
+        }
+
+        const updated = await tx.order.update({
+          where: { id: orderId },
+          data: { status: dto.status },
+          include: {
+            items: {
+              include: {
+                sku: { select: { id: true, code: true, name: true } },
+              },
+            },
+          },
+        });
+
+        this.logger.log(
+          `order.status_changed tenantId=${tenantId} orderId=${orderId} status=${dto.status} inventory_restored=true`,
+        );
+        return updated;
+      });
+    }
+
+    // All other transitions (PENDING→CANCELLED, CONFIRMED→COMPLETED)
     const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: dto.status },

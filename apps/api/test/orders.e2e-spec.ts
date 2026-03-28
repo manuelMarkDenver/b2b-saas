@@ -57,6 +57,16 @@ describe('Orders (e2e)', () => {
       expect(res.status).toBe(400);
     });
 
+    it('returns 400 for quantity > 10000', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 10001 }] });
+
+      expect(res.status).toBe(400);
+    });
+
     it('returns 400 for quantity < 1', async () => {
       const res = await request(app.getHttpServer())
         .post('/orders')
@@ -193,6 +203,78 @@ describe('Orders (e2e)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('CANCELLED');
+    });
+
+    it('restores stock when cancelling a CONFIRMED order', async () => {
+      // Record stock before
+      const skusRes = await request(app.getHttpServer())
+        .get('/skus')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware');
+      const stockBefore = (skusRes.body as Array<{ id: string; stockOnHand: number }>)
+        .find((s) => s.id === skuId)!.stockOnHand;
+
+      // Create + confirm order (deducts stock)
+      const createRes = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 2 }] });
+      const orderId = createRes.body.id as string;
+
+      await request(app.getHttpServer())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ status: 'CONFIRMED' });
+
+      // Cancel (should restore stock)
+      const cancelRes = await request(app.getHttpServer())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ status: 'CANCELLED' });
+
+      expect(cancelRes.status).toBe(200);
+      expect(cancelRes.body.status).toBe('CANCELLED');
+
+      // Verify stock is back to original
+      const skusAfterRes = await request(app.getHttpServer())
+        .get('/skus')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware');
+      const stockAfter = (skusAfterRes.body as Array<{ id: string; stockOnHand: number }>)
+        .find((s) => s.id === skuId)!.stockOnHand;
+
+      expect(stockAfter).toBe(stockBefore);
+    });
+
+    it('returns 400 when confirming order with insufficient stock', async () => {
+      // Read current stock so we order exactly one more than available
+      const skusRes = await request(app.getHttpServer())
+        .get('/skus')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware');
+      const currentStock = (skusRes.body as Array<{ id: string; stockOnHand: number }>)
+        .find((s) => s.id === skuId)!.stockOnHand;
+
+      // Clamp to ≤10000 to stay within DTO max, but still exceed available stock
+      const overStockQty = Math.min(currentStock + 1, 9999);
+      const createRes = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: overStockQty }] });
+      expect(createRes.status).toBe(201);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/orders/${createRes.body.id}/status`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ status: 'CONFIRMED' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/insufficient stock/i);
     });
   });
 });
