@@ -36,6 +36,13 @@ const STATUS_LABELS: Record<Order["status"], string> = {
   CANCELLED: "Cancelled",
 };
 
+const STATUS_COLORS: Record<Order["status"], string> = {
+  PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
+  CONFIRMED: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  COMPLETED: "bg-green-500/15 text-green-600 dark:text-green-400",
+  CANCELLED: "bg-red-500/15 text-red-500",
+};
+
 const NEXT_STATUSES: Partial<Record<Order["status"], Order["status"][]>> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["COMPLETED", "CANCELLED"],
@@ -242,7 +249,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <span className="rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[order.status]}`}>
                     {STATUS_LABELS[order.status]}
                   </span>
                   {next && next.length > 0 ? (

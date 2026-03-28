@@ -150,6 +150,8 @@ To be scoped after MS8 is complete. Do NOT implement during MS1–MS8.
 - Tabs for switching between related views (e.g. Products / SKUs / Movements)
 - Status badges, action menus, confirmation dialogs
 - Toast/alert system already in place — wire it consistently across all panels
+- Orders list: replace text rows with proper cards (SKU images placeholder, cleaner item breakdown)
+- Payments list: show order summary inline, clearer payment/order relationship
 - Mobile-responsive layout
 
 **Why deferred:** MS5–MS8 panels are scaffolding to verify API correctness. The final UI shape depends on knowing all module data and flows, which isn't finalized until MS8.

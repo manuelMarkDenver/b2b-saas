@@ -1,6 +1,6 @@
 # Data Model
 
-> Last updated: 2026-03-28 — MS5: Order and OrderItem implemented. InventoryMovement, Payment models documented.
+> Last updated: 2026-03-28 — MS5: Order and OrderItem implemented. MS6: Payment implemented.
 > Added costCents + barcode to SKU. Added businessType + features to Tenant.
 
 ---
@@ -175,8 +175,10 @@
 
 **Rules:**
 - No payment gateway. Manual verification only.
+- `proofUrl` is an optional plain string URL (e.g. Google Drive, image host). No file upload in MVP — S3/presigned URLs deferred to Phase 8.
 - Staff verifies payment by reviewing proof and marking VERIFIED or REJECTED.
-- Audit log event fired on every status change.
+- Once VERIFIED or REJECTED, status cannot be changed again.
+- Audit log events fired via Logger: `payment.submitted`, `payment.verified`, `payment.rejected`.
 
 ---
 
