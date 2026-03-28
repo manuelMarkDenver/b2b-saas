@@ -40,6 +40,10 @@ export default function Home() {
           <Link className="text-primary" href="/register">
             Register
           </Link>
+          <span className="text-muted-foreground">/</span>
+          <Link className="text-primary" href="/admin">
+            Super Admin
+          </Link>
         </div>
       </main>
     </div>
