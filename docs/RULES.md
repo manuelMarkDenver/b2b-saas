@@ -138,14 +138,35 @@ MUST:
 
 - Do all work on a new branch and merge to `main` via PR.
 - Keep `main` green (lint/typecheck/tests passing) before merge.
-- Multiple PRs per milestone are allowed if each PR is labeled with the milestone and purpose.
+- Multiple PRs per milestone are allowed — docs changes and implementation changes go in separate PRs.
 - Start new branches from an up-to-date `main` unless intentionally stacking PRs.
-- **Never commit or push without explicit confirmation from the user.** Always present the staged changes and ask "Ready to commit?" before running `git commit`. Never run `git push` — user handles all pushes manually via CLI.
+- Do not branch from another feature branch unless you want to carry its commits.
 
 SHOULD:
 
 - Use branch prefixes: `milestone-<n>/...`, `feat/...`, `fix/...`, `chore/...`, `docs/...`.
 - Squash merge PRs to keep history readable.
+
+---
+
+## Commit and Push Workflow
+
+This is the standard workflow for every change:
+
+1. **Claude implements** the change.
+2. **Claude runs API tests** — reports results with expected vs actual.
+3. **User tests UI** (if applicable) — Claude provides exact steps and expected outcomes.
+4. **User gives go signal** — explicit confirmation before any commit.
+5. **Claude commits and pushes** — with a clear commit message, no co-author line.
+6. **User merges** on GitHub via PR.
+7. **User confirms merge** — Claude uses this as the signal to proceed to the next task.
+
+MUST:
+
+- Never commit or push without explicit go signal from the user.
+- Never merge — user handles all merges on GitHub.
+- After user confirms a merge, treat `main` as updated and branch from it for the next task.
+- Separate docs-only changes from implementation changes into separate PRs.
 
 ---
 
@@ -184,12 +205,28 @@ MUST:
 
 MUST:
 
-- After making a behavior change (API or web), remind the user to manually test the change locally before committing/pushing.
-- Testing is always UI + API only — no automated test suites. User tests via browser (UI) and curl/Postman (API).
-- When reminding to test, always provide both:
-  - **API test:** curl command or Postman instructions (method, URL, headers, body)
-  - **UI test:** exact steps in the browser (where to navigate, what to do, what to expect)
-- If a change is API-only (no UI yet), label it `API-only` and provide curl/Postman steps only.
+- After making a behavior change (API or web), testing is required before committing.
+- Testing is UI + API only. API tests are run by Claude. UI tests are done by the user.
+- **API tests are Claude's responsibility.** Run all curl tests against the local API, check every response, and report results before asking the user to commit. Do not hand API tests back to the user.
+- **UI tests are the user's responsibility.** Provide exact browser steps + expected outcome for each step.
+- Every test must include its **expected result** — never list a test step without saying what success looks like.
+- If any API test fails, diagnose and fix before surfacing to user. Do not commit broken code.
+
+---
+
+## E2E Test Rules
+
+MUST:
+
+- Every new API endpoint requires an E2E test (Jest + Supertest) before the PR is merged.
+- E2E tests live in `apps/api/test/`.
+- Run with: `pnpm --filter api test:e2e`
+- E2E tests must use a real database — no mocked Prisma. Use a dedicated test DB.
+- Test at minimum: happy path, tenant isolation (cross-tenant 403), and one validation error.
+- Complex business logic (e.g., delta calculation, status transitions) gets unit tests in addition to E2E.
+- Do NOT write E2E tests that mock the service layer — they must go through the full HTTP stack.
+
+See `docs/DEVELOPMENT.md` for how to run tests locally.
 
 ---
 
