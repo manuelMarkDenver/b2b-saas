@@ -140,6 +140,22 @@ Deferred UX items to resolve in this milestone:
 
 ---
 
+## Post-MVP: UI/UX Polish (after MS8)
+
+To be scoped after MS8 is complete. Do NOT implement during MS1–MS8.
+
+- Replace dev-panel UI with a proper application shell: sidebar navigation, top header, breadcrumbs
+- Data tables with sorting, filtering, and pagination for orders, SKUs, inventory movements
+- Modals for create/edit flows (orders, SKUs, products)
+- Tabs for switching between related views (e.g. Products / SKUs / Movements)
+- Status badges, action menus, confirmation dialogs
+- Toast/alert system already in place — wire it consistently across all panels
+- Mobile-responsive layout
+
+**Why deferred:** MS5–MS8 panels are scaffolding to verify API correctness. The final UI shape depends on knowing all module data and flows, which isn't finalized until MS8.
+
+---
+
 ## Future Phases (DO NOT IMPLEMENT)
 
 | Phase | Scope |

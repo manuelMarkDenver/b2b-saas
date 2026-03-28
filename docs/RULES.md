@@ -207,10 +207,13 @@ MUST:
 
 - After making a behavior change (API or web), testing is required before committing.
 - Testing is UI + API only. API tests are run by Claude. UI tests are done by the user.
-- **API tests are Claude's responsibility.** Run all curl tests against the local API, check every response, and report results before asking the user to commit. Do not hand API tests back to the user.
+- **API tests are Claude's responsibility.** Write and run E2E tests (Jest + Supertest) — do NOT use curl for API testing. Curl wastes tokens and is not reusable. Run `pnpm --filter api test:e2e` and report pass/fail before asking the user to commit.
+- Every new API endpoint requires an E2E test covering: happy path, validation error, tenant isolation (cross-tenant 403), and invalid transitions where applicable.
+- Shared test helpers live in `apps/api/test/helpers/`. Use `createTestApp()` and `loginAs()` for all E2E tests.
 - **UI tests are the user's responsibility.** Provide exact browser steps + expected outcome for each step.
 - Every test must include its **expected result** — never list a test step without saying what success looks like.
-- If any API test fails, diagnose and fix before surfacing to user. Do not commit broken code.
+- If any E2E test fails, diagnose and fix before surfacing to user. Do not commit broken code.
+- **Run the seeder automatically** (`pnpm db:seed`) whenever a migration or seed change is made — do not ask the user to run it.
 
 ---
 
@@ -219,12 +222,14 @@ MUST:
 MUST:
 
 - Every new API endpoint requires an E2E test (Jest + Supertest) before the PR is merged.
-- E2E tests live in `apps/api/test/`.
+- E2E tests live in `apps/api/test/` — one file per module (e.g., `orders.e2e-spec.ts`).
+- Shared setup helpers live in `apps/api/test/helpers/app.helper.ts` — use `createTestApp()` and `loginAs()`.
 - Run with: `pnpm --filter api test:e2e`
-- E2E tests must use a real database — no mocked Prisma. Use a dedicated test DB.
+- E2E tests must use a real database — no mocked Prisma.
 - Test at minimum: happy path, tenant isolation (cross-tenant 403), and one validation error.
 - Complex business logic (e.g., delta calculation, status transitions) gets unit tests in addition to E2E.
 - Do NOT write E2E tests that mock the service layer — they must go through the full HTTP stack.
+- Do NOT use curl for API verification — always use E2E tests instead.
 
 See `docs/DEVELOPMENT.md` for how to run tests locally.
 

@@ -1,4 +1,4 @@
-import { PrismaClient, MovementType, ReferenceType } from "@prisma/client";
+import { PrismaClient, MovementType, OrderStatus, ReferenceType } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -34,6 +34,7 @@ async function logMovement(
   type: MovementType,
   quantity: number,
   referenceType: ReferenceType,
+  noteOrReferenceId?: string,
   note?: string,
 ) {
   const delta =
@@ -43,9 +44,14 @@ async function logMovement(
         ? -quantity
         : quantity;
 
+  // When called from seedOrder, noteOrReferenceId is the orderId (referenceId)
+  // When called directly for manual movements, noteOrReferenceId is the note
+  const referenceId = referenceType === ReferenceType.ORDER ? noteOrReferenceId : undefined;
+  const resolvedNote = referenceType === ReferenceType.ORDER ? note : noteOrReferenceId;
+
   await prisma.$transaction(async (tx) => {
     await tx.inventoryMovement.create({
-      data: { tenantId, skuId, type, quantity, referenceType, note: note ?? null },
+      data: { tenantId, skuId, type, quantity, referenceType, referenceId: referenceId ?? null, note: resolvedNote ?? null },
     });
     await tx.sku.update({
       where: { id: skuId },
@@ -366,6 +372,88 @@ async function main() {
   if (cleanerSku.stockOnHand === 0) {
     await logMovement(retailTenant.id, cleanerSku.id, MovementType.IN, 24, ReferenceType.MANUAL, "Initial stock");
   }
+
+  // --- Helper: create order with items ---
+
+  async function seedOrder(opts: {
+    tenantId: string;
+    items: Array<{ skuId: string; quantity: number; priceCents: number }>;
+    status: OrderStatus;
+  }) {
+    const existing = await prisma.order.count({ where: { tenantId: opts.tenantId, status: opts.status } });
+    if (existing > 0) return; // idempotent — skip if orders already exist for this tenant+status
+
+    const totalCents = opts.items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
+
+    const order = await prisma.order.create({
+      data: {
+        tenantId: opts.tenantId,
+        status: opts.status,
+        totalCents,
+        items: {
+          create: opts.items.map((i) => ({
+            skuId: i.skuId,
+            quantity: i.quantity,
+            priceAtTime: i.priceCents,
+          })),
+        },
+      },
+    });
+
+    // If CONFIRMED, log OUT movements
+    if (opts.status === OrderStatus.CONFIRMED) {
+      for (const item of opts.items) {
+        await logMovement(opts.tenantId, item.skuId, MovementType.OUT, item.quantity, ReferenceType.ORDER, order.id);
+      }
+    }
+  }
+
+  // --- Seed Orders ---
+
+  // Peak Hardware: one PENDING, one CONFIRMED
+  await seedOrder({
+    tenantId: hardwareTenant.id,
+    items: [
+      { skuId: boltSku.id, quantity: 50, priceCents: boltSku.priceCents ?? 150 },
+      { skuId: washerSku.id, quantity: 100, priceCents: washerSku.priceCents ?? 50 },
+    ],
+    status: OrderStatus.PENDING,
+  });
+  await seedOrder({
+    tenantId: hardwareTenant.id,
+    items: [{ skuId: cableSku.id, quantity: 10, priceCents: cableSku.priceCents ?? 8500 }],
+    status: OrderStatus.CONFIRMED,
+  });
+
+  // Metro Pizza: one PENDING, one COMPLETED
+  await seedOrder({
+    tenantId: foodTenant.id,
+    items: [
+      { skuId: flourSku.id, quantity: 5, priceCents: flourSku.priceCents ?? 189000 },
+      { skuId: sauceSku.id, quantity: 6, priceCents: sauceSku.priceCents ?? 62000 },
+    ],
+    status: OrderStatus.PENDING,
+  });
+  await seedOrder({
+    tenantId: foodTenant.id,
+    items: [{ skuId: mozzaSku.id, quantity: 8, priceCents: mozzaSku.priceCents ?? 145000 }],
+    status: OrderStatus.COMPLETED,
+  });
+
+  // Corner General: one PENDING, one CANCELLED
+  await seedOrder({
+    tenantId: retailTenant.id,
+    items: [
+      { skuId: colaSku.id, quantity: 24, priceCents: colaSku.priceCents ?? 6500 },
+      { skuId: chipsSku.id, quantity: 12, priceCents: chipsSku.priceCents ?? 9900 },
+    ],
+    status: OrderStatus.PENDING,
+  });
+  await seedOrder({
+    tenantId: retailTenant.id,
+    items: [{ skuId: cleanerSku.id, quantity: 6, priceCents: cleanerSku.priceCents ?? 28500 }],
+    status: OrderStatus.CANCELLED,
+  });
 
   console.log("✓ Admin:", admin.email);
   console.log("✓ Tenants:", hardwareTenant.slug, "|", foodTenant.slug, "|", retailTenant.slug);
