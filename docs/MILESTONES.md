@@ -133,10 +133,33 @@ Definition of done:
 - Staging/prod readiness: env checklist, Vercel + Render + Neon Postgres deployment verified.
 - All docs reflect final state.
 
-Deferred UX items to resolve in this milestone:
+Deferred items to resolve in this milestone:
 
 - Root `/` page: currently a dev convenience landing page (tenant picker + login/register links). Replace with a proper entry point or redirect to `/login`.
 - Tenant route guard: `/t/[tenantSlug]` renders the UI shell even for users without membership in that tenant — shows API 403 instead of redirecting. Add page-level membership check that redirects to the user's own tenant or `/login`.
+- Super Admin user management: Super Admin can promote another user to Super Admin via API (currently only possible via seed/DB).
+- Tenant staff invitation flow: UI for tenant owners to invite users as staff members (memberships API exists, invite flow does not).
+
+---
+
+## Post-MVP: Bulk Data Import (after MS8)
+
+- CSV upload for bulk Product + SKU creation per tenant
+- Universal CSV shape (name, sku_code, price_cents, cost_cents, category_slug, low_stock_threshold) — same format regardless of `businessType`
+- Validation: duplicate SKU codes, unknown categories, missing required fields reported per row
+- S3 or local file handling for upload (coordinate with Phase 8 AWS work)
+- `businessType` does NOT change CSV shape — it only sets default feature flags on tenant creation
+
+**Why deferred:** Not needed for platform to function. High value before real customer onboarding. Scope after MS8 when all data models are stable.
+
+---
+
+## Post-MVP: Advanced User Management (after MS8)
+
+- Super Admin PBAC: configurable permissions per platform admin (read-only admin, billing-only admin, etc.) — currently `isPlatformAdmin` is boolean only
+- Cross-tenant relationships: tenant A granting tenant B specific access (supplier/reseller model) — needs design work before implementation; could overlap with Marketplace phase
+
+**Why deferred:** Current Super Admin model (boolean `isPlatformAdmin`) is sufficient for MVP. Cross-tenant relationships need product design before engineering.
 
 ---
 

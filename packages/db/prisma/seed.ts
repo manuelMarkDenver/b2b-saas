@@ -97,22 +97,24 @@ async function main() {
 
   // --- 3 Realistic Business Tenants ---
 
+  const defaultFeatures = { inventory: true, orders: true, payments: true, marketplace: false };
+
   const hardwareTenant = await prisma.tenant.upsert({
     where: { slug: "peak-hardware" },
-    update: { name: "Peak Hardware Supply", createdByUserId: admin.id },
-    create: { name: "Peak Hardware Supply", slug: "peak-hardware", createdByUserId: admin.id },
+    update: { name: "Peak Hardware Supply", createdByUserId: admin.id, businessType: "hardware", features: defaultFeatures },
+    create: { name: "Peak Hardware Supply", slug: "peak-hardware", createdByUserId: admin.id, businessType: "hardware", features: defaultFeatures },
   });
 
   const foodTenant = await prisma.tenant.upsert({
     where: { slug: "metro-pizza-supply" },
-    update: { name: "Metro Pizza Supply", createdByUserId: admin.id },
-    create: { name: "Metro Pizza Supply", slug: "metro-pizza-supply", createdByUserId: admin.id },
+    update: { name: "Metro Pizza Supply", createdByUserId: admin.id, businessType: "food_beverage", features: defaultFeatures },
+    create: { name: "Metro Pizza Supply", slug: "metro-pizza-supply", createdByUserId: admin.id, businessType: "food_beverage", features: defaultFeatures },
   });
 
   const retailTenant = await prisma.tenant.upsert({
     where: { slug: "corner-general" },
-    update: { name: "Corner General Store", createdByUserId: admin.id },
-    create: { name: "Corner General Store", slug: "corner-general", createdByUserId: admin.id },
+    update: { name: "Corner General Store", createdByUserId: admin.id, businessType: "general_retail", features: defaultFeatures },
+    create: { name: "Corner General Store", slug: "corner-general", createdByUserId: admin.id, businessType: "general_retail", features: defaultFeatures },
   });
 
   // --- Users ---

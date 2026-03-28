@@ -11,13 +11,15 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
+import { FeatureFlagGuard, RequireFeature } from '../common/auth/feature-flag.guard';
 import type { RequestWithUser } from '../common/auth/auth.types';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Controller('orders')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, FeatureFlagGuard)
+@RequireFeature('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
