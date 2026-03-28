@@ -32,10 +32,10 @@ export default async function TenantHome({ params }: Props) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-balance text-2xl font-semibold tracking-tight">
-              {tenant.brandName} Marketplace
+              {tenant.brandName} Dashboard
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Phase 1 foundation: tenant routing + theming tokens + API connectivity.
+              Tenant dashboard — inventory, orders, and payments managed here.
             </p>
           </div>
           <div className="rounded-md bg-accent px-3 py-2 text-xs text-accent-foreground">
@@ -62,11 +62,11 @@ export default async function TenantHome({ params }: Props) {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-5">
-          <div className="text-sm font-medium">Next Steps (Milestone 1)</div>
+          <div className="text-sm font-medium">Platform Modules</div>
           <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-            <div>1) Add shadcn components as-needed (button, input, dialog).</div>
-            <div>2) Replace stub tenant themes with API-fed settings later.</div>
-            <div>3) Add marketplace browse scaffold in Milestone 5.</div>
+            <div>MS4 — Inventory movement logging</div>
+            <div>MS5 — Orders management</div>
+            <div>MS6 — Manual payment verification</div>
           </div>
         </div>
         <MembershipsPanel />

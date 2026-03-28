@@ -9,6 +9,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
 import { TenantModule } from './tenant/tenant.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -24,6 +25,7 @@ import { AppService } from './app.service';
     MembershipsModule,
     TenantModule,
     CatalogModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

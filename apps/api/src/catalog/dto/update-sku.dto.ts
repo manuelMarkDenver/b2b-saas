@@ -14,7 +14,11 @@ export class UpdateSkuDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  stockOnHand?: number;
+  costCents?: number;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string;
 
   @IsOptional()
   @IsInt()

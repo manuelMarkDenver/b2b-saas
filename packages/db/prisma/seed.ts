@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, MovementType, ReferenceType } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -28,6 +28,32 @@ async function upsertUser(user: SeededUser) {
   });
 }
 
+async function logMovement(
+  tenantId: string,
+  skuId: string,
+  type: MovementType,
+  quantity: number,
+  referenceType: ReferenceType,
+  note?: string,
+) {
+  const delta =
+    type === MovementType.IN
+      ? quantity
+      : type === MovementType.OUT
+        ? -quantity
+        : quantity;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.inventoryMovement.create({
+      data: { tenantId, skuId, type, quantity, referenceType, note: note ?? null },
+    });
+    await tx.sku.update({
+      where: { id: skuId },
+      data: { stockOnHand: { increment: delta } },
+    });
+  });
+}
+
 async function main() {
   const adminEmail =
     process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "admin@local.test";
@@ -38,8 +64,8 @@ async function main() {
 
   await prisma.appMeta.upsert({
     where: { key: "schemaVersion" },
-    update: { value: "1" },
-    create: { key: "schemaVersion", value: "1" },
+    update: { value: "2" },
+    create: { key: "schemaVersion", value: "2" },
   });
 
   const adminPasswordHash = await hash(adminPassword, 12);
@@ -51,89 +77,47 @@ async function main() {
     isPlatformAdmin: true,
   });
 
-  const tenant = await prisma.tenant.upsert({
+  const adminTenant = await prisma.tenant.upsert({
     where: { slug: tenantSlug },
-    update: {
-      name: tenantName,
-      createdByUserId: admin.id,
-    },
-    create: {
-      name: tenantName,
-      slug: tenantSlug,
-      createdByUserId: admin.id,
-    },
+    update: { name: tenantName, createdByUserId: admin.id },
+    create: { name: tenantName, slug: tenantSlug, createdByUserId: admin.id },
   });
 
   await prisma.tenantMembership.upsert({
-    where: {
-      tenantId_userId: {
-        tenantId: tenant.id,
-        userId: admin.id,
-      },
-    },
-    update: {
-      status: "ACTIVE",
-      isOwner: true,
-      role: "OWNER",
-    },
-    create: {
-      tenantId: tenant.id,
-      userId: admin.id,
-      status: "ACTIVE",
-      isOwner: true,
-      role: "OWNER",
-    },
+    where: { tenantId_userId: { tenantId: adminTenant.id, userId: admin.id } },
+    update: { status: "ACTIVE", isOwner: true, role: "OWNER" },
+    create: { tenantId: adminTenant.id, userId: admin.id, status: "ACTIVE", isOwner: true, role: "OWNER" },
   });
 
-  const tenantA = await prisma.tenant.upsert({
-    where: { slug: "tenant-a" },
-    update: { name: "Tenant A", createdByUserId: admin.id },
-    create: { name: "Tenant A", slug: "tenant-a", createdByUserId: admin.id },
+  // --- 3 Realistic Business Tenants ---
+
+  const hardwareTenant = await prisma.tenant.upsert({
+    where: { slug: "peak-hardware" },
+    update: { name: "Peak Hardware Supply", createdByUserId: admin.id },
+    create: { name: "Peak Hardware Supply", slug: "peak-hardware", createdByUserId: admin.id },
   });
 
-  const tenantB = await prisma.tenant.upsert({
-    where: { slug: "tenant-b" },
-    update: { name: "Tenant B", createdByUserId: admin.id },
-    create: { name: "Tenant B", slug: "tenant-b", createdByUserId: admin.id },
+  const foodTenant = await prisma.tenant.upsert({
+    where: { slug: "metro-pizza-supply" },
+    update: { name: "Metro Pizza Supply", createdByUserId: admin.id },
+    create: { name: "Metro Pizza Supply", slug: "metro-pizza-supply", createdByUserId: admin.id },
   });
+
+  const retailTenant = await prisma.tenant.upsert({
+    where: { slug: "corner-general" },
+    update: { name: "Corner General Store", createdByUserId: admin.id },
+    create: { name: "Corner General Store", slug: "corner-general", createdByUserId: admin.id },
+  });
+
+  // --- Users ---
 
   const users = {
-    tenantAOwner: await upsertUser({
-      email: "owner@tenant-a.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantAAdmin: await upsertUser({
-      email: "admin@tenant-a.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantAMember: await upsertUser({
-      email: "member@tenant-a.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantAViewer: await upsertUser({
-      email: "viewer@tenant-a.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantBOwner: await upsertUser({
-      email: "owner@tenant-b.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantBAdmin: await upsertUser({
-      email: "admin@tenant-b.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantBMember: await upsertUser({
-      email: "member@tenant-b.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantBViewer: await upsertUser({
-      email: "viewer@tenant-b.test",
-      passwordHash: defaultPasswordHash,
-    }),
-    tenantAOnly: await upsertUser({
-      email: "a-only@platform.test",
-      passwordHash: defaultPasswordHash,
-    }),
+    hardwareOwner: await upsertUser({ email: "owner@peak-hardware.test", passwordHash: defaultPasswordHash }),
+    hardwareMember: await upsertUser({ email: "staff@peak-hardware.test", passwordHash: defaultPasswordHash }),
+    foodOwner: await upsertUser({ email: "owner@metro-pizza.test", passwordHash: defaultPasswordHash }),
+    foodMember: await upsertUser({ email: "staff@metro-pizza.test", passwordHash: defaultPasswordHash }),
+    retailOwner: await upsertUser({ email: "owner@corner-general.test", passwordHash: defaultPasswordHash }),
+    retailMember: await upsertUser({ email: "staff@corner-general.test", passwordHash: defaultPasswordHash }),
   };
 
   const memberships: Array<{
@@ -142,120 +126,251 @@ async function main() {
     role: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
     isOwner?: boolean;
   }> = [
-    { tenantId: tenantA.id, userId: users.tenantAOwner.id, role: "OWNER", isOwner: true },
-    { tenantId: tenantA.id, userId: users.tenantAAdmin.id, role: "ADMIN" },
-    { tenantId: tenantA.id, userId: users.tenantAMember.id, role: "MEMBER" },
-    { tenantId: tenantA.id, userId: users.tenantAViewer.id, role: "VIEWER" },
-    { tenantId: tenantB.id, userId: users.tenantBOwner.id, role: "OWNER", isOwner: true },
-    { tenantId: tenantB.id, userId: users.tenantBAdmin.id, role: "ADMIN" },
-    { tenantId: tenantB.id, userId: users.tenantBMember.id, role: "MEMBER" },
-    { tenantId: tenantB.id, userId: users.tenantBViewer.id, role: "VIEWER" },
-    { tenantId: tenantA.id, userId: users.tenantAOnly.id, role: "MEMBER" },
+    { tenantId: hardwareTenant.id, userId: users.hardwareOwner.id, role: "OWNER", isOwner: true },
+    { tenantId: hardwareTenant.id, userId: users.hardwareMember.id, role: "MEMBER" },
+    { tenantId: foodTenant.id, userId: users.foodOwner.id, role: "OWNER", isOwner: true },
+    { tenantId: foodTenant.id, userId: users.foodMember.id, role: "MEMBER" },
+    { tenantId: retailTenant.id, userId: users.retailOwner.id, role: "OWNER", isOwner: true },
+    { tenantId: retailTenant.id, userId: users.retailMember.id, role: "MEMBER" },
   ];
 
-  for (const membership of memberships) {
+  for (const m of memberships) {
     await prisma.tenantMembership.upsert({
-      where: {
-        tenantId_userId: {
-          tenantId: membership.tenantId,
-          userId: membership.userId,
-        },
-      },
-      update: {
-        status: "ACTIVE",
-        isOwner: membership.isOwner ?? false,
-        role: membership.role,
-      },
-      create: {
-        tenantId: membership.tenantId,
-        userId: membership.userId,
-        status: "ACTIVE",
-        isOwner: membership.isOwner ?? false,
-        role: membership.role,
-      },
+      where: { tenantId_userId: { tenantId: m.tenantId, userId: m.userId } },
+      update: { status: "ACTIVE", isOwner: m.isOwner ?? false, role: m.role },
+      create: { tenantId: m.tenantId, userId: m.userId, status: "ACTIVE", isOwner: m.isOwner ?? false, role: m.role },
     });
   }
 
-  const categories = [
+  // --- Categories ---
+
+  const categoryData = [
     { name: "Fasteners", slug: "fasteners" },
     { name: "Electrical", slug: "electrical" },
-    { name: "Safety", slug: "safety" },
+    { name: "Safety Equipment", slug: "safety-equipment" },
+    { name: "Flour & Grains", slug: "flour-grains" },
+    { name: "Dairy & Cheese", slug: "dairy-cheese" },
+    { name: "Sauces & Condiments", slug: "sauces-condiments" },
+    { name: "Beverages", slug: "beverages" },
+    { name: "Snacks", slug: "snacks" },
+    { name: "Cleaning Supplies", slug: "cleaning-supplies" },
   ];
 
-  for (const category of categories) {
+  for (const c of categoryData) {
     await prisma.category.upsert({
-      where: { slug: category.slug },
-      update: { name: category.name },
-      create: { name: category.name, slug: category.slug },
+      where: { slug: c.slug },
+      update: { name: c.name },
+      create: { name: c.name, slug: c.slug },
     });
   }
 
-  const fasteners = await prisma.category.findUnique({
-    where: { slug: "fasteners" },
-    select: { id: true },
-  });
+  const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
+  const cat = Object.fromEntries(categories.map((c) => [c.slug, c.id]));
 
-  if (!fasteners) {
-    throw new Error("Seed category missing: fasteners");
-  }
+  // --- Helper: upsert product + SKU (stockOnHand starts at 0) ---
 
-  const sampleProducts: Array<{ tenantId: string; name: string; skuCode: string }> = [
-    { tenantId: tenantA.id, name: "Hex Bolt", skuCode: "A-BOLT-001" },
-    { tenantId: tenantA.id, name: "Washer", skuCode: "A-WASH-001" },
-    { tenantId: tenantB.id, name: "Wood Screw", skuCode: "B-SCREW-001" },
-  ];
-
-  for (const sample of sampleProducts) {
+  async function upsertProductSku(opts: {
+    tenantId: string;
+    categoryId: string;
+    productName: string;
+    skuCode: string;
+    skuName: string;
+    priceCents: number;
+    costCents: number;
+    lowStockThreshold: number;
+  }) {
     const existing = await prisma.product.findFirst({
-      where: { tenantId: sample.tenantId, name: sample.name },
+      where: { tenantId: opts.tenantId, name: opts.productName },
       select: { id: true },
     });
 
     const product = existing
       ? await prisma.product.update({
           where: { id: existing.id },
-          data: {
-            categoryId: fasteners.id,
-            isActive: true,
-          },
+          data: { categoryId: opts.categoryId, isActive: true },
         })
       : await prisma.product.create({
           data: {
-            tenantId: sample.tenantId,
-            categoryId: fasteners.id,
-            name: sample.name,
+            tenantId: opts.tenantId,
+            categoryId: opts.categoryId,
+            name: opts.productName,
             isActive: true,
           },
         });
 
-    await prisma.sku.upsert({
-      where: {
-        tenantId_code: { tenantId: sample.tenantId, code: sample.skuCode },
-      },
+    const sku = await prisma.sku.upsert({
+      where: { tenantId_code: { tenantId: opts.tenantId, code: opts.skuCode } },
       update: {
         productId: product.id,
-        name: `${sample.name} (SKU)`,
-        stockOnHand: 25,
-        lowStockThreshold: 5,
+        name: opts.skuName,
+        priceCents: opts.priceCents,
+        costCents: opts.costCents,
+        lowStockThreshold: opts.lowStockThreshold,
         isActive: true,
       },
       create: {
-        tenantId: sample.tenantId,
+        tenantId: opts.tenantId,
         productId: product.id,
-        code: sample.skuCode,
-        name: `${sample.name} (SKU)`,
-        stockOnHand: 25,
-        lowStockThreshold: 5,
+        code: opts.skuCode,
+        name: opts.skuName,
+        priceCents: opts.priceCents,
+        costCents: opts.costCents,
+        stockOnHand: 0,
+        lowStockThreshold: opts.lowStockThreshold,
         isActive: true,
       },
     });
+
+    return sku;
   }
 
-  console.log("Seeded admin user:", admin.email);
-  console.log("Seeded tenant:", tenant.slug);
-  console.log("Seeded test tenants:", tenantA.slug, tenantB.slug);
-  console.log("Seeded role users with password:", DEFAULT_PASSWORD);
-  console.log("Seeded categories:", categories.map((c) => c.slug).join(", "));
+  // --- Peak Hardware Supply ---
+
+  const boltSku = await upsertProductSku({
+    tenantId: hardwareTenant.id,
+    categoryId: cat["fasteners"],
+    productName: "Hex Bolt M8",
+    skuCode: "PHW-BOLT-M8",
+    skuName: "Hex Bolt M8 x 25mm",
+    priceCents: 150,
+    costCents: 60,
+    lowStockThreshold: 50,
+  });
+
+  const washerSku = await upsertProductSku({
+    tenantId: hardwareTenant.id,
+    categoryId: cat["fasteners"],
+    productName: "Flat Washer M8",
+    skuCode: "PHW-WASH-M8",
+    skuName: "Flat Washer M8",
+    priceCents: 50,
+    costCents: 15,
+    lowStockThreshold: 100,
+  });
+
+  const cableSku = await upsertProductSku({
+    tenantId: hardwareTenant.id,
+    categoryId: cat["electrical"],
+    productName: "Electrical Cable 2.5mm",
+    skuCode: "PHW-CABLE-25",
+    skuName: "Electrical Cable 2.5mm (per meter)",
+    priceCents: 8500,
+    costCents: 5200,
+    lowStockThreshold: 20,
+  });
+
+  // Peak Hardware — initial stock IN movements
+  if (boltSku.stockOnHand === 0) {
+    await logMovement(hardwareTenant.id, boltSku.id, MovementType.IN, 200, ReferenceType.MANUAL, "Initial stock");
+  }
+  if (washerSku.stockOnHand === 0) {
+    await logMovement(hardwareTenant.id, washerSku.id, MovementType.IN, 500, ReferenceType.MANUAL, "Initial stock");
+  }
+  if (cableSku.stockOnHand === 0) {
+    await logMovement(hardwareTenant.id, cableSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, cableSku.id, MovementType.OUT, 15, ReferenceType.MANUAL, "Sold to contractor");
+  }
+
+  // --- Metro Pizza Supply ---
+
+  const flourSku = await upsertProductSku({
+    tenantId: foodTenant.id,
+    categoryId: cat["flour-grains"],
+    productName: "All-Purpose Flour",
+    skuCode: "MPS-FLOUR-25K",
+    skuName: "All-Purpose Flour 25kg Sack",
+    priceCents: 189000,
+    costCents: 120000,
+    lowStockThreshold: 5,
+  });
+
+  const mozzaSku = await upsertProductSku({
+    tenantId: foodTenant.id,
+    categoryId: cat["dairy-cheese"],
+    productName: "Mozzarella Block",
+    skuCode: "MPS-MOZZ-2K",
+    skuName: "Mozzarella Block 2kg",
+    priceCents: 145000,
+    costCents: 95000,
+    lowStockThreshold: 10,
+  });
+
+  const sauceSku = await upsertProductSku({
+    tenantId: foodTenant.id,
+    categoryId: cat["sauces-condiments"],
+    productName: "Pizza Sauce",
+    skuCode: "MPS-SAUCE-3K",
+    skuName: "Pizza Sauce 3kg Can",
+    priceCents: 62000,
+    costCents: 38000,
+    lowStockThreshold: 8,
+  });
+
+  // Metro Pizza — initial stock IN movements
+  if (flourSku.stockOnHand === 0) {
+    await logMovement(foodTenant.id, flourSku.id, MovementType.IN, 40, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, flourSku.id, MovementType.OUT, 8, ReferenceType.MANUAL, "Delivered to client");
+  }
+  if (mozzaSku.stockOnHand === 0) {
+    await logMovement(foodTenant.id, mozzaSku.id, MovementType.IN, 30, ReferenceType.MANUAL, "Initial stock");
+  }
+  if (sauceSku.stockOnHand === 0) {
+    await logMovement(foodTenant.id, sauceSku.id, MovementType.IN, 24, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, sauceSku.id, MovementType.OUT, 6, ReferenceType.MANUAL, "Sold to restaurant");
+  }
+
+  // --- Corner General Store ---
+
+  const colaSku = await upsertProductSku({
+    tenantId: retailTenant.id,
+    categoryId: cat["beverages"],
+    productName: "Cola 355ml Can",
+    skuCode: "CGS-COLA-355",
+    skuName: "Cola 355ml Can",
+    priceCents: 6500,
+    costCents: 3800,
+    lowStockThreshold: 24,
+  });
+
+  const chipsSku = await upsertProductSku({
+    tenantId: retailTenant.id,
+    categoryId: cat["snacks"],
+    productName: "Potato Chips Original",
+    skuCode: "CGS-CHIPS-OR",
+    skuName: "Potato Chips Original 150g",
+    priceCents: 9900,
+    costCents: 5500,
+    lowStockThreshold: 12,
+  });
+
+  const cleanerSku = await upsertProductSku({
+    tenantId: retailTenant.id,
+    categoryId: cat["cleaning-supplies"],
+    productName: "All-Purpose Cleaner",
+    skuCode: "CGS-CLEAN-1L",
+    skuName: "All-Purpose Cleaner 1L",
+    priceCents: 28500,
+    costCents: 16000,
+    lowStockThreshold: 6,
+  });
+
+  // Corner General — initial stock IN movements
+  if (colaSku.stockOnHand === 0) {
+    await logMovement(retailTenant.id, colaSku.id, MovementType.IN, 144, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, colaSku.id, MovementType.OUT, 36, ReferenceType.MANUAL, "Daily sales");
+  }
+  if (chipsSku.stockOnHand === 0) {
+    await logMovement(retailTenant.id, chipsSku.id, MovementType.IN, 60, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, chipsSku.id, MovementType.ADJUSTMENT, -3, ReferenceType.MANUAL, "Damaged stock written off");
+  }
+  if (cleanerSku.stockOnHand === 0) {
+    await logMovement(retailTenant.id, cleanerSku.id, MovementType.IN, 24, ReferenceType.MANUAL, "Initial stock");
+  }
+
+  console.log("✓ Admin:", admin.email);
+  console.log("✓ Tenants:", hardwareTenant.slug, "|", foodTenant.slug, "|", retailTenant.slug);
+  console.log("✓ Categories:", categoryData.map((c) => c.slug).join(", "));
+  console.log("✓ Default password:", DEFAULT_PASSWORD);
 }
 
 main()
