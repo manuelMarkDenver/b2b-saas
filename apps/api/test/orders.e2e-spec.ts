@@ -57,6 +57,16 @@ describe('Orders (e2e)', () => {
       expect(res.status).toBe(400);
     });
 
+    it('returns 400 for quantity > 10000', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 10001 }] });
+
+      expect(res.status).toBe(400);
+    });
+
     it('returns 400 for quantity < 1', async () => {
       const res = await request(app.getHttpServer())
         .post('/orders')
@@ -248,11 +258,13 @@ describe('Orders (e2e)', () => {
       const currentStock = (skusRes.body as Array<{ id: string; stockOnHand: number }>)
         .find((s) => s.id === skuId)!.stockOnHand;
 
+      // Clamp to ≤10000 to stay within DTO max, but still exceed available stock
+      const overStockQty = Math.min(currentStock + 1, 9999);
       const createRes = await request(app.getHttpServer())
         .post('/orders')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ items: [{ skuId, quantity: currentStock + 1 }] });
+        .send({ items: [{ skuId, quantity: overStockQty }] });
       expect(createRes.status).toBe(201);
 
       const res = await request(app.getHttpServer())

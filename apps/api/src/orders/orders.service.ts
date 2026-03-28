@@ -46,6 +46,14 @@ export class OrdersService {
       };
     });
 
+    // Guard against Int overflow on the totalCents column (Postgres Int max ~2.1B cents = ~$21M)
+    const INT_MAX = 2_147_483_647;
+    if (totalCents > INT_MAX) {
+      throw new BadRequestException(
+        `Order total exceeds maximum allowed value ($${(INT_MAX / 100).toLocaleString()}). Split into multiple orders.`,
+      );
+    }
+
     const order = await this.prisma.order.create({
       data: {
         tenantId,
