@@ -11,3 +11,5 @@ coverage/
 *.log
 
 postgres-data/
+
+.vscode/

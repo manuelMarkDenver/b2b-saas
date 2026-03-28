@@ -133,6 +133,11 @@ Definition of done:
 - Staging/prod readiness: env checklist, Vercel + Render + Neon Postgres deployment verified.
 - All docs reflect final state.
 
+Deferred UX items to resolve in this milestone:
+
+- Root `/` page: currently a dev convenience landing page (tenant picker + login/register links). Replace with a proper entry point or redirect to `/login`.
+- Tenant route guard: `/t/[tenantSlug]` renders the UI shell even for users without membership in that tenant — shows API 403 instead of redirecting. Add page-level membership check that redirects to the user's own tenant or `/login`.
+
 ---
 
 ## Future Phases (DO NOT IMPLEMENT)

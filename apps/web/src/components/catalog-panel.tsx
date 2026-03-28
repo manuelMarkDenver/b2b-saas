@@ -69,7 +69,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [newSkuProductId, setNewSkuProductId] = React.useState<string>("");
   const [newSkuCode, setNewSkuCode] = React.useState("");
   const [newSkuName, setNewSkuName] = React.useState("");
-  const [newSkuStock, setNewSkuStock] = React.useState<number>(0);
   const [newSkuLowStock, setNewSkuLowStock] = React.useState<number>(0);
 
   const { pushToast } = useToast();
@@ -144,7 +143,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         productId: newSkuProductId,
         code: newSkuCode,
         name: newSkuName,
-        stockOnHand: newSkuStock,
         lowStockThreshold: newSkuLowStock,
       }),
     });
@@ -260,22 +258,14 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
               value={newSkuName}
               onChange={(e) => setNewSkuName(e.target.value)}
             />
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                type="number"
-                min={0}
-                value={newSkuStock}
-                onChange={(e) => setNewSkuStock(Number(e.target.value))}
-              />
-              <input
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                type="number"
-                min={0}
-                value={newSkuLowStock}
-                onChange={(e) => setNewSkuLowStock(Number(e.target.value))}
-              />
-            </div>
+            <input
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              type="number"
+              min={0}
+              placeholder="Low stock threshold"
+              value={newSkuLowStock}
+              onChange={(e) => setNewSkuLowStock(Number(e.target.value))}
+            />
             <button
               className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
               type="button"
@@ -286,7 +276,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             </button>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
-            Left input: stockOnHand. Right input: lowStockThreshold.
+            Stock starts at 0. Use inventory movements to add stock.
           </div>
         </div>
       </div>

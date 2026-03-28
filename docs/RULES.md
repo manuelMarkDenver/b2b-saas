@@ -166,7 +166,7 @@ MUST:
 - Never commit or push without explicit go signal from the user.
 - Never merge — user handles all merges on GitHub.
 - After user confirms a merge, treat `main` as updated and branch from it for the next task.
-- Separate docs-only changes from implementation changes into separate PRs.
+- Doc updates that are directly related to the current branch's work go in the same branch and PR — do NOT create a separate branch just for docs. Only create a separate docs branch when the doc change is standalone (e.g., a rules update unrelated to any implementation).
 
 ---
 
