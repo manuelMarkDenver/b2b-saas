@@ -153,6 +153,7 @@ Definition of done:
 ### UI overhaul (replace scaffolding panels with production UI)
 
 - Proper application shell: sidebar navigation, top header, breadcrumbs.
+- **In-app notification center**: bell icon in the top header with unread badge count. Dropdown panel lists recent notifications — each shows title, body, timestamp, and a link to the related entity (order, payment, SKU). Mark as read on click, dismiss button per notification, "Mark all as read" action. Badge clears when all are read. Polling every 60s — no WebSocket in MVP.
 - Data tables with sorting, filtering, and pagination for orders, SKUs, inventory movements.
 - Modals for create/edit flows (orders, SKUs, products).
 - Tabs for switching between related views (e.g. Products / SKUs / Movements).
@@ -182,33 +183,55 @@ Notes on data retention and soft deletes:
 
 ---
 
-## Post-MVP: Notifications Module (after MS8)
+## Post-MVP: Notifications Module — External Delivery (after MS8)
 
-Design a channel-agnostic `NotificationModule` that fires on business events.
+The in-app notification center (bell icon + panel) ships in MS8 and writes to a `Notification` DB table. This post-MVP module adds **external delivery** of those same notification events via email, SMS, and Messenger/WhatsApp.
 
-**Supported channels (in priority order):**
-1. **Email** — transactional email via Resend or Nodemailer + SMTP. Also required for password reset (MS8). Set up email first.
-2. **Meta Cloud API (Messenger + WhatsApp Business)** — send Messenger or WhatsApp messages to tenant owners/staff. Best fit for markets (PH/SEA) where Messenger/WhatsApp is primary business comms. Tenant configures their Page ID or WhatsApp Business number in tenant settings.
-3. **SMS** — Twilio or local SMS gateway. Lower priority than Messenger for target market.
+### Two-layer architecture
 
-**Events to notify:**
-| Event | Who receives | Why |
-|---|---|---|
-| `order.created` | Tenant owner/admin | New sale arrived |
-| `order.status_changed` (CONFIRMED) | Customer ref if stored | Order being processed |
-| `payment.submitted` | Tenant staff who can verify | Payment needs action |
-| `payment.verified` | Tenant owner | Sale confirmed |
-| `payment.rejected` | Tenant owner | Payment issue |
-| `stock.low` | Tenant owner/admin | SKU below `lowStockThreshold` — needs reorder |
-| `tenant.staff_added` | Tenant owner | New staff access granted |
+**Layer 1 — In-app (MS8, ships first):**
+- `Notification` table stores every event per recipient.
+- Bell icon + badge + dropdown panel in the UI consumes this table.
+- No external services — self-contained.
 
-**Architecture:**
-- `NotificationModule` is channel-agnostic — each channel is a strategy implementation.
-- Per-tenant config: `notificationSettings` JSONB on `Tenant` — stores which channels are enabled + credentials (page ID, phone number).
-- Notification events are dispatched from existing service methods (orders, payments, inventory).
-- Fire-and-forget (do not block the main request). Use a job queue (BullMQ) or just async Promise — BullMQ preferred for reliability.
+**Layer 2 — External delivery (this module, post-MS8):**
+- Same notification events dispatched to external channels based on per-user preferences.
+- Fire-and-forget async (never blocks the request). BullMQ job queue for reliability.
+- Each channel is a strategy — email, SMS, Messenger, WhatsApp are interchangeable implementations.
 
-**Why deferred:** Requires email infrastructure to be set up (Resend/SMTP). Meta Cloud API requires Facebook App review for production. Better to ship this as a complete module post-MS8 than half-build it during hardening.
+### Supported external channels (implement in this order)
+
+1. **Email** — Resend or Nodemailer + SMTP. SMTP infrastructure already set up in MS8 for password reset. Email is the cheapest channel to add first.
+2. **Facebook Messenger** — Meta Cloud API. Best fit for PH/SEA markets where Messenger is primary business comms. Tenant configures their Facebook Page ID in tenant settings. Requires Facebook App review for production use.
+3. **WhatsApp Business** — Meta Cloud API (same API as Messenger). Tenant provides their WhatsApp Business phone number. Most important channel for B2B in PH/SEA — owners check WhatsApp constantly.
+4. **SMS** — Twilio or Semaphore (PH local). Fallback for users not on Messenger/WhatsApp. Lower priority.
+
+### Events matrix
+
+| Event | Super Admin | Tenant Owner/Admin | Staff (Member) | Notes |
+|---|---|---|---|---|
+| `order.created` | — | ✓ | ✓ | New sale — staff may need to process |
+| `order.confirmed` | — | ✓ | ✓ | Order moving forward |
+| `order.cancelled` | — | ✓ | ✓ | Heads up, may need to restock |
+| `payment.submitted` | — | ✓ | ✓ (if can_verify) | Payment needs manual verification |
+| `payment.verified` | — | ✓ | — | Sale confirmed |
+| `payment.rejected` | — | ✓ | — | Customer needs to resubmit |
+| `stock.low` | — | ✓ | ✓ | SKU below `lowStockThreshold` — reorder needed |
+| `staff.added` | — | ✓ | — | New member granted access |
+| `tenant.suspended` | ✓ | ✓ (their tenant) | — | Platform action |
+| `platform.alert` | ✓ | — | — | System-level events for SA only |
+
+### Per-user notification preferences
+
+Users configure which channels they want per event category:
+- `UserNotificationPreferences` model: `userId`, `tenantId`, `emailEnabled`, `smsEnabled`, `messengerEnabled`, `whatsappEnabled`, `phoneNumber`, `messengerPageScopedId`
+- In-app is always on — cannot be disabled.
+- External channels are opt-in, configured in the user's profile settings.
+- Tenant OWNER can set defaults for new staff members.
+
+### Why in-app ships in MS8 but external delivery is post-MVP
+
+In-app is a DB table + a few API endpoints + UI component — fits the MS8 UI overhaul scope. External delivery requires: SMTP beyond password reset, Facebook App review (takes days), WhatsApp Business account verification, per-user preference UI, and a job queue. That's a full module worth of work that shouldn't block MS8 shipping.
 
 ---
 
