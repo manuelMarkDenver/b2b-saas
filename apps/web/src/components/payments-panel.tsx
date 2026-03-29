@@ -26,7 +26,8 @@ type Order = {
   status: string;
   totalCents: number;
   createdAt: string;
-  items: Array<{
+  /** Present on /orders responses; may be absent when embedded inside a Payment. */
+  items?: Array<{
     id: string;
     quantity: number;
     priceAtTime: number;
@@ -306,21 +307,21 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             >
               <div className="flex min-w-0 items-center gap-2">
                 <ProductThumb
-                  label={o.items[0]?.sku.code ?? o.id.slice(0, 4)}
+                  label={o.items?.[0]?.sku.code ?? o.id.slice(0, 4)}
                   size={40}
                   className="rounded-lg"
                 />
                 <div className="min-w-0">
                   <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {o.items[0] ? `${o.items[0].sku.code} · ${o.items[0].sku.name}` : "No items"}
-                    {o.items.length > 1 ? ` · +${o.items.length - 1} more` : ""}
+                    {o.items?.[0] ? `${o.items[0].sku.code} · ${o.items[0].sku.name}` : "No items"}
+                    {(o.items?.length ?? 0) > 1 ? ` · +${(o.items?.length ?? 0) - 1} more` : ""}
                     {pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
                   </div>
                 </div>
               </div>
 
-              <span className="text-center text-sm font-medium tabular-nums">{o.items.length}</span>
+              <span className="text-center text-sm font-medium tabular-nums">{o.items?.length ?? 0}</span>
 
               <Badge variant={ORDER_STATUS_VARIANT[o.status] ?? "muted"} className="min-w-[90px] justify-center">
                 {o.status}
@@ -381,7 +382,10 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                       {payment.orderId.slice(0, 8)}…
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {payment.order.status} · {payment.order.items.length} item{payment.order.items.length === 1 ? "" : "s"}
+                      {payment.order.status}
+                      {payment.order.items?.length
+                        ? ` · ${payment.order.items.length} item${payment.order.items.length === 1 ? "" : "s"}`
+                        : ""}
                     </div>
                   </div>
 
@@ -464,7 +468,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                         {new Date(selectedOrder.createdAt).toLocaleString()}
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        {selectedOrder.items.length} item{selectedOrder.items.length === 1 ? "" : "s"}
+                        {selectedOrder.items?.length ?? 0} item{(selectedOrder.items?.length ?? 0) === 1 ? "" : "s"}
                       </div>
                     </div>
                     <Badge variant={ORDER_STATUS_VARIANT[selectedOrder.status] ?? "muted"}>
@@ -476,7 +480,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                 <div className="rounded-lg border border-border/60 bg-card p-4">
                   <div className="text-sm font-medium">Items</div>
                   <div className="mt-3 space-y-3">
-                    {selectedOrder.items.map((it) => (
+                    {(selectedOrder.items ?? []).map((it) => (
                       <div key={it.id} className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <ProductThumb
