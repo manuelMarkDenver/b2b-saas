@@ -46,7 +46,7 @@ Notes:
 
 Definition of done:
 
-- Tenant roles (OWNER, ADMIN, MEMBER, VIEWER).
+- Tenant roles (OWNER, ADMIN, STAFF, VIEWER).
 - Permission-based access control (PBAC): roles define default permissions, permissions can be overridden.
 - Permission guards on tenant routes.
 - Platform admin (Super Admin) separation.

@@ -28,7 +28,7 @@ This is a multi-tenant B2B business platform built ERP-first. The long-term visi
 ### 2. Tenant (Business Owner + Staff)
 
 - Uses modules enabled by feature flags (inventory, orders, payments)
-- Role-based access within the tenant (OWNER, ADMIN, MEMBER, VIEWER)
+- Role-based access within the tenant (OWNER, ADMIN, STAFF, VIEWER)
 - Accessed via `/t/:tenantSlug/...`
 
 ### 3. Customer / Public (FUTURE ONLY — DO NOT BUILD)
@@ -103,7 +103,7 @@ Roles define default permission bundles. Permissions can be overridden per membe
 |---|---|
 | OWNER | All permissions |
 | ADMIN | Most permissions except tenant deletion |
-| MEMBER | Operational permissions (create orders, log inventory) |
+| STAFF | Operational permissions (create orders, log inventory) |
 | VIEWER | Read-only |
 
 Example capabilities: `can_manage_inventory`, `can_create_orders`, `can_verify_payments`
