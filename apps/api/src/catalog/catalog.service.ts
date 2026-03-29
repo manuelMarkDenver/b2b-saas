@@ -151,6 +151,7 @@ export class CatalogService {
     barcode?: string;
     lowStockThreshold?: number;
     isActive?: boolean;
+    imageUrl?: string;
   }) {
     const sku = await this.prisma.sku.findUnique({
       where: { id: skuId },
@@ -168,6 +169,7 @@ export class CatalogService {
         barcode: data.barcode === undefined ? undefined : data.barcode?.trim() || null,
         lowStockThreshold: data.lowStockThreshold,
         isActive: data.isActive,
+        imageUrl: data.imageUrl === undefined ? undefined : data.imageUrl ?? null,
       },
     });
   }

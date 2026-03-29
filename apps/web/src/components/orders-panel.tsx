@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Sheet,
   SheetContent,
@@ -19,6 +20,7 @@ type Sku = {
   id: string;
   code: string;
   name: string;
+  imageUrl?: string | null;
   priceCents: number | null;
   stockOnHand: number;
 };
@@ -28,7 +30,7 @@ type OrderItem = {
   skuId: string;
   quantity: number;
   priceAtTime: number;
-  sku: { id: string; code: string; name: string };
+  sku: { id: string; code: string; name: string; imageUrl?: string | null };
 };
 
 type Order = {
@@ -103,8 +105,12 @@ function unwrapList<T>(payload: unknown): T[] {
   return [];
 }
 
+type Meta = { total: number; page: number; limit: number; totalPages: number };
+
 export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = React.useState<Order[]>([]);
+  const [meta, setMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [page, setPage] = React.useState(1);
   const [skus, setSkus] = React.useState<Sku[]>([]);
   const [pageStatus, setPageStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
@@ -126,11 +132,11 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData() {
+  async function loadData(p = page) {
     setPageStatus({ kind: "info", text: "Loading orders..." });
     try {
       const [ordersRes, skusRes] = await Promise.all([
-        apiFetch("/orders", { tenantSlug }),
+        apiFetch(`/orders?page=${p}&limit=20`, { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
       ]);
       if (!ordersRes.ok) throw new Error(`Orders failed: ${ordersRes.status}`);
@@ -139,7 +145,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
         ordersRes.json() as Promise<unknown>,
         skusRes.json() as Promise<unknown>,
       ]);
-      setOrders(unwrapList<Order>(ordersData));
+      const parsed = ordersData as { data?: Order[]; meta?: Meta };
+      setOrders(parsed.data ?? unwrapList<Order>(ordersData));
+      if (parsed.meta) setMeta(parsed.meta);
       setSkus(unwrapList<Sku>(skusData).filter((s) => s.priceCents !== null));
       setPageStatus(null);
     } catch (err) {
@@ -148,9 +156,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    loadData();
+    void loadData(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug]);
+  }, [tenantSlug, page]);
 
   // ── Cart helpers ─────────────────────────────────────────────────────────────
 
@@ -320,7 +328,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
         <div className="flex gap-2">
           <button
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            onClick={loadData}
+            onClick={() => void loadData()}
             type="button"
           >
             Refresh
@@ -404,6 +412,16 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
             ))}
           </div>
         )}
+        {meta.totalPages > 1 && (
+          <Pagination
+            page={meta.page}
+            totalPages={meta.totalPages}
+            total={meta.total}
+            limit={meta.limit}
+            onPage={(p) => setPage(p)}
+            className="border-t border-border/60"
+          />
+        )}
       </div>
 
       {/* ──────────────────────────────────────────────────────────────────────────
@@ -461,6 +479,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                           <div className="relative aspect-square w-full bg-muted/20">
                             <ProductThumb
                               fill
+                              src={sku.imageUrl}
                               label={`${sku.code} ${sku.name}`}
                               className="absolute inset-0 rounded-none border-0"
                             />
@@ -549,6 +568,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                     return (
                       <div key={line.skuId} className="flex items-center gap-4 px-4 py-4">
                         <ProductThumb
+                          src={sku.imageUrl}
                           label={`${sku.code} ${sku.name}`}
                           size={80}
                           className="rounded-xl"
@@ -676,7 +696,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                     <div className="divide-y divide-border/60 px-4">
                       {selectedOrder.items.map((item) => (
                         <div key={item.id} className="flex items-center gap-4 py-4">
-                          <ProductThumb label={`${item.sku.code} ${item.sku.name}`} size={80} className="rounded-xl" />
+                          <ProductThumb src={item.sku.imageUrl} label={`${item.sku.code} ${item.sku.name}`} size={80} className="rounded-xl" />
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-semibold">{item.sku.code}</div>
                             <div className="text-sm text-muted-foreground">{item.sku.name}</div>
@@ -758,7 +778,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                           return (
                             <div key={sku.id} className={`overflow-hidden rounded-xl border bg-card transition-colors ${inCart ? "border-primary/60" : "border-border/60"}`}>
                               <div className="relative aspect-square w-full bg-muted/20">
-                                <ProductThumb fill label={`${sku.code} ${sku.name}`} className="absolute inset-0 rounded-none border-0" />
+                                <ProductThumb fill src={sku.imageUrl} label={`${sku.code} ${sku.name}`} className="absolute inset-0 rounded-none border-0" />
                                 {inCart ? (
                                   <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow">{qty}</div>
                                 ) : null}
@@ -809,7 +829,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                         if (!sku) return null;
                         return (
                           <div key={line.skuId} className="flex items-center gap-4 px-4 py-4">
-                            <ProductThumb label={`${sku.code} ${sku.name}`} size={80} className="rounded-xl" />
+                            <ProductThumb src={sku.imageUrl} label={`${sku.code} ${sku.name}`} size={80} className="rounded-xl" />
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-semibold">{sku.code}</div>
                               <div className="text-sm text-muted-foreground">{sku.name}</div>

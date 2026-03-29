@@ -28,4 +28,8 @@ export class UpdateSkuDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

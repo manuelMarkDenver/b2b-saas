@@ -26,5 +26,15 @@ export function configuration(env: Env) {
       from: env.SMTP_FROM,
     },
     appBaseUrl: env.APP_BASE_URL,
+    storage: {
+      type: env.STORAGE_TYPE,
+      aws: {
+        region: env.AWS_REGION,
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+        bucket: env.AWS_S3_BUCKET,
+        publicUrl: env.AWS_S3_PUBLIC_URL,
+      },
+    },
   };
 }

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Sku" ADD COLUMN     "imageUrl" TEXT;

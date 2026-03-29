@@ -2,6 +2,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
+import * as express from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 import type { Logger as PinoLogger } from 'pino';
 import { HttpExceptionFilter } from './common/http/http-exception.filter';
 import { requestIdMiddleware } from './common/http/request-id.middleware';
@@ -15,6 +18,12 @@ async function bootstrap() {
   const logger = app.get<PinoLogger>(PINO);
 
   app.use(helmet());
+
+  // Serve local uploads as static files (local storage only — S3 serves from CDN)
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  app.use('/uploads', express.static(uploadsDir));
+
   app.use(requestIdMiddleware);
   app.use(requestLoggerMiddleware(logger));
   app.useGlobalFilters(new HttpExceptionFilter());

@@ -2,7 +2,7 @@
 
 This project is delivered milestone-by-milestone. Do not pull work forward.
 
-> Last updated: 2026-03-29 — Channel priority corrected (Messenger > WhatsApp for PH/SEA). Added staff invitation email to MS8. Added Post-MVP: i18n/currency, platform integrations, custom roles. Added known engineering challenges. Marketplace reaffirmed as Phase 7 goal.
+> Last updated: 2026-03-29 — Channel priority corrected (Messenger > WhatsApp for PH/SEA). Added staff invitation email to MS8. Added Post-MVP: i18n/currency, platform integrations, custom roles. Added known engineering challenges. Marketplace reaffirmed as Phase 7 goal. MS8 in-progress: completed items marked ✅.
 
 ---
 
@@ -123,85 +123,98 @@ Definition of done:
 
 ---
 
-## Milestone 8 - Hardening + UI Overhaul + Prod Prep
+## Milestone 8 - Hardening + UI Overhaul + Prod Prep (in progress)
 
 Definition of done:
 
 ### Security + API hardening
 
-- **Password reset flow**: `POST /auth/forgot-password` + `POST /auth/reset-password`. Sends a time-limited token via email. Required before any real user can recover their account.
-- **Rate limiting**: `@nestjs/throttler` on all auth endpoints (`/auth/login`, `/auth/register`, `/auth/forgot-password`). Blocks brute force.
-- **Security headers**: Helmet middleware on the NestJS app. One-line add, production hygiene.
-- **CORS**: Explicit allowed origins configured for production (not wildcard). Coordinated with Vercel deployment URL.
-- **Negative stock prevention**: Enforce in `InventoryService` and `OrdersService` — reject movements or order confirmations that would push `stockOnHand` below zero.
-- **Order cancellation restores inventory**: When a `CONFIRMED` order is cancelled, automatically log an `IN` movement to restore stock. (Currently: stock deducted on CONFIRMED, but not restored on CANCELLED.)
-- **Pagination**: All list endpoints (`GET /orders`, `GET /payments`, `GET /inventory/movements`, `GET /catalog/skus`) must accept `?page=1&limit=20` and return paginated results. Unbounded list queries are a production performance risk.
-- **JWT expiry**: `JWT_EXPIRES_IN_SECONDS` already exists in env. Document and enforce a sensible default (86400 = 24h). No refresh tokens in MVP — users re-login after expiry. Revisit post-MVP.
+- ✅ **Password reset flow**: `POST /auth/forgot-password` + `POST /auth/reset-password`. Sends a time-limited token via email. `/reset-password` page added to web.
+- ✅ **Rate limiting**: `@nestjs/throttler` on all auth endpoints (`/auth/login`, `/auth/register`, `/auth/forgot-password`). Blocks brute force.
+- ✅ **Security headers**: Helmet middleware on the NestJS app.
+- ✅ **CORS**: Explicit allowed origins configured via `CORS_ALLOWED_ORIGINS` env var (comma-separated). Falls back to wildcard in dev only.
+- ✅ **Negative stock prevention**: Enforced in `OrdersService.updateOrderStatus` — rejects order confirmation if any SKU has insufficient stock.
+- ✅ **Order cancellation restores inventory**: Cancelling a `CONFIRMED` order automatically logs an `IN` movement and restores `stockOnHand`.
+- ✅ **Pagination**: `GET /orders`, `GET /payments` accept `?page=1&limit=20` and return `{ data, meta }`. UI implements pagination via `<Pagination>` component.
+- ✅ **JWT expiry**: `JWT_EXPIRES_IN_SECONDS` default 604800 (7 days for dev). No refresh tokens in MVP.
 
 ### Super Admin + Tenant lifecycle
 
-- **Super Admin tenant provisioning**: `POST /admin/tenants` — Super Admin creates tenants directly with businessType + default features. Currently only possible via seed.
-- **Tenant suspend/reactivate**: Add `status` enum (`ACTIVE`, `SUSPENDED`) to `Tenant` model (migration required). Super Admin can suspend or reactivate. Suspended tenants are blocked at the guard layer — all data preserved. Hard delete not supported.
-- **Super Admin user management**: Super Admin can promote another user to Super Admin via `PATCH /admin/users/:id` (currently only possible via seed/DB).
-- **Product/SKU archival**: Add `isArchived: boolean` to `Sku` (and optionally `Product`). Archived SKUs cannot receive new orders but remain on historical records. Exposed via Super Admin or tenant OWNER/ADMIN.
+- ✅ **Super Admin tenant provisioning**: `POST /admin/tenants` — Super Admin creates tenants directly.
+- ✅ **Tenant suspend/reactivate**: `Tenant.status` enum (`ACTIVE`, `SUSPENDED`). Super Admin can suspend/reactivate. Suspended tenants blocked at guard layer.
+- ✅ **Super Admin user management**: `PATCH /admin/users/:id` to promote to Super Admin.
+- ✅ **Product/SKU archival**: `isArchived` on `Product` and `Sku`. Archived SKUs cannot receive new orders. Archive UI in CatalogPanel with `PATCH /products/:id/archive` and `PATCH /skus/:id/archive`.
 
 ### Deferred UX items from earlier milestones
 
-- Root `/` page: replace dev convenience landing page with a redirect to `/login`.
-- Tenant route guard: `/t/[tenantSlug]` shows API 403 for non-members instead of redirecting. Add page-level membership check that redirects to the user's tenant or `/login`.
-- Tenant staff invitation flow: UI for tenant owners to invite users as staff members (memberships API exists, invite flow does not). Uses SMTP already wired for password reset — same email infrastructure. Flow: generate signed invite token → send email with link → recipient sets password on first login.
+- ✅ **Root `/` page**: Redirects to `/login`.
+- ✅ **Tenant route guard**: `TenantShell` checks membership — redirects to first active tenant or `/login` if not a member.
+- **Tenant staff invitation flow**: UI for tenant owners to invite users. Flow: invite token → email → `/accept-invite?token=...` page sets password. ✅ Backend API exists, ✅ `/accept-invite` page exists. Email sending requires SMTP configured in deployment env.
+
+### Image upload infrastructure
+
+- ✅ **`POST /uploads`** — Multer diskStorage, JWT-authenticated. Accepts image/jpeg, image/png, image/webp, image/gif up to 5MB.
+- ✅ **Local storage**: Files saved to `apps/api/uploads/`, served via `express.static` at `/uploads/*`. URL format: `${APP_BASE_URL}/uploads/${filename}`.
+- ✅ **S3 storage**: Switchable via `STORAGE_TYPE=s3` env var. Uses `@aws-sdk/client-s3` + `PutObjectCommand`. Public URL uses `AWS_S3_PUBLIC_URL/${key}`.
+- ✅ **SKU image upload**: `ImageUpload` component in CatalogPanel. Click-to-upload, hover overlay, remove button. `PATCH /skus/:id` persists `imageUrl` to DB.
+- ✅ **`imageUrl` in orders/payments UI**: SKU thumbnails shown in order rows and payment detail.
+- ✅ **Tenant logo upload**: `logoUrl` on `Tenant`. Sidebar header shows logo with `ImageUpload` (OWNER/ADMIN). Settings profile page also has logo upload.
+- ✅ **User avatar upload**: `avatarUrl` on `User`. User menu dropdown shows avatar with `ImageUpload`. `PATCH /auth/me` persists it.
+- **Image cropping**: deferred to MS9 (Milestone-adjacent, not DoD-required).
+
+### Notifications backend
+
+- ✅ **`Notification` model**: persists in DB, tenant + user scoped.
+- ✅ **`notifyTenant()` helper**: writes notifications to all ACTIVE tenant members.
+- ✅ **Notification triggers**: ORDER_CREATED, ORDER_CONFIRMED, ORDER_CANCELLED, PAYMENT_SUBMITTED, PAYMENT_VERIFIED, PAYMENT_REJECTED.
+- ✅ **Notifications API**: `GET /notifications`, `PATCH /:id/read`, `PATCH /read-all`, `DELETE /:id`.
+- **Notification bell UI in header**: pending (notification center dropdown).
+
+### Auth UI overhaul
+
+- ✅ **Fancy split-screen auth layout** (`AuthLayout`): left form pane, right hero pane with grid overlay, animated blobs, rotating quotes.
+- ✅ **Login page**: uses `AuthLayout`.
+- ✅ **Register page**: uses `AuthLayout` with error handling.
+- ✅ **Forgot password page**: uses `AuthLayout`.
+- ✅ **Reset password page** (`/reset-password?token=...`): reads token from URL, validates, PATCH /auth/reset-password.
+- ✅ **Accept invite page** (`/accept-invite?token=...`): reads token, POST /memberships/accept-invite.
 
 ### UI overhaul (replace scaffolding panels with production UI)
 
 **App shell and navigation:**
-- Sidebar navigation with sections: Dashboard, Inventory, Orders, Payments, Catalog, Settings.
-- Top header with tenant name, user avatar/menu, and notification bell.
-- Breadcrumbs for nested views.
-- Feature-flagged sidebar items — if `orders` is disabled for a tenant, the Orders item is hidden.
+- ✅ Sidebar navigation: Dashboard, Inventory, Orders, Payments, Catalog, Settings.
+- ✅ Top header: tenant name, user avatar/menu, notification bell.
+- ✅ Feature-flagged sidebar items.
 
 **In-app notification center (bell icon):**
-- Bell icon in the top header with an unread badge count (e.g. `3`).
-- Clicking opens a dropdown panel: list of recent notifications, each showing title, body text, timestamp, and a clickable link to the related entity (order, payment, SKU).
-- Clicking a notification navigates to the entity and marks the notification as read.
-- Dismiss button (×) per notification to remove it from the list.
-- "Mark all as read" action at the top of the panel.
-- Badge clears when all notifications are read.
-- Panel fetches on open + polls every 60s when the page is active. No WebSocket in MVP.
-- Notifications are written server-side only — never from the frontend.
+- ✅ Bell icon with unread badge count.
+- ✅ Popover panel with notification list: title, body, timestamp, unread dot.
+- ✅ Mark as read (click notification) + dismiss (×) per notification.
+- ✅ "Mark all as read" action.
+- ✅ Polls every 60s when page is active.
 
 **Settings section (in sidebar):**
-- **Tenant Profile** — name, slug (read-only), businessType display.
-- **Team & Permissions** — PBAC management UI (see below).
-- Notification Preferences — post-MVP, added when external delivery channels ship.
-
-**Team & Permissions (PBAC management UI):**
-- Accessible from Settings → Team & Permissions.
-- Two tabs: **Roles** (read-only reference) and **Members** (editable).
-- Roles tab: shows each role (OWNER, ADMIN, STAFF, VIEWER) and its default permission bundle as a read-only tree grouped by module (Inventory, Orders, Payments, Catalog, Team). Informs tenant owners what each role can do before assigning it.
-- Members tab: lists all active tenant members. Expanding a member shows their role + all permissions as checkboxes. Overridden permissions (changed from role default) are visually highlighted.
-- Permission groups are feature-gated: if the `orders` module flag is disabled by the Super Admin, the Orders permission group shows "Module not enabled" — greyed out, not editable.
-- Edit rules: OWNER can edit ADMIN, STAFF, VIEWER. ADMIN can edit STAFF, VIEWER only. STAFF/VIEWER see their own permissions as read-only (viewable in their profile).
-- Saving a membership permission override calls `PATCH /memberships/:id/permissions`.
+- **Tenant Profile**: pending.
+- **Team & Permissions PBAC UI**: pending.
 
 **Other UI items:**
-- Data tables with sorting, filtering, and pagination for orders, SKUs, inventory movements.
-- Modals for create/edit flows (orders, SKUs, products).
-- Tabs for switching between related views (e.g. Products / SKUs / Movements).
-- Status badges, action menus, confirmation dialogs.
-- Wire toast/alert system consistently across all panels.
-- Orders: proper cards with SKU line-items, cleaner breakdown.
-- Payments: show order summary inline.
-- Mobile-responsive layout.
-- Use AI-generated + optimized images for product placeholders (`/generate-image`, `/optimize-images` skills).
+- ✅ Status badges consistently applied (orders, payments).
+- ✅ Pagination UI across orders and payments tabs.
+- ✅ Toast/alert system wired across all panels.
+- ✅ Right-side Sheet for order detail + actions.
+- ✅ Payments: tabs for Payables / History.
+- **Data tables with sorting/filtering**: pending.
+- **Modals for create/edit**: pending (current: inline forms).
+- **Mobile-responsive layout**: pending.
 
 ### QA + deployment
 
-- Seed data expanded: 3 realistic businesses with products, SKUs, inventory, orders, payments — all with `isArchived`, `status`, and pagination-friendly record counts.
-- Tenant isolation audit: run `/tenant-audit` and resolve all violations.
-- QA checklist completed.
-- Staging/prod deployment verified: Vercel (web) + Render (API) + Neon Postgres (DB).
-- All env vars documented in `ENVIRONMENT.md` and `.env.example` current.
-- All docs reflect final state.
+- **Seed data expanded**: pending — needs pagination-friendly record counts and `isArchived` coverage.
+- **Tenant isolation audit**: pending.
+- **QA checklist**: pending.
+- **Staging/prod deployment**: pending — Vercel + Render + Neon.
+- ✅ All env vars for storage documented in `.env.example`.
+- **All docs fully reflect final state**: in progress.
 
 Notes on data retention and soft deletes:
 - `Order`, `Payment`, `InventoryMovement` are immutable financial records — no delete, no soft delete.

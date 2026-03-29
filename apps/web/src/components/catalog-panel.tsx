@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
+import { ImageUpload } from "@/components/image-upload";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -56,6 +57,7 @@ type Product = {
   name: string;
   description: string | null;
   isActive: boolean;
+  isArchived: boolean;
   category: { id: string; name: string; slug: string };
 };
 
@@ -63,7 +65,9 @@ type Sku = {
   id: string;
   code: string;
   name: string;
+  imageUrl?: string | null;
   isActive: boolean;
+  isArchived: boolean;
   stockOnHand: number;
   lowStockThreshold: number;
   product: { id: string; name: string };
@@ -173,6 +177,37 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     setNewSkuCode("");
     setNewSkuName("");
     pushToast({ variant: "success", title: "SKU created", message: newSkuCode });
+    await loadAll();
+  }
+
+  async function archiveProduct(id: string, name: string) {
+    const res = await apiFetch(`/products/${id}/archive`, { tenantSlug, method: 'PATCH' });
+    if (!res.ok) {
+      const msg = await readApiError(res);
+      setStatus({ kind: 'error', text: `Archive failed: ${res.status}${msg ? ` (${msg})` : ''}` });
+      return;
+    }
+    pushToast({ variant: 'success', title: 'Product archived', message: name });
+    await loadAll();
+  }
+
+  async function updateSkuImage(skuId: string, imageUrl: string | null) {
+    await apiFetch(`/skus/${skuId}`, {
+      tenantSlug,
+      method: 'PATCH',
+      body: JSON.stringify({ imageUrl }),
+    });
+    await loadAll();
+  }
+
+  async function archiveSku(id: string, code: string) {
+    const res = await apiFetch(`/skus/${id}/archive`, { tenantSlug, method: 'PATCH' });
+    if (!res.ok) {
+      const msg = await readApiError(res);
+      setStatus({ kind: 'error', text: `Archive failed: ${res.status}${msg ? ` (${msg})` : ''}` });
+      return;
+    }
+    pushToast({ variant: 'success', title: 'SKU archived', message: code });
     await loadAll();
   }
 
@@ -305,14 +340,28 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             {products.map((p) => (
               <div
                 key={p.id}
-                className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2"
+                className={`flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 ${p.isArchived ? "opacity-50" : ""}`}
               >
-                <div className="flex min-w-0 items-start gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <ProductThumb label={p.name} size={26} />
-                  <div className="font-medium">{p.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">{p.category.name}</div>
+                  <div>
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">{p.category.name}</div>
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">{p.isActive ? "Active" : "Disabled"}</div>
+                <div className="flex items-center gap-2">
+                  {p.isArchived ? (
+                    <span className="text-xs text-muted-foreground">Archived</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-xs text-destructive hover:underline"
+                      onClick={() => archiveProduct(p.id, p.name)}
+                    >
+                      Archive
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -327,20 +376,37 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             {skus.map((s) => (
               <div
                 key={s.id}
-                className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2"
+                className={`flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 ${s.isArchived ? "opacity-50" : ""}`}
               >
-                <div className="flex min-w-0 items-start gap-2">
-                  <ProductThumb label={s.code} size={26} />
-                  <div className="font-medium">
-                    {s.code} · {s.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{s.product.name}</div>
-                </div>
-                <div className="text-right text-xs text-muted-foreground">
+                <div className="flex min-w-0 items-center gap-3">
+                  <ImageUpload
+                    currentUrl={s.imageUrl}
+                    tenantSlug={tenantSlug}
+                    size={48}
+                    onUploaded={(url) => void updateSkuImage(s.id, url)}
+                    onRemoved={() => void updateSkuImage(s.id, null)}
+                  />
                   <div>
-                    Stock: {s.stockOnHand} (low: {s.lowStockThreshold})
+                    <div className="font-medium">{s.code} · {s.name}</div>
+                    <div className="text-xs text-muted-foreground">{s.product.name}</div>
                   </div>
-                  <div>{s.isActive ? "Active" : "Disabled"}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right text-xs text-muted-foreground">
+                    <div>Stock: {s.stockOnHand}</div>
+                    <div>Low: {s.lowStockThreshold}</div>
+                  </div>
+                  {s.isArchived ? (
+                    <span className="text-xs text-muted-foreground">Archived</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-xs text-destructive hover:underline"
+                      onClick={() => archiveSku(s.id, s.code)}
+                    >
+                      Archive
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

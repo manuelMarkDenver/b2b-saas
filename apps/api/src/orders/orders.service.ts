@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { OrderStatus, ReferenceType, MovementType } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -14,7 +15,10 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async createOrder(tenantId: string, dto: CreateOrderDto) {
     const skuIds = dto.items.map((i) => i.skuId);
@@ -63,12 +67,19 @@ export class OrdersService {
       },
       include: {
         items: {
-          include: { sku: { select: { id: true, code: true, name: true } } },
+          include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
       },
     });
 
     this.logger.log(`order.created tenantId=${tenantId} orderId=${order.id}`);
+    void this.notifications.notifyTenant(
+      tenantId,
+      'ORDER_CREATED',
+      'New order created',
+      `Order ${order.id.slice(0, 8)} was created with ${order.items.length} item(s).`,
+      { entityType: 'order', entityId: order.id },
+    );
     return order;
   }
 
@@ -80,7 +91,7 @@ export class OrdersService {
         where,
         include: {
           items: {
-            include: { sku: { select: { id: true, code: true, name: true } } },
+            include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -97,7 +108,7 @@ export class OrdersService {
       where: { id: orderId },
       include: {
         items: {
-          include: { sku: { select: { id: true, code: true, name: true } } },
+          include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
       },
     });
@@ -162,7 +173,7 @@ export class OrdersService {
         },
         include: {
           items: {
-            include: { sku: { select: { id: true, code: true, name: true } } },
+            include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
           },
         },
       });
@@ -243,7 +254,7 @@ export class OrdersService {
           include: {
             items: {
               include: {
-                sku: { select: { id: true, code: true, name: true } },
+                sku: { select: { id: true, code: true, name: true, imageUrl: true } },
               },
             },
           },
@@ -251,6 +262,13 @@ export class OrdersService {
 
         this.logger.log(
           `order.status_changed tenantId=${tenantId} orderId=${orderId} status=${dto.status}`,
+        );
+        void this.notifications.notifyTenant(
+          tenantId,
+          'ORDER_CONFIRMED',
+          'Order confirmed',
+          `Order ${orderId.slice(0, 8)} has been confirmed. Stock has been deducted.`,
+          { entityType: 'order', entityId: orderId },
         );
         return updated;
       });
@@ -287,7 +305,7 @@ export class OrdersService {
           include: {
             items: {
               include: {
-                sku: { select: { id: true, code: true, name: true } },
+                sku: { select: { id: true, code: true, name: true, imageUrl: true } },
               },
             },
           },
@@ -295,6 +313,13 @@ export class OrdersService {
 
         this.logger.log(
           `order.status_changed tenantId=${tenantId} orderId=${orderId} status=${dto.status} inventory_restored=true`,
+        );
+        void this.notifications.notifyTenant(
+          tenantId,
+          'ORDER_CANCELLED',
+          'Order cancelled',
+          `Order ${orderId.slice(0, 8)} was cancelled. Stock has been restored.`,
+          { entityType: 'order', entityId: orderId },
         );
         return updated;
       });
@@ -306,7 +331,7 @@ export class OrdersService {
       data: { status: dto.status },
       include: {
         items: {
-          include: { sku: { select: { id: true, code: true, name: true } } },
+          include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
       },
     });

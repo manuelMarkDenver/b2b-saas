@@ -1,17 +1,22 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/auth/current-user.decorator';
-import type { AuthUser } from '../common/auth/auth.types';
+import type { AuthUser, RequestWithUser } from '../common/auth/auth.types';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('register')
   @UseGuards(ThrottlerGuard)
@@ -49,5 +54,16 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return { user };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  async updateProfile(@Req() req: RequestWithUser, @Body() dto: UpdateProfileDto) {
+    const updated = await this.prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatarUrl: dto.avatarUrl ?? null },
+      select: { id: true, email: true, avatarUrl: true, isPlatformAdmin: true, status: true },
+    });
+    return { user: updated };
   }
 }

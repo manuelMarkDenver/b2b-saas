@@ -39,6 +39,7 @@ model User {
   passwordHash         String
   status               UserStatus         @default(ACTIVE)
   isPlatformAdmin      Boolean            @default(false)
+  avatarUrl            String?
   resetToken           String?            @unique
   resetTokenExpiresAt  DateTime?
   createdAt            DateTime           @default(now())
@@ -68,6 +69,7 @@ model Tenant {
   status             TenantStatus        @default(ACTIVE)
   businessType       BusinessType        @default(general_retail)
   features           Json                @default("{\"inventory\":true,\"orders\":true,\"payments\":true,\"marketplace\":false}")
+  logoUrl            String?
   createdByUserId    String              @db.Uuid
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -121,6 +123,7 @@ model Sku {
   barcode            String?
   stockOnHand        Int                 @default(0)
   lowStockThreshold  Int                 @default(0)
+  imageUrl           String?
   isActive           Boolean             @default(true)
   isArchived         Boolean             @default(false)
   createdAt          DateTime            @default(now())

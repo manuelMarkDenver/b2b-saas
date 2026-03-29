@@ -32,6 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         email: true,
         status: true,
         isPlatformAdmin: true,
+        avatarUrl: true,
       },
     });
 
@@ -44,6 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       status: user.status,
       isPlatformAdmin: user.isPlatformAdmin,
+      avatarUrl: user.avatarUrl,
       activeTenantId: payload.activeTenantId ?? null,
     };
   }

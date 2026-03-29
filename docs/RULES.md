@@ -2,7 +2,7 @@
 
 This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-> Last updated: 2026-03-29 — Added Confirm-Before-Act rule. Added Mailpit for local email testing.
+> Last updated: 2026-03-29 — Added Confirm-Before-Act rule. Added Mailpit for local email testing. Added image upload infrastructure rules. Added static file serving rule.
 
 ---
 
@@ -320,6 +320,40 @@ MUST NOT:
 - Commit unoptimized PNG/JPEG images directly — always convert to WebP first.
 - Store large images (>500KB) in the repo.
 - Use `<img>` tags directly in Next.js components — always use the `<Image>` component.
+
+---
+
+## Image Upload Infrastructure Rules
+
+### Storage backend
+
+- `STORAGE_TYPE=local|s3` switches the upload backend. Default: `local`.
+- **Local**: files saved to `apps/api/uploads/`, served via `express.static` at `/uploads/*` in `main.ts`. URL: `${APP_BASE_URL}/uploads/${filename}`.
+- **S3**: `PutObjectCommand` via `@aws-sdk/client-s3`. Public URL: `${AWS_S3_PUBLIC_URL}/${key}`. Required env vars: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, `AWS_S3_PUBLIC_URL`.
+
+### Static file serving
+
+- **MUST use `express.static` in `main.ts`** — NOT `ServeStaticModule` in the NestJS module tree.
+- `ServeStaticModule` breaks `createTestApp()` in E2E tests (startup fails). Never add it to any module.
+- The `express.static` middleware in `main.ts` is not loaded during tests, so it does not affect test runs.
+
+### Upload controller rules
+
+- All uploads require `JwtAuthGuard` — no anonymous uploads.
+- Max file size: 5MB. Accepted MIME types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`.
+- Multer uses `diskStorage` locally. For S3, the file is written to disk first, then streamed to S3 — the local file is not retained.
+- `x-tenant-slug` header is required and forwarded from the frontend for tenant context.
+
+### Entity image URL fields
+
+- `Sku.imageUrl`: ✅ implemented (migration `20260329061213_add_sku_image_url`).
+- `Tenant.logoUrl`: ✅ implemented (migration `20260329300000_add_avatar_logo_url`). `PATCH /tenant/logo` (OWNER/ADMIN only).
+- `User.avatarUrl`: ✅ implemented (same migration). `PATCH /auth/me` to update.
+- `SuperAdmin` profile image: deferred to MS9.
+
+### Image cropping
+
+- Deferred to MS9 (Milestone-adjacent). When implemented, use a client-side cropper (e.g. `react-easy-crop`) before upload — do not crop server-side.
 
 ---
 

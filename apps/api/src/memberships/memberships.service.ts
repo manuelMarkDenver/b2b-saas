@@ -23,7 +23,7 @@ export class MembershipsService {
     return this.prisma.tenantMembership.findMany({
       where: { userId },
       include: {
-        tenant: { select: { id: true, name: true, slug: true, features: true } },
+        tenant: { select: { id: true, name: true, slug: true, features: true, logoUrl: true } },
       },
       orderBy: { createdAt: 'asc' },
     });

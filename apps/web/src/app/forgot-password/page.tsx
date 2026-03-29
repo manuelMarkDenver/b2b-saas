@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AuthLayout } from '@/components/auth-layout';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = React.useState('');
@@ -44,16 +45,16 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <main className="mx-auto max-w-sm px-4 py-20">
-        <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-          <h1 className="text-2xl font-semibold tracking-tight">Reset password</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Enter your email and we&apos;ll send a reset link if an account exists.
-          </p>
+    <AuthLayout quoteIndex={2}>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Enter your email and we&apos;ll send a reset link if an account exists.
+        </p>
+      </div>
 
           {sent ? (
-            <div className="mt-6 space-y-4">
+            <div className="mt-8 space-y-4">
               <p className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">
                 If that email is registered, a reset link has been sent.
               </p>
@@ -62,7 +63,7 @@ export default function ForgotPasswordPage() {
               </Link>
             </div>
           ) : (
-            <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+            <form className="mt-8 space-y-4" onSubmit={onSubmit}>
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -82,19 +83,17 @@ export default function ForgotPasswordPage() {
                 </p>
               )}
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full h-10" disabled={loading}>
                 {loading ? 'Sending…' : 'Send reset link'}
               </Button>
 
-              <div className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-sm text-muted-foreground">
                 <Link href="/login" className="text-primary hover:underline">
                   Back to sign in
                 </Link>
-              </div>
+              </p>
             </form>
           )}
-        </div>
-      </main>
-    </div>
+    </AuthLayout>
   );
 }
