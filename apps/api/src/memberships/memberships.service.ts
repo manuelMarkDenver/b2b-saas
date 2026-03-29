@@ -56,7 +56,7 @@ export class MembershipsService {
 
   listTeamMembers(tenantId: string) {
     return this.prisma.tenantMembership.findMany({
-      where: { tenantId, status: { in: ['ACTIVE', 'INVITED'] } },
+      where: { tenantId },
       select: {
         id: true,
         role: true,
@@ -68,6 +68,70 @@ export class MembershipsService {
       },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  async addDirectStaff(
+    tenantId: string,
+    actorUserId: string,
+    identifier: string,
+    role: TenantRole,
+    password: string,
+    jobTitle?: string,
+  ) {
+    const actor = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId: actorUserId } },
+      select: { role: true },
+    });
+    if (!actor || (actor.role !== 'OWNER' && actor.role !== 'ADMIN')) {
+      throw new ForbiddenException('Only OWNER or ADMIN can add staff');
+    }
+
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email: normalizedIdentifier },
+      select: { id: true },
+    });
+    if (existing) {
+      const alreadyMember = await this.prisma.tenantMembership.findUnique({
+        where: { tenantId_userId: { tenantId, userId: existing.id } },
+        select: { status: true },
+      });
+      if (alreadyMember?.status === 'ACTIVE') {
+        throw new BadRequestException('That identifier is already used by an active member');
+      }
+    }
+
+    const passwordHash = await hash(password, 12);
+    const user = existing ?? await this.prisma.user.create({
+      data: { email: normalizedIdentifier, passwordHash, status: 'ACTIVE' },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await this.prisma.user.update({
+        where: { id: existing.id },
+        data: { passwordHash, status: 'ACTIVE' },
+      });
+    }
+
+    await this.prisma.tenantMembership.upsert({
+      where: { tenantId_userId: { tenantId, userId: user.id } },
+      create: {
+        tenantId,
+        userId: user.id,
+        role,
+        jobTitle: jobTitle?.trim() || null,
+        status: 'ACTIVE',
+      },
+      update: {
+        role,
+        jobTitle: jobTitle?.trim() || null,
+        status: 'ACTIVE',
+      },
+    });
+
+    return { message: 'Staff member added', identifier: normalizedIdentifier };
   }
 
   async updateMembership(
@@ -96,7 +160,7 @@ export class MembershipsService {
       data: {
         ...(dto.role ? { role: dto.role as TenantRole } : {}),
         ...(dto.jobTitle !== undefined ? { jobTitle: dto.jobTitle || null } : {}),
-        ...(dto.deactivate ? { status: 'DISABLED' } : {}),
+        ...(dto.deactivate === true ? { status: 'DISABLED' } : dto.deactivate === false ? { status: 'ACTIVE' } : {}),
       },
       select: {
         id: true,
