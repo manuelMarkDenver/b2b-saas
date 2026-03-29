@@ -12,6 +12,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 type Order = {
   id: string;
@@ -43,16 +49,16 @@ const STATUS_LABELS: Record<Payment["status"], string> = {
 };
 
 const STATUS_COLORS: Record<Payment["status"], string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
-  VERIFIED: "bg-green-500/15 text-green-700 dark:text-green-300",
-  REJECTED: "bg-red-500/15 text-red-600 dark:text-red-400",
+  PENDING: "bg-yellow-500/25 text-yellow-900 dark:bg-yellow-500/15 dark:text-yellow-300",
+  VERIFIED: "bg-green-500/25 text-green-900 dark:bg-green-500/15 dark:text-green-300",
+  REJECTED: "bg-red-500/20 text-red-900 dark:bg-red-500/15 dark:text-red-300",
 };
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
-  CONFIRMED: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  COMPLETED: "bg-green-500/15 text-green-700 dark:text-green-300",
-  CANCELLED: "bg-red-500/15 text-red-600 dark:text-red-400",
+  PENDING: "bg-yellow-500/25 text-yellow-900 dark:bg-yellow-500/15 dark:text-yellow-300",
+  CONFIRMED: "bg-blue-500/25 text-blue-900 dark:bg-blue-500/15 dark:text-blue-300",
+  COMPLETED: "bg-green-500/25 text-green-900 dark:bg-green-500/15 dark:text-green-300",
+  CANCELLED: "bg-red-500/20 text-red-900 dark:bg-red-500/15 dark:text-red-300",
 };
 
 function formatCents(cents: number) {
@@ -253,7 +259,20 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
+      <Tabs defaultValue="payables" className="mt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="payables">Payables</TabsTrigger>
+            <TabsTrigger value="history">Payments</TabsTrigger>
+          </TabsList>
+          <div className="text-xs text-muted-foreground">
+            Payables: {orders.length} · Payments: {payments.length}
+          </div>
+        </div>
+
+        <TabsContent value="payables" className="mt-4">
+
+      <div className="overflow-hidden rounded-md border border-border/60">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
           <div>
             <div className="text-sm font-medium">Orders</div>
@@ -311,121 +330,11 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       </div>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-[520px]">
-          <SheetHeader>
-            <SheetTitle>Order details</SheetTitle>
-            <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>
-          </SheetHeader>
+        </TabsContent>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-5">
-            {selectedOrder ? (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border/60 bg-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <ProductThumb label={selectedOrder.id.slice(0, 8)} size={44} className="rounded-lg border border-border/60" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Order</div>
-                        <div className="mt-0.5 font-mono text-sm font-medium">{selectedOrder.id.slice(0, 8)}…</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {new Date(selectedOrder.createdAt).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        ORDER_STATUS_COLORS[selectedOrder.status] ?? "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {selectedOrder.status}
-                    </span>
-                  </div>
+        <TabsContent value="history" className="mt-4">
 
-                  <div className="mt-3 flex items-baseline justify-between gap-3">
-                    <div className="text-sm text-muted-foreground">Total</div>
-                    <div className="font-mono text-lg font-semibold tabular-nums">
-                      {formatCents(selectedOrder.totalCents)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-card p-4">
-                  <div className="text-sm font-medium">Items</div>
-                  <div className="mt-3 space-y-2">
-                    {selectedOrder.items.map((it) => (
-                      <div key={it.id} className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <ProductThumb label={it.sku.code} size={26} />
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">
-                              {it.sku.code} · {it.sku.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">Qty {it.quantity}</div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-mono text-sm tabular-nums">
-                            {formatCents(it.priceAtTime * it.quantity)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatCents(it.priceAtTime)} ea
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-card p-4">
-                  <div className="text-sm font-medium">Submit payment</div>
-                  <div className="mt-3 space-y-2">
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                      <input
-                        className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={amountDollars}
-                        onChange={(e) => setAmountDollars(e.target.value)}
-                      />
-                    </div>
-                    <input
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      placeholder="Proof URL (optional)"
-                      value={proofUrl}
-                      onChange={(e) => setProofUrl(e.target.value)}
-                    />
-                    <button
-                      className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
-                      type="button"
-                      onClick={submitPayment}
-                      disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
-                    >
-                      Submit Payment
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-card p-4">
-                  <div className="text-sm font-medium">Activity</div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Created/updated by will appear here once audit actors are exposed by the API.
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
-                Select an order from the list to view details.
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
+      <div className="overflow-hidden rounded-md border border-border/60">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
           <div>
             <div className="text-sm font-medium">Payments</div>
@@ -514,6 +423,125 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </>
         )}
       </div>
+
+        </TabsContent>
+      </Tabs>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-[520px]">
+          <SheetHeader>
+            <SheetTitle>Order details</SheetTitle>
+            <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 pb-5">
+            {selectedOrder ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <ProductThumb
+                        label={selectedOrder.id.slice(0, 8)}
+                        size={44}
+                        className="rounded-lg border border-border/60"
+                      />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Order</div>
+                        <div className="mt-0.5 font-mono text-sm font-medium">{selectedOrder.id.slice(0, 8)}…</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {new Date(selectedOrder.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        ORDER_STATUS_COLORS[selectedOrder.status] ?? "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {selectedOrder.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-baseline justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">Total</div>
+                    <div className="font-mono text-lg font-semibold tabular-nums">
+                      {formatCents(selectedOrder.totalCents)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Items</div>
+                  <div className="mt-3 space-y-2">
+                    {selectedOrder.items.map((it) => (
+                      <div key={it.id} className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ProductThumb label={it.sku.code} size={26} />
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {it.sku.code} · {it.sku.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Qty {it.quantity}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-sm tabular-nums">
+                            {formatCents(it.priceAtTime * it.quantity)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{formatCents(it.priceAtTime)} ea</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Submit payment</div>
+                  <div className="mt-3 space-y-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                      <input
+                        className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={amountDollars}
+                        onChange={(e) => setAmountDollars(e.target.value)}
+                      />
+                    </div>
+                    <input
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      placeholder="Proof URL (optional)"
+                      value={proofUrl}
+                      onChange={(e) => setProofUrl(e.target.value)}
+                    />
+                    <button
+                      className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
+                      type="button"
+                      onClick={submitPayment}
+                      disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
+                    >
+                      Submit Payment
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Activity</div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Created/updated by will appear here once audit actors are exposed by the API.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
+                Select an order from the list to view details.
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

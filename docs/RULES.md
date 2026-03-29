@@ -294,6 +294,8 @@ SHOULD:
 
 - When introducing new list UIs, confirm whether the backing endpoint is paginated. If it is, implement pagination (or explicit limits + sorting) in the UI so behavior stays consistent across modules.
 
+- Avoid mixing multiple primary workflows in a single view (e.g. payables + payment history). If both are needed, use tabs or separate routes.
+
 MUST NOT:
 
 - Commit unoptimized PNG/JPEG images directly — always convert to WebP first.
