@@ -62,7 +62,7 @@ export class PaymentsService {
       tenantId,
       'PAYMENT_SUBMITTED',
       'Payment submitted',
-      `A payment of $${(dto.amountCents / 100).toFixed(2)} was submitted for order ${dto.orderId.slice(0, 8)}.`,
+      `A payment of ₱${(dto.amountCents / 100).toFixed(2)} was submitted for order ${dto.orderId.slice(0, 8)}.`,
       { entityType: 'payment', entityId: payment.id },
     );
     return payment;
