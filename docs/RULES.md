@@ -288,6 +288,8 @@ SHOULD:
 - Store product/UI images in `apps/web/public/images/` with a clear subfolder structure (e.g. `products/`, `ui/`, `generated/`).
 - Prefer AI-generated placeholder images over lorem picsum or generic stock photos for product demos.
 
+- If the backend does not provide an image URL yet, render a deterministic default thumbnail (so lists remain scannable without introducing storage/upload scope).
+
 MUST NOT:
 
 - Commit unoptimized PNG/JPEG images directly — always convert to WebP first.

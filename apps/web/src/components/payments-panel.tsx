@@ -4,6 +4,7 @@ import * as React from "react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
+import { ProductThumb } from "@/components/product-thumb";
 
 type Order = {
   id: string;
@@ -283,10 +284,13 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               </div>
               <div className="mt-2 space-y-1">
                 {selectedOrder.items.slice(0, 3).map((it) => (
-                  <div key={it.id} className="flex justify-between text-xs text-muted-foreground">
-                    <span className="truncate">
-                      {it.sku.code} · {it.sku.name} × {it.quantity}
-                    </span>
+                  <div key={it.id} className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ProductThumb label={it.sku.code} size={22} />
+                      <span className="truncate">
+                        {it.sku.code} · {it.sku.name} × {it.quantity}
+                      </span>
+                    </div>
                     <span className="font-mono tabular-nums">{formatCents(it.priceAtTime * it.quantity)}</span>
                   </div>
                 ))}

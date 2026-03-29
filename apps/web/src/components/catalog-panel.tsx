@@ -5,6 +5,7 @@ import * as React from "react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
+import { ProductThumb } from "@/components/product-thumb";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -306,9 +307,10 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 key={p.id}
                 className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2"
               >
-                <div>
+                <div className="flex min-w-0 items-start gap-2">
+                  <ProductThumb label={p.name} size={26} />
                   <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">{p.category.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">{p.category.name}</div>
                 </div>
                 <div className="text-xs text-muted-foreground">{p.isActive ? "Active" : "Disabled"}</div>
               </div>
@@ -327,7 +329,8 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 key={s.id}
                 className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2"
               >
-                <div>
+                <div className="flex min-w-0 items-start gap-2">
+                  <ProductThumb label={s.code} size={26} />
                   <div className="font-medium">
                     {s.code} · {s.name}
                   </div>
