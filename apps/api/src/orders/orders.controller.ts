@@ -6,9 +6,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
 import { FeatureFlagGuard, RequireFeature } from '../common/auth/feature-flag.guard';
@@ -29,8 +31,8 @@ export class OrdersController {
   }
 
   @Get()
-  listOrders(@Req() req: RequestWithUser) {
-    return this.ordersService.listOrders(req.tenant!.id);
+  listOrders(@Req() req: RequestWithUser, @Query() pagination: PaginationDto) {
+    return this.ordersService.listOrders(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20);
   }
 
   @Get(':id')

@@ -11,7 +11,10 @@ export const envSchema = z.object({
     .default('info'),
   LOG_PRETTY: z.coerce.boolean().optional().default(false),
   JWT_SECRET: z.string().min(16),
-  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(604800),
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(86400),
+  THROTTLE_TTL: z.coerce.number().int().positive().default(60000),
+  THROTTLE_LIMIT: z.coerce.number().int().positive().default(10),
+  CORS_ALLOWED_ORIGINS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

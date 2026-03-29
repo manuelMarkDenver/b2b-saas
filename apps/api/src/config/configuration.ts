@@ -13,5 +13,10 @@ export function configuration(env: Env) {
       jwtSecret: env.JWT_SECRET,
       jwtExpiresInSeconds: env.JWT_EXPIRES_IN_SECONDS,
     },
+    throttle: {
+      ttl: env.THROTTLE_TTL,
+      limit: env.THROTTLE_LIMIT,
+    },
+    corsAllowedOrigins: env.CORS_ALLOWED_ORIGINS,
   };
 }

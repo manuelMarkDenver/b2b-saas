@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/auth/admin.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
@@ -57,8 +58,8 @@ export class CatalogController {
   // SKUs (tenant-scoped)
   @Get('skus')
   @UseGuards(TenantGuard)
-  listSkus(@Req() req: RequestWithUser) {
-    return this.catalogService.listSkus(req.tenant!.id);
+  listSkus(@Req() req: RequestWithUser, @Query() pagination: PaginationDto) {
+    return this.catalogService.listSkus(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20);
   }
 
   @Post('skus')

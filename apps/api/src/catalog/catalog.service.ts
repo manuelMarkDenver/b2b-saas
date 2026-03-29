@@ -90,14 +90,22 @@ export class CatalogService {
     });
   }
 
-  listSkus(tenantId: string) {
-    return this.prisma.sku.findMany({
-      where: { tenantId },
-      include: {
-        product: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listSkus(tenantId: string, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const where = { tenantId };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.sku.findMany({
+        where,
+        include: {
+          product: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.sku.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
   async createSku(tenantId: string, data: {

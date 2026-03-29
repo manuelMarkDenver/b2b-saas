@@ -22,7 +22,7 @@ describe('Payments (e2e)', () => {
       .get('/skus')
       .set('Authorization', `Bearer ${peakToken}`)
       .set('x-tenant-slug', 'peak-hardware');
-    const skus = skuRes.body as Array<{ id: string; priceCents: number | null }>;
+    const skus = skuRes.body.data as Array<{ id: string; priceCents: number | null }>;
     const skuId = skus.find((s) => s.priceCents !== null)!.id;
 
     const orderRes = await request(app.getHttpServer())
@@ -57,7 +57,7 @@ describe('Payments (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const skus = skuRes.body as Array<{ id: string; priceCents: number | null }>;
+      const skus = skuRes.body.data as Array<{ id: string; priceCents: number | null }>;
       const skuId = skus.find((s) => s.priceCents !== null)!.id;
 
       const orderRes = await request(app.getHttpServer())
@@ -118,7 +118,8 @@ describe('Payments (e2e)', () => {
         .set('x-tenant-slug', 'peak-hardware');
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.meta).toBeDefined();
     });
 
     it('filters by orderId', async () => {
@@ -128,7 +129,7 @@ describe('Payments (e2e)', () => {
         .set('x-tenant-slug', 'peak-hardware');
 
       expect(res.status).toBe(200);
-      const payments = res.body as Array<{ orderId: string }>;
+      const payments = res.body.data as Array<{ orderId: string }>;
       expect(payments.every((p) => p.orderId === orderId)).toBe(true);
     });
   });
@@ -141,7 +142,7 @@ describe('Payments (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const skus = skuRes.body as Array<{ id: string; priceCents: number | null }>;
+      const skus = skuRes.body.data as Array<{ id: string; priceCents: number | null }>;
       const skuId = skus.find((s) => s.priceCents !== null)!.id;
 
       const orderRes = await request(app.getHttpServer())
@@ -184,7 +185,7 @@ describe('Payments (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const skus = skuRes.body as Array<{ id: string; priceCents: number | null }>;
+      const skus = skuRes.body.data as Array<{ id: string; priceCents: number | null }>;
       const skuId = skus.find((s) => s.priceCents !== null)!.id;
 
       const orderRes = await request(app.getHttpServer())

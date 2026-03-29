@@ -22,7 +22,7 @@ describe('Orders (e2e)', () => {
       .get('/skus')
       .set('Authorization', `Bearer ${peakToken}`)
       .set('x-tenant-slug', 'peak-hardware');
-    const skus = skuRes.body as Array<{ id: string; priceCents: number | null }>;
+    const skus = skuRes.body.data as Array<{ id: string; priceCents: number | null }>;
     skuId = skus.find((s) => s.priceCents !== null)!.id;
   });
 
@@ -95,7 +95,8 @@ describe('Orders (e2e)', () => {
         .set('x-tenant-slug', 'peak-hardware');
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.meta).toBeDefined();
     });
   });
 
@@ -141,7 +142,7 @@ describe('Orders (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const skus = skusRes.body as Array<{ id: string; stockOnHand: number }>;
+      const skus = skusRes.body.data as Array<{ id: string; stockOnHand: number }>;
       stockBefore = skus.find((s) => s.id === skuId)!.stockOnHand;
 
       const res = await request(app.getHttpServer())
@@ -167,7 +168,7 @@ describe('Orders (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const skus = skusRes.body as Array<{ id: string; stockOnHand: number }>;
+      const skus = skusRes.body.data as Array<{ id: string; stockOnHand: number }>;
       const stockAfter = skus.find((s) => s.id === skuId)!.stockOnHand;
       expect(stockAfter).toBe(stockBefore - 3);
     });
@@ -211,7 +212,7 @@ describe('Orders (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const stockBefore = (skusRes.body as Array<{ id: string; stockOnHand: number }>)
+      const stockBefore = (skusRes.body.data as Array<{ id: string; stockOnHand: number }>)
         .find((s) => s.id === skuId)!.stockOnHand;
 
       // Create + confirm order (deducts stock)
@@ -243,7 +244,7 @@ describe('Orders (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const stockAfter = (skusAfterRes.body as Array<{ id: string; stockOnHand: number }>)
+      const stockAfter = (skusAfterRes.body.data as Array<{ id: string; stockOnHand: number }>)
         .find((s) => s.id === skuId)!.stockOnHand;
 
       expect(stockAfter).toBe(stockBefore);
@@ -255,7 +256,7 @@ describe('Orders (e2e)', () => {
         .get('/skus')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware');
-      const currentStock = (skusRes.body as Array<{ id: string; stockOnHand: number }>)
+      const currentStock = (skusRes.body.data as Array<{ id: string; stockOnHand: number }>)
         .find((s) => s.id === skuId)!.stockOnHand;
 
       // Clamp to ≤10000 to stay within DTO max, but still exceed available stock

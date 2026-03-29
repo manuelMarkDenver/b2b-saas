@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { LoggerModule } from './common/logging/logger.module';
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -19,6 +21,16 @@ import { AppService } from './app.service';
 @Module({
   imports: [
     ConfigModule,
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          name: 'default',
+          ttl: config.get<number>('throttle.ttl')!,
+          limit: config.get<number>('throttle.limit')!,
+        },
+      ],
+    }),
     LoggerModule,
     PrismaModule,
     HealthModule,
