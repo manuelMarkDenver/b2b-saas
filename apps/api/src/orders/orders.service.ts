@@ -7,6 +7,7 @@ import {
 import { OrderStatus, ReferenceType, MovementType } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Injectable()
@@ -106,6 +107,69 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  async updateOrder(tenantId: string, orderId: string, dto: UpdateOrderDto) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+
+    if (!order || order.tenantId !== tenantId) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Only PENDING orders can be edited');
+    }
+
+    const skuIds = dto.items.map((i) => i.skuId);
+    const skus = await this.prisma.sku.findMany({
+      where: { id: { in: skuIds }, tenantId },
+      select: { id: true, priceCents: true, isActive: true },
+    });
+
+    if (skus.length !== skuIds.length) {
+      throw new NotFoundException('One or more SKUs not found for this tenant');
+    }
+
+    const inactiveSkus = skus.filter((s) => !s.isActive);
+    if (inactiveSkus.length > 0) {
+      throw new BadRequestException('One or more SKUs are inactive');
+    }
+
+    const skuMap = new Map(skus.map((s) => [s.id, s]));
+
+    let totalCents = 0;
+    const itemsData = dto.items.map((item) => {
+      const sku = skuMap.get(item.skuId)!;
+      const priceAtTime = sku.priceCents ?? 0;
+      totalCents += priceAtTime * item.quantity;
+      return { skuId: item.skuId, quantity: item.quantity, priceAtTime };
+    });
+
+    const INT_MAX = 2_147_483_647;
+    if (totalCents > INT_MAX) {
+      throw new BadRequestException(
+        `Order total exceeds maximum allowed value ($${(INT_MAX / 100).toLocaleString()}). Split into multiple orders.`,
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.orderItem.deleteMany({ where: { orderId } });
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          totalCents,
+          items: { create: itemsData },
+        },
+        include: {
+          items: {
+            include: { sku: { select: { id: true, code: true, name: true } } },
+          },
+        },
+      });
+    });
+
+    this.logger.log(`order.updated tenantId=${tenantId} orderId=${orderId}`);
+    return updated;
   }
 
   async updateOrderStatus(

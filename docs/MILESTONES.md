@@ -84,8 +84,9 @@ Definition of done:
 - Order items capture `priceAtTime` (snapshot of SKU price at order creation).
 - Inventory movement logged automatically on order confirmation (`OUT` type, reference `ORDER`).
 - API endpoints: create order, list orders, get order by ID, update order status (tenant-scoped).
+- Edit order (PENDING only): `PATCH /orders/:id` replaces items and recalculates total. Non-PENDING orders return 400.
 - Tenant-scoped: all queries filter by `tenantId`.
-- Audit log event: `order.created`, `order.status_changed`.
+- Audit log event: `order.created`, `order.updated`, `order.status_changed`.
 - Docs updated: `DATA_MODEL.md`.
 
 ---

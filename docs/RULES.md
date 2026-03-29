@@ -91,6 +91,17 @@ Use `/scope-check <feature>` to classify any proposed addition before touching c
 
 ---
 
+## Order Mutability Rules
+
+- Orders are **immutable once confirmed**. Only `PENDING` orders may be edited.
+- Editing an order (`PATCH /orders/:id`) replaces all items and recalculates the total in a single transaction.
+- Attempting to edit a non-PENDING order returns `400 Bad Request`.
+- After `CONFIRMED`: no edits. To correct a confirmed order, cancel it and create a new one.
+- `priceAtTime` on `OrderItem` is always captured at the moment the item is saved (create or edit) — never updated retroactively.
+- Audit log must emit `order.updated` on every successful edit.
+
+---
+
 ## Inventory Safety Rules
 
 - `stockOnHand` on `Sku` must NEVER be mutated directly.

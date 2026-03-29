@@ -118,6 +118,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
 
+  // Edit mode (within detail sheet, PENDING only)
+  const [editMode, setEditMode] = React.useState(false);
+  const [editCart, setEditCart] = React.useState<CartLine[]>([]);
+  const [editView, setEditView] = React.useState<"products" | "cart">("products");
+  const [editSearch, setEditSearch] = React.useState("");
+
   const { pushToast } = useToast();
 
   async function loadData() {
@@ -209,6 +215,73 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     await loadData();
   }
 
+  // ── Edit mode helpers ─────────────────────────────────────────────────────────
+
+  const filteredEditSkus = React.useMemo(
+    () =>
+      skus.filter(
+        (s) =>
+          editSearch.trim() === "" ||
+          s.code.toLowerCase().includes(editSearch.toLowerCase()) ||
+          s.name.toLowerCase().includes(editSearch.toLowerCase()),
+      ),
+    [skus, editSearch],
+  );
+
+  function editCartQtyFor(skuId: string) {
+    return editCart.find((l) => l.skuId === skuId)?.quantity ?? 0;
+  }
+
+  function editAddOne(skuId: string) {
+    setEditCart((prev) => {
+      const ex = prev.find((l) => l.skuId === skuId);
+      if (ex) return prev.map((l) => (l.skuId === skuId ? { ...l, quantity: l.quantity + 1 } : l));
+      return [...prev, { skuId, quantity: 1 }];
+    });
+  }
+
+  function setEditLineQty(skuId: string, qty: number) {
+    if (qty < 1) { setEditCart((prev) => prev.filter((l) => l.skuId !== skuId)); return; }
+    setEditCart((prev) => prev.map((l) => (l.skuId === skuId ? { ...l, quantity: qty } : l)));
+  }
+
+  const editCartTotalCents = editCart.reduce((sum, line) => {
+    const sku = skus.find((s) => s.id === line.skuId);
+    return sum + (sku?.priceCents ?? 0) * line.quantity;
+  }, 0);
+
+  const editCartItemCount = editCart.reduce((n, l) => n + l.quantity, 0);
+
+  function enterEditMode() {
+    if (!selectedOrder) return;
+    setEditCart(selectedOrder.items.map((item) => ({ skuId: item.skuId, quantity: item.quantity })));
+    setEditView("products");
+    setEditSearch("");
+    setEditMode(true);
+  }
+
+  function exitEditMode() {
+    setEditMode(false);
+  }
+
+  async function saveOrderEdit() {
+    if (!selectedOrder || editCart.length === 0) return;
+    const res = await apiFetch(`/orders/${selectedOrder.id}`, {
+      tenantSlug,
+      method: "PATCH",
+      body: JSON.stringify({ items: editCart.map((l) => ({ skuId: l.skuId, quantity: l.quantity })) }),
+    });
+    if (!res.ok) {
+      const msg = await readApiError(res);
+      setPageStatus({ kind: "error", text: `Update failed: ${res.status}${msg ? ` (${msg})` : ""}` });
+      return;
+    }
+    setEditMode(false);
+    setDetailOpen(false);
+    pushToast({ variant: "success", title: "Order updated", message: "" });
+    await loadData();
+  }
+
   // ── Order detail ──────────────────────────────────────────────────────────────
 
   function openDetail(order: Order) {
@@ -270,7 +343,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
       {/* ── Orders table ── */}
       <div className="mt-5 overflow-hidden rounded-md border border-border/60">
-        <div className="grid grid-cols-[1fr_80px_120px_120px_1fr_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[1fr_60px_120px_120px_160px_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
           <span>Status</span>
@@ -299,22 +372,19 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                 key={order.id}
                 type="button"
                 onClick={() => openDetail(order)}
-                className="grid w-full grid-cols-[1fr_80px_120px_120px_1fr_100px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+                className="grid w-full grid-cols-[1fr_60px_120px_120px_160px_100px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <ProductThumb label={order.id.slice(0, 8)} size={40} className="rounded-lg" />
-                  <div className="min-w-0">
-                    <div className="truncate font-medium font-mono text-xs">{order.id.slice(0, 8)}…</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {order.items[0]
-                        ? `${order.items[0].sku.code} · ${order.items[0].sku.name}`
-                        : "No items"}
-                      {order.items.length > 1 ? ` · +${order.items.length - 1} more` : ""}
-                    </div>
+                <div className="min-w-0">
+                  <div className="font-mono text-xs font-semibold text-foreground">{order.id.slice(0, 8)}…</div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {order.items[0]
+                      ? `${order.items[0].sku.code} · ${order.items[0].sku.name}`
+                      : "No items"}
+                    {order.items.length > 1 ? ` +${order.items.length - 1} more` : ""}
                   </div>
                 </div>
 
-                <span className="text-center text-xs text-muted-foreground">{order.items.length}</span>
+                <span className="text-center text-sm font-medium tabular-nums">{order.items.reduce((sum, i) => sum + i.quantity, 0)}</span>
 
                 <Badge variant={STATUS_VARIANT[order.status]} className="min-w-[80px] justify-center">
                   {STATUS_LABELS[order.status]}
@@ -323,9 +393,13 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                 <span className="text-right font-mono tabular-nums">{formatCents(order.totalCents)}</span>
                 <span className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</span>
 
-                <span className={`text-right text-xs font-medium ${order.status === "COMPLETED" || order.status === "CANCELLED" ? "text-muted-foreground" : "text-primary"}`}>
-                  {ACTION_LABEL[order.status]}
-                </span>
+                {order.status === "COMPLETED" || order.status === "CANCELLED" ? (
+                  <span className="text-right text-xs text-muted-foreground">{ACTION_LABEL[order.status]}</span>
+                ) : (
+                  <span className="ml-auto inline-flex items-center rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary ring-1 ring-primary/30">
+                    {ACTION_LABEL[order.status]}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -552,99 +626,223 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       {/* ──────────────────────────────────────────────────────────────────────────
           ORDER DETAIL SHEET
       ────────────────────────────────────────────────────────────────────────── */}
-      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-        <SheetContent side="right" className="w-[520px]">
+      <Sheet open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setEditMode(false); }}>
+        <SheetContent side="right" className="w-[680px]">
           <SheetHeader>
-            <SheetTitle>Order {selectedOrder?.id.slice(0, 8)}…</SheetTitle>
+            <SheetTitle>
+              {editMode ? "Edit Order" : `Order ${selectedOrder?.id.slice(0, 8)}…`}
+            </SheetTitle>
             <SheetDescription>
-              {selectedOrder
-                ? `${new Date(selectedOrder.createdAt).toLocaleString()} · ${selectedOrder.items.length} item${selectedOrder.items.length === 1 ? "" : "s"}`
-                : ""}
+              {editMode
+                ? "Change items or quantities. Only PENDING orders can be edited."
+                : selectedOrder
+                  ? `${new Date(selectedOrder.createdAt).toLocaleString()} · ${selectedOrder.items.reduce((sum, i) => sum + i.quantity, 0)} item${selectedOrder.items.reduce((sum, i) => sum + i.quantity, 0) === 1 ? "" : "s"}`
+                  : ""}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-28">
-            {selectedOrder ? (
-              <div className="space-y-4">
-                {/* Status + summary */}
-                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-4">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Total</div>
-                    <div className="mt-0.5 text-2xl font-bold tabular-nums">
-                      {formatCents(selectedOrder.totalCents)}
+          {/* ── VIEW MODE ── */}
+          {!editMode && selectedOrder ? (
+            <>
+              <div className="flex-1 overflow-y-auto px-5 pb-28">
+                <div className="space-y-4">
+                  {/* Status + summary + edit button */}
+                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-4">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Total</div>
+                      <div className="mt-0.5 text-2xl font-bold tabular-nums">
+                        {formatCents(selectedOrder.totalCents)}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge variant={STATUS_VARIANT[selectedOrder.status]} className="min-w-[90px] justify-center text-sm">
+                        {STATUS_LABELS[selectedOrder.status]}
+                      </Badge>
+                      {selectedOrder.status === "PENDING" ? (
+                        <button
+                          type="button"
+                          className="h-9 rounded-lg border border-primary/60 px-4 text-sm font-semibold text-primary hover:bg-primary/10"
+                          onClick={enterEditMode}
+                        >
+                          Edit order
+                        </button>
+                      ) : null}
                     </div>
                   </div>
-                  <Badge variant={STATUS_VARIANT[selectedOrder.status]} className="min-w-[90px] justify-center text-sm">
-                    {STATUS_LABELS[selectedOrder.status]}
-                  </Badge>
-                </div>
 
-                {/* Items */}
-                <div className="rounded-xl border border-border/60 bg-card">
-                  <div className="border-b border-border/60 px-4 py-3 text-sm font-semibold">Items</div>
-                  <div className="divide-y divide-border/60 px-4">
-                    {selectedOrder.items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4 py-4">
-                        <ProductThumb
-                          label={`${item.sku.code} ${item.sku.name}`}
-                          size={80}
-                          className="rounded-xl"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold">{item.sku.code}</div>
-                          <div className="text-sm text-muted-foreground">{item.sku.name}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            Qty {item.quantity} · {formatCents(item.priceAtTime)} ea
+                  {/* Items */}
+                  <div className="rounded-xl border border-border/60 bg-card">
+                    <div className="border-b border-border/60 px-4 py-3 text-sm font-semibold">Items</div>
+                    <div className="divide-y divide-border/60 px-4">
+                      {selectedOrder.items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-4 py-4">
+                          <ProductThumb label={`${item.sku.code} ${item.sku.name}`} size={80} className="rounded-xl" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold">{item.sku.code}</div>
+                            <div className="text-sm text-muted-foreground">{item.sku.name}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Qty {item.quantity} · {formatCents(item.priceAtTime)} ea
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-right">
                           <div className="text-base font-bold tabular-nums">
                             {formatCents(item.priceAtTime * item.quantity)}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Detail footer — status actions */}
-          {selectedOrder ? (
-            <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
-              {(() => {
-                const next = NEXT_STATUSES[selectedOrder.status];
-                if (!next || next.length === 0) {
-                  return (
-                    <p className="text-center text-sm text-muted-foreground">
-                      No further actions available for this order.
-                    </p>
-                  );
-                }
-                return (
-                  <div className="space-y-2">
-                    <div className="text-xs text-muted-foreground">Update status</div>
-                    <div className="flex gap-2">
-                      {next.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          className={`flex-1 rounded-xl py-3 text-sm font-semibold transition-colors ${
-                            s === "CANCELLED"
-                              ? "border border-destructive/60 text-destructive hover:bg-destructive/10"
-                              : "bg-primary text-primary-foreground hover:bg-primary/90"
-                          }`}
-                          onClick={() => updateStatus(selectedOrder.id, s)}
-                        >
-                          → {STATUS_LABELS[s]}
-                        </button>
                       ))}
                     </div>
                   </div>
-                );
-              })()}
-            </div>
+                </div>
+              </div>
+
+              {/* View footer — status actions */}
+              <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+                {(() => {
+                  const next = NEXT_STATUSES[selectedOrder.status];
+                  if (!next || next.length === 0) {
+                    return <p className="text-center text-sm text-muted-foreground">No further actions available.</p>;
+                  }
+                  return (
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground">Update status</div>
+                      <div className="flex gap-2">
+                        {next.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className={`flex-1 rounded-xl py-3 text-sm font-semibold transition-colors ${
+                              s === "CANCELLED"
+                                ? "border border-destructive/60 text-destructive hover:bg-destructive/10"
+                                : "bg-primary text-primary-foreground hover:bg-primary/90"
+                            }`}
+                            onClick={() => updateStatus(selectedOrder.id, s)}
+                          >
+                            → {STATUS_LABELS[s]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
+          ) : null}
+
+          {/* ── EDIT MODE — same two-view pattern as New Order ── */}
+          {editMode ? (
+            <>
+              {editView === "products" ? (
+                <>
+                  <div className="px-5 pb-3">
+                    <input
+                      type="search"
+                      placeholder="Search by name or SKU code…"
+                      value={editSearch}
+                      onChange={(e) => setEditSearch(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-input bg-background px-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {filteredEditSkus.length !== skus.length ? (
+                      <div className="mt-1.5 text-xs text-muted-foreground">
+                        {filteredEditSkus.length} of {skus.length} products
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-5 pb-36">
+                    {filteredEditSkus.length === 0 ? (
+                      <div className="py-16 text-center text-sm text-muted-foreground">No products match &ldquo;{editSearch}&rdquo;</div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        {filteredEditSkus.map((sku) => {
+                          const qty = editCartQtyFor(sku.id);
+                          const inCart = qty > 0;
+                          return (
+                            <div key={sku.id} className={`overflow-hidden rounded-xl border bg-card transition-colors ${inCart ? "border-primary/60" : "border-border/60"}`}>
+                              <div className="relative aspect-square w-full bg-muted/20">
+                                <ProductThumb fill label={`${sku.code} ${sku.name}`} className="absolute inset-0 rounded-none border-0" />
+                                {inCart ? (
+                                  <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow">{qty}</div>
+                                ) : null}
+                              </div>
+                              <div className="p-3">
+                                <div className="text-[11px] font-medium text-muted-foreground">{sku.code}</div>
+                                <div className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug">{sku.name}</div>
+                                <div className="mt-1.5 text-base font-bold text-primary">{formatCents(sku.priceCents ?? 0)}</div>
+                                <div className="mt-0.5 text-xs text-muted-foreground">Stock: {sku.stockOnHand}</div>
+                                {inCart ? (
+                                  <div className="mt-3 flex items-center justify-between gap-1">
+                                    <button type="button" className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background" onClick={() => setEditLineQty(sku.id, qty - 1)}><Minus className="h-4 w-4" /></button>
+                                    <span className="flex-1 text-center text-base font-bold tabular-nums">{qty}</span>
+                                    <button type="button" className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background" onClick={() => setEditLineQty(sku.id, qty + 1)}><Plus className="h-4 w-4" /></button>
+                                  </div>
+                                ) : (
+                                  <button type="button" className="mt-3 w-full rounded-lg border border-primary/60 py-2 text-sm font-semibold text-primary hover:bg-primary/10" onClick={() => editAddOne(sku.id)}>+ Add</button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm text-muted-foreground">
+                          {editCartItemCount === 0 ? "No items yet" : `${editCartItemCount} item${editCartItemCount === 1 ? "" : "s"} in cart`}
+                        </div>
+                        <div className="mt-0.5 text-3xl font-bold tabular-nums">{formatCents(editCartTotalCents)}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" className="h-12 rounded-xl border border-input bg-background px-4 text-sm font-semibold hover:bg-muted/40" onClick={exitEditMode}>Cancel</button>
+                        <button type="button" className="h-12 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground disabled:opacity-40" onClick={() => setEditView("cart")} disabled={editCart.length === 0}>Review →</button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex-1 overflow-y-auto px-5 pb-36">
+                    <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card">
+                      {editCart.map((line) => {
+                        const sku = skus.find((s) => s.id === line.skuId);
+                        if (!sku) return null;
+                        return (
+                          <div key={line.skuId} className="flex items-center gap-4 px-4 py-4">
+                            <ProductThumb label={`${sku.code} ${sku.name}`} size={80} className="rounded-xl" />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold">{sku.code}</div>
+                              <div className="text-sm text-muted-foreground">{sku.name}</div>
+                              <div className="mt-0.5 text-xs text-muted-foreground">{formatCents(sku.priceCents ?? 0)} ea</div>
+                              <div className="mt-2 flex items-center gap-2">
+                                <button type="button" className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background" onClick={() => setEditLineQty(line.skuId, line.quantity - 1)}><Minus className="h-3.5 w-3.5" /></button>
+                                <span className="w-10 text-center text-base font-bold tabular-nums">{line.quantity}</span>
+                                <button type="button" className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background" onClick={() => setEditLineQty(line.skuId, line.quantity + 1)}><Plus className="h-3.5 w-3.5" /></button>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <div className="text-base font-bold tabular-nums">{formatCents((sku.priceCents ?? 0) * line.quantity)}</div>
+                              <button type="button" className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={() => setEditLineQty(line.skuId, 0)}><X className="h-4 w-4" /></button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+                    <div className="flex items-center justify-between gap-4">
+                      <button type="button" className="h-12 rounded-xl border border-input bg-background px-5 text-sm font-semibold hover:bg-muted/40" onClick={() => setEditView("products")}>← Add More</button>
+                      <div className="flex flex-col items-end">
+                        <div className="text-sm text-muted-foreground">{editCartItemCount} item{editCartItemCount === 1 ? "" : "s"}</div>
+                        <div className="text-2xl font-bold tabular-nums">{formatCents(editCartTotalCents)}</div>
+                      </div>
+                      <button type="button" className="h-12 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground" onClick={saveOrderEdit}>Save Changes</button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
           ) : null}
         </SheetContent>
       </Sheet>
