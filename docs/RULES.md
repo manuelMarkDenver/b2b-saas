@@ -290,6 +290,8 @@ SHOULD:
 
 - If the backend does not provide an image URL yet, render a deterministic default thumbnail (so lists remain scannable without introducing storage/upload scope).
 
+- For ERP-style workflows, prefer list views (table/cards) that open a focused detail view (right-side sheet) for actions; keep destructive/state-change actions inside the detail view to reduce mis-clicks.
+
 MUST NOT:
 
 - Commit unoptimized PNG/JPEG images directly — always convert to WebP first.

@@ -5,6 +5,13 @@ import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 type Order = {
   id: string;
@@ -52,13 +59,6 @@ function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-function formatOrderLabel(order: Order) {
-  const shortId = `${order.id.slice(0, 8)}…`;
-  const date = new Date(order.createdAt);
-  const when = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-  return `${shortId} · ${order.status} · ${formatCents(order.totalCents)} · ${when}`;
-}
-
 async function readApiError(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as unknown;
@@ -103,6 +103,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
   const [amountDollars, setAmountDollars] = React.useState("0.00");
   const [proofUrl, setProofUrl] = React.useState("");
+  const [sheetOpen, setSheetOpen] = React.useState(false);
 
   const { pushToast } = useToast();
 
@@ -170,6 +171,11 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     setSelectedOrderId(orderId);
     const order = orders.find((o) => o.id === orderId);
     if (order) setAmountDollars((order.totalCents / 100).toFixed(2));
+  }
+
+  function openOrder(orderId: string) {
+    handleOrderChange(orderId);
+    setSheetOpen(true);
   }
 
   async function submitPayment() {
@@ -247,88 +253,177 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       ) : null}
 
-      <div className="mt-5 rounded-md border border-border/60 p-4">
-        <div className="text-sm font-medium">Submit Payment</div>
-        <div className="mt-3 space-y-2">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={selectedOrderId}
-            onChange={(e) => handleOrderChange(e.target.value)}
-          >
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {formatOrderLabel(o)}{pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
-              </option>
-            ))}
-          </select>
-
-          {selectedOrder ? (
-            <div className="rounded-md border border-border/60 bg-background px-3 py-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">
-                  Order <span className="font-mono text-foreground">{selectedOrder.id.slice(0, 8)}…</span>
-                </div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    ORDER_STATUS_COLORS[selectedOrder.status] ?? "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {selectedOrder.status}
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
-                <div className="text-sm font-medium">{formatCents(selectedOrder.totalCents)}</div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(selectedOrder.createdAt).toLocaleString()}
-                </div>
-              </div>
-              <div className="mt-2 space-y-1">
-                {selectedOrder.items.slice(0, 3).map((it) => (
-                  <div key={it.id} className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <ProductThumb label={it.sku.code} size={22} />
-                      <span className="truncate">
-                        {it.sku.code} · {it.sku.name} × {it.quantity}
-                      </span>
-                    </div>
-                    <span className="font-mono tabular-nums">{formatCents(it.priceAtTime * it.quantity)}</span>
-                  </div>
-                ))}
-                {selectedOrder.items.length > 3 ? (
-                  <div className="text-xs text-muted-foreground">+{selectedOrder.items.length - 3} more items</div>
-                ) : null}
-              </div>
+      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
+          <div>
+            <div className="text-sm font-medium">Orders</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Click an order to view details and submit payment.
             </div>
-          ) : null}
-
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-            <input
-              className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="0.00"
-              value={amountDollars}
-              onChange={(e) => setAmountDollars(e.target.value)}
-            />
           </div>
-          <input
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            placeholder="Proof URL (optional)"
-            value={proofUrl}
-            onChange={(e) => setProofUrl(e.target.value)}
-          />
-          <button
-            className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
-            type="button"
-            onClick={submitPayment}
-            disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
-          >
-            Submit Payment
-          </button>
+          <div className="text-xs text-muted-foreground">
+            {orders.length} total
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[1fr_120px_120px_1fr_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span>Order</span>
+          <span>Status</span>
+          <span className="text-right">Total</span>
+          <span>Created</span>
+          <span className="text-right">Action</span>
+        </div>
+
+        <div className="divide-y divide-border/60">
+          {orders.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => openOrder(o.id)}
+              className="grid w-full grid-cols-[1fr_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <ProductThumb label={o.id.slice(0, 8)} size={26} />
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {o.items[0] ? `${o.items[0].sku.code} · ${o.items[0].sku.name}` : "No items"}
+                    {o.items.length > 1 ? ` · +${o.items.length - 1} more` : ""}
+                    {pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
+                  </div>
+                </div>
+              </div>
+
+              <span
+                className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${
+                  ORDER_STATUS_COLORS[o.status] ?? "bg-muted text-muted-foreground"
+                }`}
+              >
+                {o.status}
+              </span>
+
+              <span className="text-right font-mono tabular-nums">{formatCents(o.totalCents)}</span>
+              <span className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleString()}</span>
+
+              <span className="text-right text-xs text-primary">View</span>
+            </button>
+          ))}
         </div>
       </div>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-[520px]">
+          <SheetHeader>
+            <SheetTitle>Order details</SheetTitle>
+            <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 pb-5">
+            {selectedOrder ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <ProductThumb label={selectedOrder.id.slice(0, 8)} size={44} className="rounded-lg border border-border/60" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Order</div>
+                        <div className="mt-0.5 font-mono text-sm font-medium">{selectedOrder.id.slice(0, 8)}…</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {new Date(selectedOrder.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        ORDER_STATUS_COLORS[selectedOrder.status] ?? "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {selectedOrder.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-baseline justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">Total</div>
+                    <div className="font-mono text-lg font-semibold tabular-nums">
+                      {formatCents(selectedOrder.totalCents)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Items</div>
+                  <div className="mt-3 space-y-2">
+                    {selectedOrder.items.map((it) => (
+                      <div key={it.id} className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ProductThumb label={it.sku.code} size={26} />
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {it.sku.code} · {it.sku.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Qty {it.quantity}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-sm tabular-nums">
+                            {formatCents(it.priceAtTime * it.quantity)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatCents(it.priceAtTime)} ea
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Submit payment</div>
+                  <div className="mt-3 space-y-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                      <input
+                        className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={amountDollars}
+                        onChange={(e) => setAmountDollars(e.target.value)}
+                      />
+                    </div>
+                    <input
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      placeholder="Proof URL (optional)"
+                      value={proofUrl}
+                      onChange={(e) => setProofUrl(e.target.value)}
+                    />
+                    <button
+                      className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
+                      type="button"
+                      onClick={submitPayment}
+                      disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
+                    >
+                      Submit Payment
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Activity</div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Created/updated by will appear here once audit actors are exposed by the API.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
+                Select an order from the list to view details.
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <div className="mt-5 space-y-3">
         {payments.length === 0 ? (
