@@ -412,7 +412,7 @@ async function main() {
 
   // --- Seed Orders ---
 
-  // Peak Hardware: one PENDING, one CONFIRMED
+  // Peak Hardware: PENDING (2 items), CONFIRMED (1 item), COMPLETED (3 items — multi-item showcase)
   await seedOrder({
     tenantId: hardwareTenant.id,
     items: [
@@ -426,8 +426,17 @@ async function main() {
     items: [{ skuId: cableSku.id, quantity: 10, priceCents: cableSku.priceCents ?? 8500 }],
     status: OrderStatus.CONFIRMED,
   });
+  await seedOrder({
+    tenantId: hardwareTenant.id,
+    items: [
+      { skuId: boltSku.id,   quantity: 200, priceCents: boltSku.priceCents ?? 150 },
+      { skuId: washerSku.id, quantity: 200, priceCents: washerSku.priceCents ?? 50 },
+      { skuId: cableSku.id,  quantity: 5,   priceCents: cableSku.priceCents ?? 8500 },
+    ],
+    status: OrderStatus.COMPLETED,
+  });
 
-  // Metro Pizza: one PENDING, one COMPLETED
+  // Metro Pizza: PENDING (2 items), COMPLETED (1 item), CONFIRMED (3 items — multi-item showcase)
   await seedOrder({
     tenantId: foodTenant.id,
     items: [
@@ -441,12 +450,21 @@ async function main() {
     items: [{ skuId: mozzaSku.id, quantity: 8, priceCents: mozzaSku.priceCents ?? 145000 }],
     status: OrderStatus.COMPLETED,
   });
+  await seedOrder({
+    tenantId: foodTenant.id,
+    items: [
+      { skuId: flourSku.id, quantity: 10, priceCents: flourSku.priceCents ?? 189000 },
+      { skuId: mozzaSku.id, quantity: 15, priceCents: mozzaSku.priceCents ?? 145000 },
+      { skuId: sauceSku.id, quantity: 12, priceCents: sauceSku.priceCents ?? 62000 },
+    ],
+    status: OrderStatus.CONFIRMED,
+  });
 
-  // Corner General: one PENDING, one CANCELLED
+  // Corner General: PENDING (2 items), CANCELLED (1 item), COMPLETED (3 items — multi-item showcase)
   await seedOrder({
     tenantId: retailTenant.id,
     items: [
-      { skuId: colaSku.id, quantity: 24, priceCents: colaSku.priceCents ?? 6500 },
+      { skuId: colaSku.id,  quantity: 24, priceCents: colaSku.priceCents ?? 6500 },
       { skuId: chipsSku.id, quantity: 12, priceCents: chipsSku.priceCents ?? 9900 },
     ],
     status: OrderStatus.PENDING,
@@ -455,6 +473,15 @@ async function main() {
     tenantId: retailTenant.id,
     items: [{ skuId: cleanerSku.id, quantity: 6, priceCents: cleanerSku.priceCents ?? 28500 }],
     status: OrderStatus.CANCELLED,
+  });
+  await seedOrder({
+    tenantId: retailTenant.id,
+    items: [
+      { skuId: colaSku.id,    quantity: 48, priceCents: colaSku.priceCents ?? 6500 },
+      { skuId: chipsSku.id,   quantity: 24, priceCents: chipsSku.priceCents ?? 9900 },
+      { skuId: cleanerSku.id, quantity: 12, priceCents: cleanerSku.priceCents ?? 28500 },
+    ],
+    status: OrderStatus.COMPLETED,
   });
 
   // --- Seed Payments ---

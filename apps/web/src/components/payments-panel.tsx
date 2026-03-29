@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Check, Eye, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -44,23 +44,23 @@ type Payment = {
   order: Order;
 };
 
-const STATUS_LABELS: Record<Payment["status"], string> = {
+const PAYMENT_STATUS_LABELS: Record<Payment["status"], string> = {
   PENDING: "Pending",
   VERIFIED: "Verified",
   REJECTED: "Rejected",
 };
 
-const STATUS_COLORS: Record<Payment["status"], string> = {
-  PENDING: "bg-yellow-500/25 text-yellow-900 dark:bg-yellow-500/15 dark:text-yellow-300",
-  VERIFIED: "bg-green-500/25 text-green-900 dark:bg-green-500/15 dark:text-green-300",
-  REJECTED: "bg-red-500/20 text-red-900 dark:bg-red-500/15 dark:text-red-300",
+const PAYMENT_STATUS_VARIANT: Record<Payment["status"], "pending" | "verified" | "rejected"> = {
+  PENDING: "pending",
+  VERIFIED: "verified",
+  REJECTED: "rejected",
 };
 
-const ORDER_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/25 text-yellow-900 dark:bg-yellow-500/15 dark:text-yellow-300",
-  CONFIRMED: "bg-blue-500/25 text-blue-900 dark:bg-blue-500/15 dark:text-blue-300",
-  COMPLETED: "bg-green-500/25 text-green-900 dark:bg-green-500/15 dark:text-green-300",
-  CANCELLED: "bg-red-500/20 text-red-900 dark:bg-red-500/15 dark:text-red-300",
+const ORDER_STATUS_VARIANT: Record<string, "pending" | "confirmed" | "completed" | "cancelled"> = {
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
 };
 
 function formatCents(cents: number) {
@@ -304,7 +304,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               className="grid w-full grid-cols-[1fr_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <ProductThumb label={o.id.slice(0, 8)} size={26} />
+                <ProductThumb label={o.id.slice(0, 8)} size={40} />
                 <div className="min-w-0">
                   <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
                   <div className="truncate text-xs text-muted-foreground">
@@ -315,18 +315,16 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                 </div>
               </div>
 
-              <span
-                className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${
-                  ORDER_STATUS_COLORS[o.status] ?? "bg-muted text-muted-foreground"
-                }`}
-              >
+              <Badge variant={ORDER_STATUS_VARIANT[o.status] ?? "muted"} className="min-w-[90px] justify-center">
                 {o.status}
-              </span>
+              </Badge>
 
               <span className="text-right font-mono tabular-nums">{formatCents(o.totalCents)}</span>
               <span className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleString()}</span>
 
-              <span className="text-right text-xs text-primary">View</span>
+              <span className="ml-auto text-xs font-medium text-primary">
+                {o.status === "COMPLETED" || o.status === "CANCELLED" ? "View" : "Pay →"}
+              </span>
             </button>
           ))}
         </div>
@@ -351,7 +349,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           <div className="px-4 py-6 text-sm text-muted-foreground">No payments yet.</div>
         ) : (
           <>
-            <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_110px_140px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Payment</span>
               <span className="text-right">Amount</span>
               <span>Order</span>
@@ -365,7 +363,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               {payments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="grid grid-cols-[120px_110px_1fr_90px_1fr_110px_140px] items-center gap-3 px-4 py-3 text-sm"
+                  className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] items-center gap-3 px-4 py-3 text-sm"
                 >
                   <span className="font-mono text-xs text-muted-foreground">{payment.id.slice(0, 8)}…</span>
 
@@ -393,18 +391,17 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
                   <span className="text-xs text-muted-foreground">{new Date(payment.createdAt).toLocaleString()}</span>
 
-                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[payment.status]}`}>
-                    {STATUS_LABELS[payment.status]}
-                  </span>
+                  <Badge variant={PAYMENT_STATUS_VARIANT[payment.status]} className="min-w-[72px] justify-center">
+                    {PAYMENT_STATUS_LABELS[payment.status]}
+                  </Badge>
 
-                  <div className="flex justify-end gap-1">
+                  <div className="flex flex-wrap justify-end gap-1">
                     <Button
                       variant="outline"
                       type="button"
                       className="h-7 px-2 text-xs"
                       onClick={() => openOrder(payment.orderId)}
                     >
-                      <Eye className="h-3.5 w-3.5" />
                       View
                     </Button>
 
@@ -416,7 +413,6 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                           className="h-7 px-2 text-xs"
                           onClick={() => verifyPayment(payment.id, "VERIFIED")}
                         >
-                          <Check className="h-3.5 w-3.5" />
                           Verify
                         </Button>
                         <Button
@@ -425,7 +421,6 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                           className="h-7 px-2 text-xs"
                           onClick={() => verifyPayment(payment.id, "REJECTED")}
                         >
-                          <X className="h-3.5 w-3.5" />
                           Reject
                         </Button>
                       </>
@@ -448,54 +443,44 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-5">
+          <div className="flex-1 overflow-y-auto px-5 pb-28">
             {selectedOrder ? (
               <div className="space-y-4">
                 <div className="rounded-lg border border-border/60 bg-card p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <ProductThumb
-                        label={selectedOrder.id.slice(0, 8)}
-                        size={44}
-                        className="rounded-lg border border-border/60"
-                      />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Order</div>
-                        <div className="mt-0.5 font-mono text-sm font-medium">{selectedOrder.id.slice(0, 8)}…</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {new Date(selectedOrder.createdAt).toLocaleString()}
-                        </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Order</div>
+                      <div className="mt-0.5 font-mono text-sm font-medium">{selectedOrder.id.slice(0, 8)}…</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {new Date(selectedOrder.createdAt).toLocaleString()}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {selectedOrder.items.length} item{selectedOrder.items.length === 1 ? "" : "s"}
                       </div>
                     </div>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        ORDER_STATUS_COLORS[selectedOrder.status] ?? "bg-muted text-muted-foreground"
-                      }`}
-                    >
+                    <Badge variant={ORDER_STATUS_VARIANT[selectedOrder.status] ?? "muted"}>
                       {selectedOrder.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 flex items-baseline justify-between gap-3">
-                    <div className="text-sm text-muted-foreground">Total</div>
-                    <div className="font-mono text-lg font-semibold tabular-nums">
-                      {formatCents(selectedOrder.totalCents)}
-                    </div>
+                    </Badge>
                   </div>
                 </div>
 
                 <div className="rounded-lg border border-border/60 bg-card p-4">
                   <div className="text-sm font-medium">Items</div>
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-3">
                     {selectedOrder.items.map((it) => (
                       <div key={it.id} className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <ProductThumb label={it.sku.code} size={26} />
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ProductThumb
+                            label={`${it.sku.code} ${it.sku.name}`}
+                            caption="No image"
+                            size={96}
+                            className="rounded-lg border border-border/60"
+                          />
                           <div className="min-w-0">
                             <div className="truncate text-sm font-medium">
                               {it.sku.code} · {it.sku.name}
                             </div>
-                            <div className="text-xs text-muted-foreground">Qty {it.quantity}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">Qty {it.quantity}</div>
                           </div>
                         </div>
                         <div className="text-right">
@@ -510,7 +495,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                 </div>
 
                 <div className="rounded-lg border border-border/60 bg-card p-4">
-                  <div className="text-sm font-medium">Submit payment</div>
+                  <div className="text-sm font-medium">Payment details</div>
                   <div className="mt-3 space-y-2">
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
@@ -530,14 +515,6 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                       value={proofUrl}
                       onChange={(e) => setProofUrl(e.target.value)}
                     />
-                    <button
-                      className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
-                      type="button"
-                      onClick={submitPayment}
-                      disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
-                    >
-                      Submit Payment
-                    </button>
                   </div>
                 </div>
 
@@ -553,6 +530,25 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                 Select an order from the list to view details.
               </div>
             )}
+          </div>
+
+          <div className="border-t border-border/60 bg-background/95 px-5 py-4 backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground">Total</div>
+                <div className="font-mono text-lg font-semibold tabular-nums">
+                  {selectedOrder ? formatCents(selectedOrder.totalCents) : "—"}
+                </div>
+              </div>
+              <button
+                className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                type="button"
+                onClick={submitPayment}
+                disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
+              >
+                Submit Payment
+              </button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>

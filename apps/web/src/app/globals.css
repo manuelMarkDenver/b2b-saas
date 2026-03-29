@@ -10,6 +10,16 @@
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
 
+  /* Status badge tokens — overrideable per tenant */
+  --status-pending:    55 97% 86%;
+  --status-pending-fg: 28 80% 28%;
+  --status-confirmed:    214 95% 90%;
+  --status-confirmed-fg: 227 70% 38%;
+  --status-completed:    142 76% 88%;
+  --status-completed-fg: 140 70% 24%;
+  --status-cancelled:    0 93% 92%;
+  --status-cancelled-fg: 0 72% 33%;
+
   /* Tenant-driven tokens (set per /t/:tenantSlug) */
   --tenant-primary: 221.2 83.2% 53.3%;
   --tenant-primary-foreground: 210 40% 98%;
@@ -69,6 +79,15 @@
 }
 
 .dark {
+  --status-pending:    32 70% 14%;
+  --status-pending-fg: 43 97% 63%;
+  --status-confirmed:    224 70% 14%;
+  --status-confirmed-fg: 213 97% 68%;
+  --status-completed:    143 70% 12%;
+  --status-completed-fg: 142 70% 55%;
+  --status-cancelled:    0 72% 14%;
+  --status-cancelled-fg: 0 93% 66%;
+
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;

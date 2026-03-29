@@ -1,10 +1,19 @@
 "use client";
 
 import * as React from "react";
+import { Minus, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 type Sku = {
   id: string;
@@ -30,6 +39,8 @@ type Order = {
   items: OrderItem[];
 };
 
+type CartLine = { skuId: string; quantity: number };
+
 const STATUS_LABELS: Record<Order["status"], string> = {
   PENDING: "Pending",
   CONFIRMED: "Confirmed",
@@ -37,16 +48,23 @@ const STATUS_LABELS: Record<Order["status"], string> = {
   CANCELLED: "Cancelled",
 };
 
-const STATUS_COLORS: Record<Order["status"], string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
-  CONFIRMED: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  COMPLETED: "bg-green-500/15 text-green-700 dark:text-green-300",
-  CANCELLED: "bg-red-500/15 text-red-600 dark:text-red-400",
+const STATUS_VARIANT: Record<Order["status"], "pending" | "confirmed" | "completed" | "cancelled"> = {
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
 };
 
 const NEXT_STATUSES: Partial<Record<Order["status"], Order["status"][]>> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["COMPLETED", "CANCELLED"],
+};
+
+const ACTION_LABEL: Record<Order["status"], string> = {
+  PENDING: "Review →",
+  CONFIRMED: "Fulfill →",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
 };
 
 function formatCents(cents: number) {
@@ -64,15 +82,11 @@ async function readApiError(res: Response): Promise<string> {
     ) {
       return (data as { message: string }).message;
     }
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
   try {
     const text = await res.text();
     if (text) return text;
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
   return "";
 }
 
@@ -92,40 +106,38 @@ function unwrapList<T>(payload: unknown): T[] {
 export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [skus, setSkus] = React.useState<Sku[]>([]);
-  const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
+  const [pageStatus, setPageStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
-  const [selectedSkuId, setSelectedSkuId] = React.useState("");
-  const [quantity, setQuantity] = React.useState(1);
+  // New Order sheet
+  const [newOrderOpen, setNewOrderOpen] = React.useState(false);
+  const [cart, setCart] = React.useState<CartLine[]>([]);
+  const [orderView, setOrderView] = React.useState<"products" | "cart">("products");
+  const [search, setSearch] = React.useState("");
+
+  // Order detail sheet
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
 
   const { pushToast } = useToast();
 
   async function loadData() {
-    setStatus({ kind: "info", text: "Loading orders..." });
+    setPageStatus({ kind: "info", text: "Loading orders..." });
     try {
       const [ordersRes, skusRes] = await Promise.all([
         apiFetch("/orders", { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
       ]);
-
       if (!ordersRes.ok) throw new Error(`Orders failed: ${ordersRes.status}`);
       if (!skusRes.ok) throw new Error(`SKUs failed: ${skusRes.status}`);
-
       const [ordersData, skusData] = await Promise.all([
         ordersRes.json() as Promise<unknown>,
         skusRes.json() as Promise<unknown>,
       ]);
-
-      const ordersList = unwrapList<Order>(ordersData);
-      const skusList = unwrapList<Sku>(skusData);
-
-      setOrders(ordersList);
-      setSkus(skusList.filter((s) => s.priceCents !== null));
-      setStatus(null);
+      setOrders(unwrapList<Order>(ordersData));
+      setSkus(unwrapList<Sku>(skusData).filter((s) => s.priceCents !== null));
+      setPageStatus(null);
     } catch (err) {
-      setStatus({
-        kind: "error",
-        text: err instanceof Error ? err.message : "Unable to load data",
-      });
+      setPageStatus({ kind: "error", text: err instanceof Error ? err.message : "Unable to load data" });
     }
   }
 
@@ -134,174 +146,508 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantSlug]);
 
-  React.useEffect(() => {
-    if (!selectedSkuId && skus.length > 0) {
-      setSelectedSkuId(skus[0].id);
-    }
-  }, [skus, selectedSkuId]);
+  // ── Cart helpers ─────────────────────────────────────────────────────────────
 
-  async function createOrder() {
-    if (!selectedSkuId) return;
-    setStatus({ kind: "info", text: "Creating order..." });
+  function cartQtyFor(skuId: string) {
+    return cart.find((l) => l.skuId === skuId)?.quantity ?? 0;
+  }
 
+  function addOne(skuId: string) {
+    setCart((prev) => {
+      const ex = prev.find((l) => l.skuId === skuId);
+      if (ex) return prev.map((l) => (l.skuId === skuId ? { ...l, quantity: l.quantity + 1 } : l));
+      return [...prev, { skuId, quantity: 1 }];
+    });
+  }
+
+  function setLineQty(skuId: string, qty: number) {
+    if (qty < 1) { setCart((prev) => prev.filter((l) => l.skuId !== skuId)); return; }
+    setCart((prev) => prev.map((l) => (l.skuId === skuId ? { ...l, quantity: qty } : l)));
+  }
+
+  const cartTotalCents = cart.reduce((sum, line) => {
+    const sku = skus.find((s) => s.id === line.skuId);
+    return sum + (sku?.priceCents ?? 0) * line.quantity;
+  }, 0);
+
+  const cartItemCount = cart.reduce((n, l) => n + l.quantity, 0);
+
+  const filteredSkus = React.useMemo(
+    () =>
+      skus.filter(
+        (s) =>
+          search.trim() === "" ||
+          s.code.toLowerCase().includes(search.toLowerCase()) ||
+          s.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [skus, search],
+  );
+
+  function openNewOrder() {
+    setCart([]);
+    setSearch("");
+    setOrderView("products");
+    setNewOrderOpen(true);
+  }
+
+  async function placeOrder() {
+    if (cart.length === 0) return;
+    setPageStatus({ kind: "info", text: "Creating order..." });
     const res = await apiFetch("/orders", {
       tenantSlug,
       method: "POST",
-      body: JSON.stringify({
-        items: [{ skuId: selectedSkuId, quantity }],
-      }),
+      body: JSON.stringify({ items: cart.map((l) => ({ skuId: l.skuId, quantity: l.quantity })) }),
     });
-
     if (!res.ok) {
       const msg = await readApiError(res);
-      setStatus({
-        kind: "error",
-        text: `Create order failed: ${res.status}${msg ? ` (${msg})` : ""}`,
-      });
+      setPageStatus({ kind: "error", text: `Create order failed: ${res.status}${msg ? ` (${msg})` : ""}` });
       return;
     }
-
-    setQuantity(1);
+    setNewOrderOpen(false);
+    setCart([]);
     pushToast({ variant: "success", title: "Order created", message: "" });
     await loadData();
   }
 
-  async function updateStatus(orderId: string, newStatus: Order["status"]) {
-    setStatus({ kind: "info", text: "Updating order..." });
+  // ── Order detail ──────────────────────────────────────────────────────────────
 
+  function openDetail(order: Order) {
+    setSelectedOrder(order);
+    setDetailOpen(true);
+  }
+
+  async function updateStatus(orderId: string, newStatus: Order["status"]) {
     const res = await apiFetch(`/orders/${orderId}/status`, {
       tenantSlug,
       method: "PATCH",
       body: JSON.stringify({ status: newStatus }),
     });
-
     if (!res.ok) {
       const msg = await readApiError(res);
-      setStatus({
-        kind: "error",
-        text: `Update failed: ${res.status}${msg ? ` (${msg})` : ""}`,
-      });
+      setPageStatus({ kind: "error", text: `Update failed: ${res.status}${msg ? ` (${msg})` : ""}` });
       return;
     }
-
-    pushToast({ variant: "success", title: "Order updated", message: newStatus });
+    pushToast({ variant: "success", title: "Order updated", message: STATUS_LABELS[newStatus] });
+    setDetailOpen(false);
     await loadData();
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
     <div className="rounded-lg border border-border bg-card p-5">
+      {/* ── Panel header ── */}
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium">Orders (Milestone 5)</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Create orders and manage status. Confirming an order deducts stock automatically.
+            Create and manage orders. Confirming deducts stock automatically.
           </div>
         </div>
-        <button
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          onClick={loadData}
-          type="button"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {status ? (
-        <div className="mt-3">
-          <Alert variant={status.kind === "error" ? "error" : "info"}>{status.text}</Alert>
-        </div>
-      ) : null}
-
-      <div className="mt-5 rounded-md border border-border/60 p-4">
-        <div className="text-sm font-medium">Create Order</div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <select
-            className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-            value={selectedSkuId}
-            onChange={(e) => setSelectedSkuId(e.target.value)}
-          >
-            {skus.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name} ({formatCents(s.priceCents ?? 0)}, stock: {s.stockOnHand})
-              </option>
-            ))}
-          </select>
-          <input
-            className="h-9 w-24 rounded-md border border-input bg-background px-3 text-sm"
-            type="number"
-            min={1}
-            value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-          />
+        <div className="flex gap-2">
           <button
-            className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            onClick={loadData}
             type="button"
-            onClick={createOrder}
-            disabled={!selectedSkuId || quantity < 1}
           >
-            Create Order
+            Refresh
+          </button>
+          <button
+            className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+            type="button"
+            onClick={openNewOrder}
+          >
+            + New Order
           </button>
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
+      {pageStatus ? (
+        <div className="mt-3">
+          <Alert variant={pageStatus.kind === "error" ? "error" : "info"}>{pageStatus.text}</Alert>
+        </div>
+      ) : null}
+
+      {/* ── Orders table ── */}
+      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
+        <div className="grid grid-cols-[1fr_80px_120px_120px_1fr_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span>Order</span>
+          <span className="text-center">Items</span>
+          <span>Status</span>
+          <span className="text-right">Total</span>
+          <span>Created</span>
+          <span className="text-right">Action</span>
+        </div>
+
         {orders.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No orders yet.</div>
-        ) : null}
-        {orders.map((order) => {
-          const next = NEXT_STATUSES[order.status];
-          return (
-            <div
-              key={order.id}
-              className="rounded-md border border-border/60 bg-background p-4 text-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium font-mono text-xs text-muted-foreground">
-                    {order.id.slice(0, 8)}…
-                  </div>
-                  <div className="mt-1 font-medium">{formatCents(order.totalCents)}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {new Date(order.createdAt).toLocaleString()}
+          <div className="px-4 py-10 text-center">
+            <div className="text-sm font-medium text-muted-foreground">No orders yet</div>
+            <div className="mt-3">
+              <button
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                type="button"
+                onClick={openNewOrder}
+              >
+                + New Order
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {orders.map((order) => (
+              <button
+                key={order.id}
+                type="button"
+                onClick={() => openDetail(order)}
+                className="grid w-full grid-cols-[1fr_80px_120px_120px_1fr_100px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <ProductThumb label={order.id.slice(0, 8)} size={40} className="rounded-lg" />
+                  <div className="min-w-0">
+                    <div className="truncate font-medium font-mono text-xs">{order.id.slice(0, 8)}…</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {order.items[0]
+                        ? `${order.items[0].sku.code} · ${order.items[0].sku.name}`
+                        : "No items"}
+                      {order.items.length > 1 ? ` · +${order.items.length - 1} more` : ""}
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[order.status]}`}>
-                    {STATUS_LABELS[order.status]}
-                  </span>
-                  {next && next.length > 0 ? (
-                    <div className="flex gap-1">
+
+                <span className="text-center text-xs text-muted-foreground">{order.items.length}</span>
+
+                <Badge variant={STATUS_VARIANT[order.status]} className="min-w-[80px] justify-center">
+                  {STATUS_LABELS[order.status]}
+                </Badge>
+
+                <span className="text-right font-mono tabular-nums">{formatCents(order.totalCents)}</span>
+                <span className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</span>
+
+                <span className={`text-right text-xs font-medium ${order.status === "COMPLETED" || order.status === "CANCELLED" ? "text-muted-foreground" : "text-primary"}`}>
+                  {ACTION_LABEL[order.status]}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ──────────────────────────────────────────────────────────────────────────
+          NEW ORDER SHEET — two-view: Products ↔ Cart
+      ────────────────────────────────────────────────────────────────────────── */}
+      <Sheet open={newOrderOpen} onOpenChange={setNewOrderOpen}>
+        <SheetContent side="right" className="w-[680px]">
+          <SheetHeader>
+            <SheetTitle>
+              {orderView === "products" ? "New Order" : "Review Cart"}
+            </SheetTitle>
+            <SheetDescription>
+              {orderView === "products"
+                ? "Browse and add products. Your cart is saved as you go."
+                : `${cartItemCount} item${cartItemCount === 1 ? "" : "s"} · review before placing.`}
+            </SheetDescription>
+          </SheetHeader>
+
+          {/* ── PRODUCTS VIEW ── */}
+          {orderView === "products" ? (
+            <>
+              {/* Sticky search bar */}
+              <div className="px-5 pb-3">
+                <input
+                  type="search"
+                  placeholder="Search by name or SKU code…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-input bg-background px-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                {filteredSkus.length !== skus.length ? (
+                  <div className="mt-1.5 text-xs text-muted-foreground">
+                    {filteredSkus.length} of {skus.length} products
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Product grid — takes all scrollable space */}
+              <div className="flex-1 overflow-y-auto px-5 pb-36">
+                {filteredSkus.length === 0 ? (
+                  <div className="py-16 text-center text-sm text-muted-foreground">
+                    No products match &ldquo;{search}&rdquo;
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {filteredSkus.map((sku) => {
+                      const qty = cartQtyFor(sku.id);
+                      const inCart = qty > 0;
+                      return (
+                        <div
+                          key={sku.id}
+                          className={`overflow-hidden rounded-xl border bg-card transition-colors ${inCart ? "border-primary/60" : "border-border/60"}`}
+                        >
+                          {/* Square image */}
+                          <div className="relative aspect-square w-full bg-muted/20">
+                            <ProductThumb
+                              fill
+                              label={`${sku.code} ${sku.name}`}
+                              className="absolute inset-0 rounded-none border-0"
+                            />
+                            {inCart ? (
+                              <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow">
+                                {qty}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {/* Info */}
+                          <div className="p-3">
+                            <div className="text-[11px] font-medium text-muted-foreground">{sku.code}</div>
+                            <div className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug">{sku.name}</div>
+                            <div className="mt-1.5 text-base font-bold text-primary">
+                              {formatCents(sku.priceCents ?? 0)}
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">Stock: {sku.stockOnHand}</div>
+
+                            {/* Controls */}
+                            {inCart ? (
+                              <div className="mt-3 flex items-center justify-between gap-1">
+                                <button
+                                  type="button"
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background"
+                                  onClick={() => setLineQty(sku.id, qty - 1)}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </button>
+                                <span className="flex-1 text-center text-base font-bold tabular-nums">{qty}</span>
+                                <button
+                                  type="button"
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background"
+                                  onClick={() => setLineQty(sku.id, qty + 1)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="mt-3 w-full rounded-lg border border-primary/60 py-2 text-sm font-semibold text-primary hover:bg-primary/10"
+                                onClick={() => addOne(sku.id)}
+                              >
+                                + Add
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Products footer */}
+              <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground">
+                      {cartItemCount === 0 ? "No items yet" : `${cartItemCount} item${cartItemCount === 1 ? "" : "s"} in cart`}
+                    </div>
+                    <div className="mt-0.5 text-3xl font-bold tabular-nums">
+                      {formatCents(cartTotalCents)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="h-12 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground disabled:opacity-40"
+                    onClick={() => setOrderView("cart")}
+                    disabled={cart.length === 0}
+                  >
+                    Review Cart →
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* ── CART VIEW ── */
+            <>
+              <div className="flex-1 overflow-y-auto px-5 pb-36">
+                <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card">
+                  {cart.map((line) => {
+                    const sku = skus.find((s) => s.id === line.skuId);
+                    if (!sku) return null;
+                    return (
+                      <div key={line.skuId} className="flex items-center gap-4 px-4 py-4">
+                        <ProductThumb
+                          label={`${sku.code} ${sku.name}`}
+                          size={80}
+                          className="rounded-xl"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold">{sku.code}</div>
+                          <div className="text-sm text-muted-foreground">{sku.name}</div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            {formatCents(sku.priceCents ?? 0)} ea
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background"
+                              onClick={() => setLineQty(line.skuId, line.quantity - 1)}
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="w-10 text-center text-base font-bold tabular-nums">{line.quantity}</span>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background"
+                              onClick={() => setLineQty(line.skuId, line.quantity + 1)}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="text-base font-bold tabular-nums">
+                            {formatCents((sku.priceCents ?? 0) * line.quantity)}
+                          </div>
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setLineQty(line.skuId, 0)}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cart footer */}
+              <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+                <div className="flex items-center justify-between gap-4">
+                  <button
+                    type="button"
+                    className="h-12 rounded-xl border border-input bg-background px-5 text-sm font-semibold hover:bg-muted/40"
+                    onClick={() => setOrderView("products")}
+                  >
+                    ← Add More
+                  </button>
+                  <div className="flex flex-col items-end">
+                    <div className="text-sm text-muted-foreground">{cartItemCount} item{cartItemCount === 1 ? "" : "s"}</div>
+                    <div className="text-2xl font-bold tabular-nums">{formatCents(cartTotalCents)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="h-12 rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground"
+                    onClick={placeOrder}
+                  >
+                    Place Order
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ──────────────────────────────────────────────────────────────────────────
+          ORDER DETAIL SHEET
+      ────────────────────────────────────────────────────────────────────────── */}
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent side="right" className="w-[520px]">
+          <SheetHeader>
+            <SheetTitle>Order {selectedOrder?.id.slice(0, 8)}…</SheetTitle>
+            <SheetDescription>
+              {selectedOrder
+                ? `${new Date(selectedOrder.createdAt).toLocaleString()} · ${selectedOrder.items.length} item${selectedOrder.items.length === 1 ? "" : "s"}`
+                : ""}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 pb-28">
+            {selectedOrder ? (
+              <div className="space-y-4">
+                {/* Status + summary */}
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Total</div>
+                    <div className="mt-0.5 text-2xl font-bold tabular-nums">
+                      {formatCents(selectedOrder.totalCents)}
+                    </div>
+                  </div>
+                  <Badge variant={STATUS_VARIANT[selectedOrder.status]} className="min-w-[90px] justify-center text-sm">
+                    {STATUS_LABELS[selectedOrder.status]}
+                  </Badge>
+                </div>
+
+                {/* Items */}
+                <div className="rounded-xl border border-border/60 bg-card">
+                  <div className="border-b border-border/60 px-4 py-3 text-sm font-semibold">Items</div>
+                  <div className="divide-y divide-border/60 px-4">
+                    {selectedOrder.items.map((item) => (
+                      <div key={item.id} className="flex items-center gap-4 py-4">
+                        <ProductThumb
+                          label={`${item.sku.code} ${item.sku.name}`}
+                          size={80}
+                          className="rounded-xl"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold">{item.sku.code}</div>
+                          <div className="text-sm text-muted-foreground">{item.sku.name}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Qty {item.quantity} · {formatCents(item.priceAtTime)} ea
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-base font-bold tabular-nums">
+                            {formatCents(item.priceAtTime * item.quantity)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Detail footer — status actions */}
+          {selectedOrder ? (
+            <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+              {(() => {
+                const next = NEXT_STATUSES[selectedOrder.status];
+                if (!next || next.length === 0) {
+                  return (
+                    <p className="text-center text-sm text-muted-foreground">
+                      No further actions available for this order.
+                    </p>
+                  );
+                }
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">Update status</div>
+                    <div className="flex gap-2">
                       {next.map((s) => (
                         <button
                           key={s}
-                          className="rounded-md border border-input bg-background px-2 py-1 text-xs"
                           type="button"
-                          onClick={() => updateStatus(order.id, s)}
+                          className={`flex-1 rounded-xl py-3 text-sm font-semibold transition-colors ${
+                            s === "CANCELLED"
+                              ? "border border-destructive/60 text-destructive hover:bg-destructive/10"
+                              : "bg-primary text-primary-foreground hover:bg-primary/90"
+                          }`}
+                          onClick={() => updateStatus(selectedOrder.id, s)}
                         >
                           → {STATUS_LABELS[s]}
                         </button>
                       ))}
                     </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="mt-3 space-y-1">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <ProductThumb label={item.sku.code} size={22} />
-                      <span className="truncate">
-                        {item.sku.code} · {item.sku.name} × {item.quantity}
-                      </span>
-                    </div>
-                    <span className="font-mono tabular-nums">{formatCents(item.priceAtTime * item.quantity)}</span>
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
-          );
-        })}
-      </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
