@@ -169,6 +169,7 @@
 - `totalCents` is computed at order creation and not updated afterward.
 - Orders with a computed `totalCents` exceeding 2,147,483,647 (~$21M) are rejected with a 400 before insert.
 - **Future:** migrate `totalCents` to `Decimal` or `BigInt` if enterprise-scale orders (>$21M) are required. Blocked on JSON serialization strategy for BigInt in NestJS responses.
+- **Phase 7 addition:** add `source: Enum` (`INTERNAL` | `MARKETPLACE`) so tenants can distinguish manually-created orders from marketplace orders in their dashboard.
 
 ---
 
@@ -255,14 +256,95 @@
 
 ## Future Models (DO NOT IMPLEMENT)
 
+### Phase 7 — Marketplace
+
+#### CustomerProfile
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| email | String | Unique — separate from User.email |
+| passwordHash | String | |
+| name | String | |
+| locale | String? | Customer's preferred language |
+| currency | String? | Customer's preferred display currency |
+| createdAt | DateTime | |
+
+**Rules:**
+- Completely separate from `TenantMembership`. A customer is not a staff member.
+- One global account — a customer can order from any tenant on the marketplace.
+- Uses the same JWT auth pattern but issued as a customer token, not a staff token.
+
+---
+
+#### Cart (tenant-agnostic, scoped to customer)
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| customerId | UUID | FK → CustomerProfile |
+| createdAt | DateTime | |
+| updatedAt | DateTime | |
+
+#### CartItem
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| cartId | UUID | FK → Cart |
+| marketplaceListingId | UUID | FK → MarketplaceListing |
+| skuId | UUID | FK → Sku |
+| tenantId | UUID | FK → Tenant — denormalized for split-order logic |
+| quantity | Int | |
+
+**Rules:**
+- A single cart can contain items from multiple tenants.
+- At checkout, `CartItem` rows are grouped by `tenantId`. One `Order` is created per tenant group.
+- `tenantId` is denormalized on `CartItem` to avoid joins during checkout split logic.
+
+---
+
+#### MarketplaceListing
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| tenantId | UUID | FK → Tenant |
+| skuId | UUID | FK → Sku |
+| marketplacePrice | Int? | Optional override of `Sku.priceCents` for marketplace display |
+| isPublished | Boolean | `false` by default — staff must explicitly publish |
+| createdAt | DateTime | |
+| updatedAt | DateTime | |
+
+**Rules:**
+- Only tenants with `features.marketplace: true` can create listings.
+- Archived SKUs (`isArchived: true`) cannot be listed.
+- `marketplacePrice` allows tenants to sell at a different price on the marketplace vs internally.
+- Delisting (`isPublished: false`) hides from browse but preserves historical order references.
+
+---
+
+### Phase 6 — POS
+
+#### PosSession
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| tenantId | UUID | FK → Tenant |
+| staffId | UUID | FK → User |
+| status | Enum | `OPEN`, `CLOSED` |
+| createdAt | DateTime | |
+| closedAt | DateTime? | |
+
+---
+
+### Post-MVP
+
 | Model | Phase | Notes |
 |---|---|---|
-| CustomerProfile | Phase 7 (Marketplace) | End-user customers — completely separate from TenantMembership |
-| Cart / CartItem | Phase 7 (Marketplace) | Customer shopping session |
-| MarketplaceListing | Phase 7 (Marketplace) | Tenant's public product listing |
-| PosSession | Phase 6 (POS) | In-person point-of-sale session |
 | AuditLog | Post-MVP | Queryable audit trail — replaces logger-only events |
 | UserNotificationPreferences | Post-MVP | Per-user channel opt-in: email / Messenger / WhatsApp / SMS + per-event subscription overrides |
-| TenantRole | Post-MVP (Custom Roles) | Custom named roles per tenant: `id`, `tenantId`, `name`, `basedOn` (base role enum), `permissions` (JSONB overrides) |
-| Integration | Post-MVP (Platform Integrations) | Connector config per tenant: `id`, `tenantId`, `type` (Shopee / Lazada / Custom / Courier), `config` (JSONB), `isActive` |
+| TenantRole | Post-MVP (Custom Roles) | Custom named roles: `id`, `tenantId`, `name`, `basedOn` (base role enum), `permissions` (JSONB overrides) |
+| Integration | Post-MVP (Platform Integrations) | Connector config: `id`, `tenantId`, `type` (Shopee / Lazada / Custom / Courier), `config` (JSONB), `isActive` |
 | IntegrationEvent | Post-MVP (Platform Integrations) | Append-only webhook event log: `id`, `integrationId`, `payload` (JSONB), `status` (OK / FAILED), `processedAt` |

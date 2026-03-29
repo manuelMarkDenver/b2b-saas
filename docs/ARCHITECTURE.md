@@ -291,11 +291,49 @@ Dispatched async via BullMQ job queue (fire-and-forget, never blocks the request
 
 ---
 
-## Future Architecture (DO NOT IMPLEMENT)
+## Future Architecture (DO NOT IMPLEMENT YET)
 
 | Future Capability | Phase | Notes |
 |---|---|---|
 | React Native mobile app | Phase 5 | Staff-focused, offline-first |
 | POS layer + barcode scanning | Phase 6 | Reuses Orders + Payments backend |
-| Customer marketplace UI | Phase 7 | Multi-tenant selling, public browsing |
-| AWS scaling (ECS/RDS/S3/CloudFront) | Phase 8 | Subdomain routing per tenant |
+| Marketplace | Phase 7 | See full design below and in MILESTONES.md |
+| AWS scaling (ECS/RDS/S3/CloudFront) | Phase 8 | Subdomain routing per tenant. EKS if traffic demands it post-Phase 8. |
+
+---
+
+## Marketplace Architecture (Phase 7)
+
+The marketplace is built on the existing ERP foundation — same inventory, same order model, same payment flow. No parallel systems.
+
+### Routing (Phase 7 additions)
+
+```
+/marketplace                    → global browse (all tenants, all listings)
+/marketplace/search?q=...       → cross-tenant search
+/marketplace/category/:slug     → category-filtered browse
+/shop/:tenantSlug               → per-tenant storefront (only that tenant's listings)
+/shop/:tenantSlug/products/:id  → product detail
+/account/...                    → customer account (orders, profile)
+```
+
+Existing routes (`/t/:tenantSlug/...`, `/admin/...`) are unchanged.
+
+### System surfaces (Phase 7 additions)
+
+- **Customer / Public** — browses global marketplace or per-tenant storefront. Has a `CustomerProfile` (separate from `TenantMembership`). One account, can order from any tenant.
+- **Staff (listing management)** — existing staff roles extended with `can_manage_listings` permission. Publish/unpublish SKUs to the marketplace.
+
+### Key architectural decisions
+
+**Cart is multi-tenant aware.** A single cart can contain items from multiple tenants. At checkout, the cart splits into one `Order` per tenant. Each tenant fulfills their own orders.
+
+**Inventory is shared.** A marketplace sale creates an `InventoryMovement` (type: `OUT`, referenceType: `ORDER`) just like a manual order. `stockOnHand` is always the real count regardless of sale origin.
+
+**Order source tracking.** `Order` gets a `source` field (`INTERNAL` | `MARKETPLACE`) so tenants can distinguish internally-created orders from marketplace orders in their dashboard.
+
+**Payment gateway is required.** Manual verification does not scale for customer-facing checkout. PayMongo (PH — GCash, Maya, cards) first, Stripe (global) second.
+
+**Search.** Postgres full-text search at launch. Migrate to Meilisearch/Typesense when latency degrades under load.
+
+**Customer auth is separate.** `CustomerProfile` uses the same JWT pattern but is a completely different entity from `TenantMembership`. A customer is not a staff member.

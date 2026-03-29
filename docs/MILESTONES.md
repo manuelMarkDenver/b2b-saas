@@ -472,7 +472,102 @@ The ERP foundation (MS1–MS8) comes first. These phases are real goals — they
 |---|---|
 | Phase 5 | Mobile app (React Native / Expo) — staff-focused, offline-first |
 | Phase 6 | POS + Barcode scanning (mobile-based, uses Orders + Payments) |
-| Phase 7 | **Marketplace** — customer-facing storefront, multi-tenant product browsing + ordering. This is a long-term goal. The ERP foundation (inventory, orders, payments, PBAC) must be solid first so tenants have real operational data before opening a storefront. |
-| Phase 8 | AWS scaling — ECS, RDS, S3, CloudFront, **subdomain routing per tenant** (e.g. `acme.yourplatform.com`) |
+| Phase 7 | **Marketplace** — see full design below. |
+| Phase 8 | AWS scaling — ECS, RDS, S3, CloudFront, **subdomain routing per tenant** (e.g. `acme.yourplatform.com`). If traffic demands it, migrate to EKS — a decision driven by real load data, not preemptive. |
 
 If a feature belongs to Phase 5+, do NOT implement now. Document it and assign to the appropriate future phase.
+
+---
+
+## Phase 7 — Marketplace (Full Design)
+
+The marketplace is a long-term goal, not an afterthought. ERP comes first so tenants have real operational data (inventory, orders, payments) before they open a storefront. The marketplace is built on top of that foundation — same inventory, same order system, same payment flow.
+
+### Two entry points, one inventory truth
+
+**Global marketplace** — customers land on the main storefront and search/browse across all tenants. Filter by keyword, category, price range, tenant/brand, or custom attributes. Products from multiple tenants appear side by side.
+
+**Per-tenant storefront** — customers navigate to a specific business (e.g. `/shop/peak-hardware`). Only that tenant's published listings are visible. Same products, same inventory — just scoped to one seller.
+
+Both views pull from the same `MarketplaceListing` + `Sku` data. No duplication.
+
+### Routing
+
+```
+/marketplace                    → global browse (all tenants)
+/marketplace/search?q=...       → search results across tenants
+/marketplace/category/:slug     → category-filtered browse
+/shop/:tenantSlug               → per-tenant storefront
+/shop/:tenantSlug/products/:id  → product detail page
+```
+
+### Staff side — listing management
+
+- Staff with `can_manage_listings` permission publish/unpublish SKUs to the marketplace.
+- `MarketplaceListing` record opts a SKU in. Can have its own `marketplacePrice` (different from internal `priceCents` — e.g. sell wholesale internally, retail on marketplace).
+- Feature-flagged: only tenants with `marketplace: true` can list. Controlled by Super Admin.
+- Archived SKUs (`isArchived: true`) cannot be listed.
+
+### Customer side — browse + buy
+
+- Customer auth is separate from staff auth. `CustomerProfile` is NOT a `TenantMembership`. One global customer account — can order from any tenant.
+- Browse → Product Detail → Add to Cart → Checkout → Payment → Order confirmation.
+- Cart supports multi-tenant line items (items from Peak Hardware + Corner General in one cart).
+- At checkout, cart splits into separate orders per tenant. Each tenant fulfills their own orders independently.
+- Customer sees grouped order summary: "Order from Peak Hardware", "Order from Corner General".
+
+### Multi-tenant cart → split orders
+
+This is the most complex piece. Design:
+
+1. `Cart` + `CartItem` records scoped to `customerId`. `CartItem` references `marketplaceListingId` + `skuId` + `tenantId`.
+2. At checkout, `CartItem` rows are grouped by `tenantId`.
+3. One `Order` created per tenant group (reuses existing `Order` + `OrderItem` model).
+4. Each order is confirmed independently — tenant staff process their own orders.
+5. Payment: one checkout transaction to the customer, split per order behind the scenes (payment gateway handles this).
+
+### Payment gateway — hard dependency for Phase 7
+
+Manual verification won't scale for customer-facing checkout. Phase 7 requires a real payment gateway.
+
+| Gateway | Market | Priority |
+|---|---|---|
+| PayMongo | PH | First — local payment methods (GCash, Maya, cards) |
+| Stripe | Global | Second — international cards |
+
+Gateway responsibilities: charge customer, split funds per tenant order, handle webhooks (payment confirmed/failed), refund flow.
+
+### Search
+
+| Stage | Technology | When |
+|---|---|---|
+| Launch | Postgres full-text search (`tsvector`) | Sufficient for early scale |
+| Growth | Meilisearch or Typesense | When Postgres FTS shows latency under load |
+| Scale | Elasticsearch | Hyperscale — likely post-Phase 8 |
+
+### Inventory concurrency at marketplace scale
+
+Same race condition as order confirmation — two customers buying the last item simultaneously. Same mitigation: Prisma `$transaction` wrapping stock check + decrement. At high traffic, add optimistic locking or a queue per SKU.
+
+### New permissions for Phase 7
+
+| Permission | Who | What |
+|---|---|---|
+| `can_manage_listings` | OWNER, ADMIN | Publish/unpublish SKUs to marketplace |
+| `can_view_marketplace_orders` | OWNER, ADMIN, STAFF | See marketplace-originated orders |
+
+### Notifications for marketplace events
+
+| Event | Who notified |
+|---|---|
+| `marketplace.order_received` | Tenant OWNER + ADMIN |
+| `marketplace.payment_confirmed` | Tenant OWNER |
+| `marketplace.order_cancelled` | Tenant OWNER + ADMIN |
+
+### Data model additions (Phase 7)
+
+See DATA_MODEL.md → Future Models for full field lists:
+- `CustomerProfile` — customer auth, separate from TenantMembership
+- `Cart` + `CartItem` — multi-tenant aware, scoped to customer
+- `MarketplaceListing` — opts a SKU into the marketplace, optional price override
+- `MarketplaceOrder` — or reuse `Order` with a `source: MARKETPLACE | INTERNAL` field (decision at Phase 7 start)
