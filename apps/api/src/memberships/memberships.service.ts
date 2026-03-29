@@ -56,15 +56,56 @@ export class MembershipsService {
 
   listTeamMembers(tenantId: string) {
     return this.prisma.tenantMembership.findMany({
-      where: { tenantId, status: 'ACTIVE' },
+      where: { tenantId, status: { in: ['ACTIVE', 'INVITED'] } },
       select: {
         id: true,
         role: true,
         status: true,
+        jobTitle: true,
         isOwner: true,
-        user: { select: { email: true } },
+        createdAt: true,
+        user: { select: { email: true, avatarUrl: true } },
       },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateMembership(
+    tenantId: string,
+    actorUserId: string,
+    membershipId: string,
+    dto: { role?: string; jobTitle?: string; deactivate?: boolean },
+  ) {
+    const actor = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId: actorUserId } },
+      select: { role: true },
+    });
+    if (!actor || (actor.role !== 'OWNER' && actor.role !== 'ADMIN')) {
+      throw new ForbiddenException('Only OWNER or ADMIN can update memberships');
+    }
+
+    const target = await this.prisma.tenantMembership.findFirst({
+      where: { id: membershipId, tenantId },
+      select: { id: true, isOwner: true },
+    });
+    if (!target) throw new NotFoundException('Membership not found');
+    if (target.isOwner) throw new ForbiddenException('Cannot modify the tenant owner');
+
+    return this.prisma.tenantMembership.update({
+      where: { id: membershipId },
+      data: {
+        ...(dto.role ? { role: dto.role as TenantRole } : {}),
+        ...(dto.jobTitle !== undefined ? { jobTitle: dto.jobTitle || null } : {}),
+        ...(dto.deactivate ? { status: 'DISABLED' } : {}),
+      },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        jobTitle: true,
+        isOwner: true,
+        user: { select: { email: true, avatarUrl: true } },
+      },
     });
   }
 
@@ -73,6 +114,7 @@ export class MembershipsService {
     inviterUserId: string,
     email: string,
     role: TenantRole,
+    jobTitle?: string,
   ) {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -124,12 +166,14 @@ export class MembershipsService {
         tenantId,
         userId: user.id,
         role,
+        jobTitle: jobTitle?.trim() || null,
         status: 'INVITED',
         inviteToken: token,
         inviteExpiresAt: expiresAt,
       },
       update: {
         role,
+        jobTitle: jobTitle?.trim() || null,
         status: 'INVITED',
         inviteToken: token,
         inviteExpiresAt: expiresAt,

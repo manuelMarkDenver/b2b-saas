@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -15,6 +17,7 @@ import type { AuthUser, RequestWithUser } from '../common/auth/auth.types';
 import { SwitchTenantDto } from './dto/switch-tenant.dto';
 import { InviteStaffDto } from './dto/invite-staff.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
+import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { AuthService } from '../auth/auth.service';
 
 @Controller('memberships')
@@ -61,6 +64,22 @@ export class MembershipsController {
       req.user.id,
       body.email,
       body.role ?? 'STAFF',
+      body.jobTitle,
+    );
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  updateMembership(
+    @Req() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() body: UpdateMembershipDto,
+  ) {
+    return this.membershipsService.updateMembership(
+      req.tenant!.id,
+      req.user.id,
+      id,
+      body,
     );
   }
 

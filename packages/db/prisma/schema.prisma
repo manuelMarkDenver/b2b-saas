@@ -145,6 +145,7 @@ model TenantMembership {
   userId            String           @db.Uuid
   status            MembershipStatus @default(ACTIVE)
   role              TenantRole       @default(STAFF)
+  jobTitle          String?
   isOwner           Boolean          @default(false)
   inviteToken       String?          @unique
   inviteExpiresAt   DateTime?
