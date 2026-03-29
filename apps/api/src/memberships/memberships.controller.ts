@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../common/auth/tenant.guard';
 import { MembershipsService } from './memberships.service';
 import { CurrentUser } from '../common/auth/current-user.decorator';
-import type { AuthUser } from '../common/auth/auth.types';
+import type { AuthUser, RequestWithUser } from '../common/auth/auth.types';
 import { SwitchTenantDto } from './dto/switch-tenant.dto';
 import { AuthService } from '../auth/auth.service';
 
@@ -17,6 +18,12 @@ export class MembershipsController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.membershipsService.listForUser(user.id);
+  }
+
+  @Get('team')
+  @UseGuards(TenantGuard)
+  listTeam(@Req() req: RequestWithUser) {
+    return this.membershipsService.listTeamMembers(req.tenant!.id);
   }
 
   @Post('switch')

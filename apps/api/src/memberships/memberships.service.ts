@@ -13,7 +13,7 @@ export class MembershipsService {
     return this.prisma.tenantMembership.findMany({
       where: { userId },
       include: {
-        tenant: { select: { id: true, name: true, slug: true } },
+        tenant: { select: { id: true, name: true, slug: true, features: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -42,5 +42,19 @@ export class MembershipsService {
     }
 
     return { tenant, membership };
+  }
+
+  listTeamMembers(tenantId: string) {
+    return this.prisma.tenantMembership.findMany({
+      where: { tenantId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        isOwner: true,
+        user: { select: { email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }
