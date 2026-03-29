@@ -287,8 +287,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_120px_120px_1fr_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[1fr_52px_120px_120px_1fr_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
+          <span className="text-center">Items</span>
           <span>Status</span>
           <span className="text-right">Total</span>
           <span>Created</span>
@@ -301,10 +302,14 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               key={o.id}
               type="button"
               onClick={() => openOrder(o.id)}
-              className="grid w-full grid-cols-[1fr_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+              className="grid w-full grid-cols-[1fr_52px_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <ProductThumb label={o.id.slice(0, 8)} size={40} />
+                <ProductThumb
+                  label={o.items[0]?.sku.code ?? o.id.slice(0, 4)}
+                  size={40}
+                  className="rounded-lg"
+                />
                 <div className="min-w-0">
                   <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
                   <div className="truncate text-xs text-muted-foreground">
@@ -314,6 +319,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                   </div>
                 </div>
               </div>
+
+              <span className="text-center text-sm font-medium tabular-nums">{o.items.length}</span>
 
               <Badge variant={ORDER_STATUS_VARIANT[o.status] ?? "muted"} className="min-w-[90px] justify-center">
                 {o.status}
@@ -373,7 +380,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                     <div className="truncate text-xs text-muted-foreground">
                       {payment.orderId.slice(0, 8)}…
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">{payment.order.status}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {payment.order.status} · {payment.order.items.length} item{payment.order.items.length === 1 ? "" : "s"}
+                    </div>
                   </div>
 
                   {payment.proofUrl ? (
