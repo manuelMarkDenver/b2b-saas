@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AuthLayout } from '@/components/auth-layout';
 
 export default function AcceptInvitePage() {
   const searchParams = useSearchParams();
@@ -58,13 +59,13 @@ export default function AcceptInvitePage() {
   }
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <main className="mx-auto max-w-sm px-4 py-20">
-        <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
-          <h1 className="text-2xl font-semibold tracking-tight">Accept invitation</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Set a password to activate your account and join the team.
-          </p>
+    <AuthLayout quoteIndex={0}>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Accept invitation</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Set a password to activate your account and join the team.
+        </p>
+      </div>
 
           {done ? (
             <div className="mt-6 space-y-4">
@@ -126,8 +127,6 @@ export default function AcceptInvitePage() {
               </div>
             </form>
           )}
-        </div>
-      </main>
-    </div>
+    </AuthLayout>
   );
 }
