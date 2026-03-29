@@ -9,6 +9,13 @@ type Order = {
   id: string;
   status: string;
   totalCents: number;
+  createdAt: string;
+  items: Array<{
+    id: string;
+    quantity: number;
+    priceAtTime: number;
+    sku: { code: string; name: string };
+  }>;
 };
 
 type Payment = {
@@ -33,8 +40,22 @@ const STATUS_COLORS: Record<Payment["status"], string> = {
   REJECTED: "bg-red-500/15 text-red-500",
 };
 
+const ORDER_STATUS_COLORS: Record<string, string> = {
+  PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
+  CONFIRMED: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  COMPLETED: "bg-green-500/15 text-green-600 dark:text-green-400",
+  CANCELLED: "bg-red-500/15 text-red-500",
+};
+
 function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatOrderLabel(order: Order) {
+  const shortId = `${order.id.slice(0, 8)}…`;
+  const date = new Date(order.createdAt);
+  const when = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  return `${shortId} · ${order.status} · ${formatCents(order.totalCents)} · ${when}`;
 }
 
 async function readApiError(res: Response): Promise<string> {
@@ -104,7 +125,10 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       const ordersList = unwrapList<Order>(ordersData);
 
       setPayments(paymentsList);
-      const payableOrders = ordersList.filter((o) => o.status !== "CANCELLED");
+      const payableOrders = ordersList
+        .filter((o) => o.status !== "CANCELLED")
+        .slice()
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(payableOrders);
       setStatus(null);
     } catch (err) {
@@ -122,11 +146,24 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
-      const first = orders[0];
-      setSelectedOrderId(first.id);
-      setAmountDollars((first.totalCents / 100).toFixed(2));
+      const preferred = orders.find((o) => o.status === "CONFIRMED" || o.status === "PENDING") ?? orders[0];
+      setSelectedOrderId(preferred.id);
+      setAmountDollars((preferred.totalCents / 100).toFixed(2));
     }
   }, [orders, selectedOrderId]);
+
+  const selectedOrder = React.useMemo(
+    () => orders.find((o) => o.id === selectedOrderId) ?? null,
+    [orders, selectedOrderId],
+  );
+
+  const pendingPaymentByOrderId = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const p of payments) {
+      if (p.status === "PENDING") set.add(p.orderId);
+    }
+    return set;
+  }, [payments]);
 
   function handleOrderChange(orderId: string) {
     setSelectedOrderId(orderId);
@@ -219,10 +256,47 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           >
             {orders.map((o) => (
               <option key={o.id} value={o.id}>
-                {o.id.slice(0, 8)}… — {o.status} — {formatCents(o.totalCents)}
+                {formatOrderLabel(o)}{pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
               </option>
             ))}
           </select>
+
+          {selectedOrder ? (
+            <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">
+                  Order <span className="font-mono text-foreground">{selectedOrder.id.slice(0, 8)}…</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    ORDER_STATUS_COLORS[selectedOrder.status] ?? "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {selectedOrder.status}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
+                <div className="text-sm font-medium">{formatCents(selectedOrder.totalCents)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(selectedOrder.createdAt).toLocaleString()}
+                </div>
+              </div>
+              <div className="mt-2 space-y-1">
+                {selectedOrder.items.slice(0, 3).map((it) => (
+                  <div key={it.id} className="flex justify-between text-xs text-muted-foreground">
+                    <span className="truncate">
+                      {it.sku.code} · {it.sku.name} × {it.quantity}
+                    </span>
+                    <span className="font-mono tabular-nums">{formatCents(it.priceAtTime * it.quantity)}</span>
+                  </div>
+                ))}
+                {selectedOrder.items.length > 3 ? (
+                  <div className="text-xs text-muted-foreground">+{selectedOrder.items.length - 3} more items</div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
             <input
