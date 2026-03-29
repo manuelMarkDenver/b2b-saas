@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Settings, Users, Plus, Mail } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -59,7 +59,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
   const [inviteRole, setInviteRole] = useState<string>('STAFF');
   const [inviting, setInviting] = useState(false);
 
-  async function loadMembers() {
+  const loadMembers = useCallback(async () => {
     setLoading(true);
     const res = await apiFetch('/memberships/team', { tenantSlug });
     if (res.ok) {
@@ -67,11 +67,11 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
       setMembers(data);
     }
     setLoading(false);
-  }
+  }, [tenantSlug]);
 
   useEffect(() => {
     loadMembers();
-  }, [tenantSlug]);
+  }, [loadMembers]);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();

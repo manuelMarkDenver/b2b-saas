@@ -75,6 +75,19 @@ async function readApiError(res: Response): Promise<string> {
   return "";
 }
 
+function unwrapList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
 export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [skus, setSkus] = React.useState<Sku[]>([]);
@@ -97,12 +110,15 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       if (!skusRes.ok) throw new Error(`SKUs failed: ${skusRes.status}`);
 
       const [ordersData, skusData] = await Promise.all([
-        ordersRes.json() as Promise<Order[]>,
-        skusRes.json() as Promise<Sku[]>,
+        ordersRes.json() as Promise<unknown>,
+        skusRes.json() as Promise<unknown>,
       ]);
 
-      setOrders(ordersData);
-      setSkus(skusData.filter((s) => s.priceCents !== null));
+      const ordersList = unwrapList<Order>(ordersData);
+      const skusList = unwrapList<Sku>(skusData);
+
+      setOrders(ordersList);
+      setSkus(skusList.filter((s) => s.priceCents !== null));
       setStatus(null);
     } catch (err) {
       setStatus({
