@@ -1,18 +1,18 @@
 # Architecture
 
-> Last updated: 2026-03-28 — Realigned to ERP-lite modular platform. Removed marketplace references.
-> Added system surfaces, feature flag system, PBAC, and module phase map.
+> Last updated: 2026-03-29 — Clarified marketplace as long-term goal (Phase 7), not abandoned.
+> Added i18n/currency design, platform integrations vision, known challenges, and channel priority correction (Messenger > WhatsApp for PH/SEA).
 
 ---
 
 ## System Overview
 
-This is a multi-tenant B2B business platform (ERP-lite foundation). It is NOT a marketplace.
+This is a multi-tenant B2B business platform built ERP-first. The long-term vision includes a marketplace (Phase 7) — the ERP foundation comes first so tenants have real operational data (inventory, orders, payments) before opening a storefront.
 
 - Modular monolith in a single repo (Turborepo)
 - Shared database with `tenantId` enforced on all tenant-owned data
 - Feature flags control which modules are available per tenant
-- Future capabilities (marketplace, mobile, POS) are designed for but NOT built yet
+- Marketplace, mobile, and POS are sequenced future phases — designed for but NOT built yet
 
 ---
 
@@ -232,6 +232,62 @@ Added to Settings → Notifications when external delivery channels ship. PBAC-d
 - Treat branding as data (tenant settings: name, logo, theme tokens)
 - Keep platform name and tenant name separate in UI copy
 - Do not bake tenant-specific assumptions into shared modules
+
+---
+
+## i18n + Currency
+
+App-wide locale and currency are configurable — not hardcoded. Needed from the start because the platform targets global markets.
+
+**Settings levels:**
+- **Tenant default** — set in Settings → Tenant Profile. Applies to all staff without a personal override.
+- **Per-staff override** — set in user account settings. Overrides tenant default for that user only.
+- **Per-end-user** — Phase 7 (customer marketplace). Stored in customer profile.
+
+**Schema additions (post-MVP, when this ships):**
+- `Tenant`: `locale: String` (default `"en"`), `currency: String` (default `"PHP"`).
+- `User`: `locale: String?`, `currency: String?` — null inherits from tenant default.
+
+**Implementation:**
+- Translation: `react-i18next` + `i18next`. Translation files in `apps/web/public/locales/`.
+- Currency display: `Intl.NumberFormat`. No extra library.
+- Stored values (`priceCents`) remain in cents — currency conversion is display-only.
+- First locales: `en`, `fil`. Expand as needed.
+
+---
+
+## Platform Integrations (Future — Post-MVP)
+
+Vision: this platform is the centralized inventory hub. Sales from any channel (Shopee, Lazada, a custom supplier system) deduct from the same `stockOnHand` — the dashboard always shows the real count.
+
+**Architecture:**
+- Each integration is a feature-flagged connector, disabled by default.
+- Connectors create `InventoryMovement` records (`type: OUT`, `referenceType: INTEGRATION`) when an external sale occurs.
+- Core inventory model is unchanged — integrations are just another movement source.
+- Webhook payloads must be HMAC-verified before processing.
+
+**PBAC additions:**
+- `can_manage_integrations` — configure credentials, enable/disable connectors.
+- `can_view_integration_log` — view event history.
+
+**Planned connectors:** Shopee, Lazada, custom supplier/distributor API, courier APIs (J&T, LBC, Ninja Van).
+
+See MILESTONES.md → Post-MVP: Platform Integrations for full design.
+
+---
+
+## External Notification Channels
+
+Post-MVP. Channel priority for PH/SEA market:
+
+1. **Email** — SMTP (already wired for password reset in MS8)
+2. **Facebook Messenger** — Primary channel in PH. Meta Cloud API.
+3. **WhatsApp Business** — Secondary. Meta Cloud API (same infrastructure).
+4. **SMS** — Fallback. Twilio or Semaphore (PH local).
+
+Dispatched async via BullMQ job queue (fire-and-forget, never blocks the request). Each channel is a swappable strategy implementation.
+
+**Constraint:** Meta only allows free-form messages within a 24h reply window. Events sent outside that window require pre-approved message templates registered with Meta.
 
 ---
 

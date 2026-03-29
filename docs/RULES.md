@@ -2,8 +2,23 @@
 
 This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-> Last updated: 2026-03-28 — Realigned to ERP-lite modular platform. Added scope control system,
-> inventory safety rules, feature flag rules, PBAC rules, and businessType rules.
+> Last updated: 2026-03-29 — Added Confirm-Before-Act rule. Added Mailpit for local email testing.
+
+---
+
+## Confirm-Before-Act Rule (Non-Negotiable)
+
+Before making ANY change — code, docs, migrations, config — Claude must:
+
+1. **State the action plan in plain text** — what will change, which files, why.
+2. **Wait for explicit user confirmation** (a "yes", "go ahead", or equivalent).
+3. **Only then execute.**
+
+This applies to everything: code changes, documentation updates, schema migrations, config edits.
+
+**No exceptions.** Even if the change seems obvious. Even for docs-only updates. Confirm first.
+
+The goal: no back-and-forth to undo unwanted changes.
 
 ---
 

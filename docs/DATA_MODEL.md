@@ -1,6 +1,7 @@
 # Data Model
 
 > Last updated: 2026-03-29 — Audit pass: added Tenant.status, Sku.isArchived, Sku.lowStockThreshold, Order.customerRef/note, fixed MembershipStatus enum.
+> Added i18n/currency fields to Tenant + User (post-MVP). Added Integration + TenantRole to Future Models.
 > Bug fixes: negative stock prevention enforced (OUT movements + order confirmation); CONFIRMED→CANCELLED now restores inventory.
 > Added quantity cap (max 10,000/line) and totalCents overflow guard (~$21M). Future: migrate totalCents to Decimal/BigInt.
 
@@ -59,6 +60,10 @@
 - Hard delete is NOT supported. Suspension is the permanent end state.
 - `businessType` is used ONLY for setting default feature flags on tenant creation. It must NOT control any logic.
 - `features` is controlled by Super Admin only. Frontend must never mutate it directly.
+
+**Post-MVP fields (i18n — add when i18n module ships):**
+- `locale: String` — default `"en"`. Sets the UI language for all staff in this tenant unless overridden per user.
+- `currency: String` — default `"PHP"`. Sets the display currency for prices and totals tenant-wide.
 
 ---
 
@@ -250,11 +255,14 @@
 
 ## Future Models (DO NOT IMPLEMENT)
 
-| Model | Phase |
-|---|---|
-| CustomerProfile | Phase 7 (Marketplace) |
-| Cart / CartItem | Phase 7 (Marketplace) |
-| MarketplaceListing | Phase 7 (Marketplace) |
-| PosSession | Phase 6 (POS) |
-| AuditLog | Post-MVP (queryable audit trail) |
-| UserNotificationPreferences | Post-MVP (per-user channel opt-in: email/SMS/WhatsApp/Messenger + contact details + per-event subscription overrides) |
+| Model | Phase | Notes |
+|---|---|---|
+| CustomerProfile | Phase 7 (Marketplace) | End-user customers — completely separate from TenantMembership |
+| Cart / CartItem | Phase 7 (Marketplace) | Customer shopping session |
+| MarketplaceListing | Phase 7 (Marketplace) | Tenant's public product listing |
+| PosSession | Phase 6 (POS) | In-person point-of-sale session |
+| AuditLog | Post-MVP | Queryable audit trail — replaces logger-only events |
+| UserNotificationPreferences | Post-MVP | Per-user channel opt-in: email / Messenger / WhatsApp / SMS + per-event subscription overrides |
+| TenantRole | Post-MVP (Custom Roles) | Custom named roles per tenant: `id`, `tenantId`, `name`, `basedOn` (base role enum), `permissions` (JSONB overrides) |
+| Integration | Post-MVP (Platform Integrations) | Connector config per tenant: `id`, `tenantId`, `type` (Shopee / Lazada / Custom / Courier), `config` (JSONB), `isActive` |
+| IntegrationEvent | Post-MVP (Platform Integrations) | Append-only webhook event log: `id`, `integrationId`, `payload` (JSONB), `status` (OK / FAILED), `processedAt` |
