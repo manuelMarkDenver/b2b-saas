@@ -227,6 +227,21 @@ Added to Settings → Notifications when external delivery channels ship. PBAC-d
 
 ---
 
+## AI + RAG Architecture (Post-MVP)
+
+See MILESTONES.md → Post-MVP: AI Chatbot + RAG for the full feature plan.
+
+**Stack:**
+- LLM: Claude API (`@anthropic/sdk`) — haiku-4-5 for chatbot, sonnet-4-6 for analysis
+- Vector store: pgvector Neon extension — no separate DB needed at early scale
+- RAG pattern: embed on write → store in pgvector → retrieve on query → pass to Claude with tenant context
+- Env var: `ANTHROPIC_API_KEY` (added when AI module ships)
+- Feature flag: `features.ai_chatbot` on `Tenant` — Super Admin enables per tenant
+
+**Isolation:** All AI queries are tenant-scoped at the service layer. The existing `tenantId` enforcement covers AI the same as any other module — no special AI isolation layer needed.
+
+---
+
 ## White-Label Considerations
 
 - Treat branding as data (tenant settings: name, logo, theme tokens)

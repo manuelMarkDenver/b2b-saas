@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
-
-import { AuthStatus } from "@/components/auth-status";
-import { ModeToggle } from "@/components/mode-toggle";
-import { TenantAuthGate } from "@/components/tenant-auth-gate";
-import { TenantSwitcher } from "@/components/tenant-switcher";
-import { getTenantTheme } from "@/lib/tenant-theme";
+import type { Metadata } from 'next';
+import { TenantShell } from '@/components/tenant-shell';
+import { getTenantTheme } from '@/lib/tenant-theme';
 
 export const metadata: Metadata = {
-  title: "B2B Marketplace",
+  title: 'Platform',
 };
 
 export default async function TenantLayout({
@@ -21,33 +17,18 @@ export default async function TenantLayout({
     <div
       style={
         {
-          "--tenant-primary": theme.primary,
-          "--tenant-primary-foreground": theme.primaryForeground,
-          "--tenant-accent": theme.accent,
-          "--tenant-accent-foreground": theme.accentForeground,
-          "--tenant-radius": theme.radius,
+          '--tenant-primary': theme.primary,
+          '--tenant-primary-foreground': theme.primaryForeground,
+          '--tenant-accent': theme.accent,
+          '--tenant-accent-foreground': theme.accentForeground,
+          '--tenant-radius': theme.radius,
         } as React.CSSProperties
       }
       className="min-h-dvh bg-background text-foreground"
     >
-      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-baseline gap-2">
-            <div className="text-sm font-semibold tracking-wide">{theme.brandName}</div>
-            <div className="text-xs text-muted-foreground">/t/{tenantSlug}</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <TenantSwitcher currentSlug={tenantSlug} />
-            <AuthStatus />
-            <ModeToggle />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <TenantAuthGate />
+      <TenantShell tenantSlug={tenantSlug} tenantName={theme.brandName}>
         {children}
-      </main>
+      </TenantShell>
     </div>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 
@@ -44,10 +46,25 @@ async function readApiError(res: Response): Promise<string> {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
   const [updating, setUpdating] = React.useState<string | null>(null);
+  const [authChecked, setAuthChecked] = React.useState(false);
   const { pushToast } = useToast();
+
+  React.useEffect(() => {
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    apiFetch("/auth/me").then(async (res) => {
+      if (!res.ok) { router.replace("/login"); return; }
+      const { user } = await res.json() as { user: { isPlatformAdmin: boolean } };
+      if (!user.isPlatformAdmin) { router.replace("/login"); return; }
+      setAuthChecked(true);
+    }).catch(() => router.replace("/login"));
+  }, [router]);
 
   async function loadTenants() {
     setStatus({ kind: "info", text: "Loading tenants..." });
@@ -61,7 +78,7 @@ export default function AdminPage() {
     setStatus(null);
   }
 
-  React.useEffect(() => { loadTenants(); }, []);
+  React.useEffect(() => { if (authChecked) loadTenants(); }, [authChecked]);
 
   async function toggleFlag(tenantId: string, flag: keyof TenantFeatures, current: boolean) {
     setUpdating(`${tenantId}-${flag}`);
@@ -79,6 +96,8 @@ export default function AdminPage() {
     }
     setUpdating(null);
   }
+
+  if (!authChecked) return null;
 
   return (
     <div className="min-h-dvh bg-background text-foreground">

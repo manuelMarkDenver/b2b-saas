@@ -66,6 +66,10 @@ API — Notifications (Messenger / WhatsApp / SMS)
 - `META_ACCESS_TOKEN` — page-level access token for Meta Cloud API
 - `REPLICATE_API_TOKEN` — for AI image generation via `/generate-image` skill (dev only)
 
+API — AI Chatbot (post-MVP)
+
+- `ANTHROPIC_API_KEY` — Claude API key for in-app chatbot and RAG features
+
 ## Naming
 
 - Public client vars must be prefixed with `NEXT_PUBLIC_`.
