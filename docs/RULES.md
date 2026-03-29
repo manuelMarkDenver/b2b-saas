@@ -292,6 +292,8 @@ SHOULD:
 
 - For ERP-style workflows, prefer list views (table/cards) that open a focused detail view (right-side sheet) for actions; keep destructive/state-change actions inside the detail view to reduce mis-clicks.
 
+- When introducing new list UIs, confirm whether the backing endpoint is paginated. If it is, implement pagination (or explicit limits + sorting) in the UI so behavior stays consistent across modules.
+
 MUST NOT:
 
 - Commit unoptimized PNG/JPEG images directly — always convert to WebP first.

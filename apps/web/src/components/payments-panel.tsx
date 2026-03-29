@@ -425,64 +425,94 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         </SheetContent>
       </Sheet>
 
-      <div className="mt-5 space-y-3">
-        {payments.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No payments yet.</div>
-        ) : null}
-        {payments.map((payment) => (
-          <div
-            key={payment.id}
-            className="rounded-md border border-border/60 bg-background p-4 text-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-mono text-xs text-muted-foreground">{payment.id.slice(0, 8)}…</div>
-                <div className="mt-1 font-medium tabular-nums">{formatCents(payment.amountCents)}</div>
-              </div>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[payment.status]}`}
-              >
-                {STATUS_LABELS[payment.status]}
-              </span>
+      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
+          <div>
+            <div className="text-sm font-medium">Payments</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Review payment history. Pending payments can be verified or rejected.
             </div>
-
-            <div className="mt-2 text-xs text-muted-foreground">
-              Order: {payment.orderId.slice(0, 8)}… · {payment.order.status}
-            </div>
-
-            {payment.proofUrl ? (
-              <a
-                href={payment.proofUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-block text-xs text-primary underline"
-              >
-                View proof
-              </a>
-            ) : (
-              <div className="mt-1 text-xs text-muted-foreground">No proof attached</div>
-            )}
-
-            {payment.status === "PENDING" ? (
-              <div className="mt-3 flex justify-end gap-1">
-                <button
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                  type="button"
-                  onClick={() => verifyPayment(payment.id, "VERIFIED")}
-                >
-                  ✓ Verify
-                </button>
-                <button
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                  type="button"
-                  onClick={() => verifyPayment(payment.id, "REJECTED")}
-                >
-                  ✕ Reject
-                </button>
-              </div>
-            ) : null}
           </div>
-        ))}
+          <div className="text-xs text-muted-foreground">{payments.length} total</div>
+        </div>
+
+        {payments.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-muted-foreground">No payments yet.</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_110px_140px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span>Payment</span>
+              <span className="text-right">Amount</span>
+              <span>Order</span>
+              <span>Proof</span>
+              <span>Created</span>
+              <span>Status</span>
+              <span className="text-right">Action</span>
+            </div>
+
+            <div className="divide-y divide-border/60">
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="grid grid-cols-[120px_110px_1fr_90px_1fr_110px_140px] items-center gap-3 px-4 py-3 text-sm"
+                >
+                  <span className="font-mono text-xs text-muted-foreground">{payment.id.slice(0, 8)}…</span>
+
+                  <span className="text-right font-mono tabular-nums">{formatCents(payment.amountCents)}</span>
+
+                  <div className="min-w-0">
+                    <div className="truncate text-xs text-muted-foreground">
+                      {payment.orderId.slice(0, 8)}…
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">{payment.order.status}</div>
+                  </div>
+
+                  {payment.proofUrl ? (
+                    <a
+                      href={payment.proofUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-fit text-xs text-primary underline"
+                    >
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+
+                  <span className="text-xs text-muted-foreground">{new Date(payment.createdAt).toLocaleString()}</span>
+
+                  <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[payment.status]}`}>
+                    {STATUS_LABELS[payment.status]}
+                  </span>
+
+                  <div className="flex justify-end gap-1">
+                    {payment.status === "PENDING" ? (
+                      <>
+                        <button
+                          className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                          type="button"
+                          onClick={() => verifyPayment(payment.id, "VERIFIED")}
+                        >
+                          ✓ Verify
+                        </button>
+                        <button
+                          className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                          type="button"
+                          onClick={() => verifyPayment(payment.id, "REJECTED")}
+                        >
+                          ✕ Reject
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
