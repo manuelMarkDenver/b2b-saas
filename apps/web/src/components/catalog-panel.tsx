@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
+import { ImageUpload } from "@/components/image-upload";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -64,6 +65,7 @@ type Sku = {
   id: string;
   code: string;
   name: string;
+  imageUrl?: string | null;
   isActive: boolean;
   isArchived: boolean;
   stockOnHand: number;
@@ -186,6 +188,15 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       return;
     }
     pushToast({ variant: 'success', title: 'Product archived', message: name });
+    await loadAll();
+  }
+
+  async function updateSkuImage(skuId: string, imageUrl: string | null) {
+    await apiFetch(`/skus/${skuId}`, {
+      tenantSlug,
+      method: 'PATCH',
+      body: JSON.stringify({ imageUrl }),
+    });
     await loadAll();
   }
 
@@ -367,8 +378,14 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 key={s.id}
                 className={`flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 ${s.isArchived ? "opacity-50" : ""}`}
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <ProductThumb label={s.code} size={26} />
+                <div className="flex min-w-0 items-center gap-3">
+                  <ImageUpload
+                    currentUrl={s.imageUrl}
+                    tenantSlug={tenantSlug}
+                    size={48}
+                    onUploaded={(url) => void updateSkuImage(s.id, url)}
+                    onRemoved={() => void updateSkuImage(s.id, null)}
+                  />
                   <div>
                     <div className="font-medium">{s.code} · {s.name}</div>
                     <div className="text-xs text-muted-foreground">{s.product.name}</div>

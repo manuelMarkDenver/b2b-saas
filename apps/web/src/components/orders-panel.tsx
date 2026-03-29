@@ -20,6 +20,7 @@ type Sku = {
   id: string;
   code: string;
   name: string;
+  imageUrl?: string | null;
   priceCents: number | null;
   stockOnHand: number;
 };
@@ -29,7 +30,7 @@ type OrderItem = {
   skuId: string;
   quantity: number;
   priceAtTime: number;
-  sku: { id: string; code: string; name: string };
+  sku: { id: string; code: string; name: string; imageUrl?: string | null };
 };
 
 type Order = {
@@ -478,6 +479,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                           <div className="relative aspect-square w-full bg-muted/20">
                             <ProductThumb
                               fill
+                              src={sku.imageUrl}
                               label={`${sku.code} ${sku.name}`}
                               className="absolute inset-0 rounded-none border-0"
                             />
@@ -566,6 +568,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                     return (
                       <div key={line.skuId} className="flex items-center gap-4 px-4 py-4">
                         <ProductThumb
+                          src={sku.imageUrl}
                           label={`${sku.code} ${sku.name}`}
                           size={80}
                           className="rounded-xl"
@@ -693,7 +696,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                     <div className="divide-y divide-border/60 px-4">
                       {selectedOrder.items.map((item) => (
                         <div key={item.id} className="flex items-center gap-4 py-4">
-                          <ProductThumb label={`${item.sku.code} ${item.sku.name}`} size={80} className="rounded-xl" />
+                          <ProductThumb src={item.sku.imageUrl} label={`${item.sku.code} ${item.sku.name}`} size={80} className="rounded-xl" />
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-semibold">{item.sku.code}</div>
                             <div className="text-sm text-muted-foreground">{item.sku.name}</div>
@@ -775,7 +778,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                           return (
                             <div key={sku.id} className={`overflow-hidden rounded-xl border bg-card transition-colors ${inCart ? "border-primary/60" : "border-border/60"}`}>
                               <div className="relative aspect-square w-full bg-muted/20">
-                                <ProductThumb fill label={`${sku.code} ${sku.name}`} className="absolute inset-0 rounded-none border-0" />
+                                <ProductThumb fill src={sku.imageUrl} label={`${sku.code} ${sku.name}`} className="absolute inset-0 rounded-none border-0" />
                                 {inCart ? (
                                   <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow">{qty}</div>
                                 ) : null}
@@ -826,7 +829,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                         if (!sku) return null;
                         return (
                           <div key={line.skuId} className="flex items-center gap-4 px-4 py-4">
-                            <ProductThumb label={`${sku.code} ${sku.name}`} size={80} className="rounded-xl" />
+                            <ProductThumb src={sku.imageUrl} label={`${sku.code} ${sku.name}`} size={80} className="rounded-xl" />
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-semibold">{sku.code}</div>
                               <div className="text-sm text-muted-foreground">{sku.name}</div>

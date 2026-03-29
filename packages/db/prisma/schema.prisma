@@ -121,6 +121,7 @@ model Sku {
   barcode            String?
   stockOnHand        Int                 @default(0)
   lowStockThreshold  Int                 @default(0)
+  imageUrl           String?
   isActive           Boolean             @default(true)
   isArchived         Boolean             @default(false)
   createdAt          DateTime            @default(now())

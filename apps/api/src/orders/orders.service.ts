@@ -67,7 +67,7 @@ export class OrdersService {
       },
       include: {
         items: {
-          include: { sku: { select: { id: true, code: true, name: true } } },
+          include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
       },
     });
@@ -91,7 +91,7 @@ export class OrdersService {
         where,
         include: {
           items: {
-            include: { sku: { select: { id: true, code: true, name: true } } },
+            include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -108,7 +108,7 @@ export class OrdersService {
       where: { id: orderId },
       include: {
         items: {
-          include: { sku: { select: { id: true, code: true, name: true } } },
+          include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
       },
     });
@@ -173,7 +173,7 @@ export class OrdersService {
         },
         include: {
           items: {
-            include: { sku: { select: { id: true, code: true, name: true } } },
+            include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
           },
         },
       });
@@ -254,7 +254,7 @@ export class OrdersService {
           include: {
             items: {
               include: {
-                sku: { select: { id: true, code: true, name: true } },
+                sku: { select: { id: true, code: true, name: true, imageUrl: true } },
               },
             },
           },
@@ -305,7 +305,7 @@ export class OrdersService {
           include: {
             items: {
               include: {
-                sku: { select: { id: true, code: true, name: true } },
+                sku: { select: { id: true, code: true, name: true, imageUrl: true } },
               },
             },
           },
@@ -331,7 +331,7 @@ export class OrdersService {
       data: { status: dto.status },
       include: {
         items: {
-          include: { sku: { select: { id: true, code: true, name: true } } },
+          include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
       },
     });
