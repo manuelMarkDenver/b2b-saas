@@ -28,6 +28,7 @@ async function upsertUser(user: SeededUser) {
   });
 }
 
+/** Apply an inventory movement and update stockOnHand in one transaction. */
 async function logMovement(
   tenantId: string,
   skuId: string,
@@ -44,8 +45,6 @@ async function logMovement(
         ? -quantity
         : quantity;
 
-  // When called from seedOrder, noteOrReferenceId is the orderId (referenceId)
-  // When called directly for manual movements, noteOrReferenceId is the note
   const referenceId = referenceType === ReferenceType.ORDER ? noteOrReferenceId : undefined;
   const resolvedNote = referenceType === ReferenceType.ORDER ? note : noteOrReferenceId;
 
@@ -60,13 +59,124 @@ async function logMovement(
   });
 }
 
+async function upsertProductSku(opts: {
+  tenantId: string;
+  categoryId: string;
+  productName: string;
+  skuCode: string;
+  skuName: string;
+  priceCents: number;
+  costCents: number;
+  lowStockThreshold: number;
+  isArchived?: boolean;
+}) {
+  const existing = await prisma.product.findFirst({
+    where: { tenantId: opts.tenantId, name: opts.productName },
+    select: { id: true },
+  });
+
+  const product = existing
+    ? await prisma.product.update({
+        where: { id: existing.id },
+        data: { categoryId: opts.categoryId, isActive: !opts.isArchived, isArchived: opts.isArchived ?? false },
+      })
+    : await prisma.product.create({
+        data: {
+          tenantId: opts.tenantId,
+          categoryId: opts.categoryId,
+          name: opts.productName,
+          isActive: !opts.isArchived,
+          isArchived: opts.isArchived ?? false,
+        },
+      });
+
+  const sku = await prisma.sku.upsert({
+    where: { tenantId_code: { tenantId: opts.tenantId, code: opts.skuCode } },
+    update: {
+      productId: product.id,
+      name: opts.skuName,
+      priceCents: opts.priceCents,
+      costCents: opts.costCents,
+      lowStockThreshold: opts.lowStockThreshold,
+      isActive: !opts.isArchived,
+      isArchived: opts.isArchived ?? false,
+    },
+    create: {
+      tenantId: opts.tenantId,
+      productId: product.id,
+      code: opts.skuCode,
+      name: opts.skuName,
+      priceCents: opts.priceCents,
+      costCents: opts.costCents,
+      stockOnHand: 0,
+      lowStockThreshold: opts.lowStockThreshold,
+      isActive: !opts.isArchived,
+      isArchived: opts.isArchived ?? false,
+    },
+  });
+
+  return sku;
+}
+
+/** Create a single order with items; optionally deduct stock for CONFIRMED. */
+async function createOrder(opts: {
+  tenantId: string;
+  items: Array<{ skuId: string; quantity: number; priceCents: number }>;
+  status: OrderStatus;
+  deductStock?: boolean;
+}) {
+  const totalCents = opts.items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
+
+  const order = await prisma.order.create({
+    data: {
+      tenantId: opts.tenantId,
+      status: opts.status,
+      totalCents,
+      items: {
+        create: opts.items.map((i) => ({
+          skuId: i.skuId,
+          quantity: i.quantity,
+          priceAtTime: i.priceCents,
+        })),
+      },
+    },
+  });
+
+  if (opts.deductStock) {
+    for (const item of opts.items) {
+      await logMovement(opts.tenantId, item.skuId, MovementType.OUT, item.quantity, ReferenceType.ORDER, order.id);
+    }
+  }
+
+  return order;
+}
+
+/** Create a payment for an order if none exists yet. */
+async function createPaymentIfAbsent(opts: {
+  tenantId: string;
+  orderId: string;
+  amountCents: number;
+  status: PaymentStatus;
+  proofUrl?: string;
+}) {
+  const existing = await prisma.payment.count({ where: { orderId: opts.orderId } });
+  if (existing > 0) return;
+  await prisma.payment.create({
+    data: {
+      tenantId: opts.tenantId,
+      orderId: opts.orderId,
+      amountCents: opts.amountCents,
+      status: opts.status,
+      proofUrl: opts.proofUrl ?? null,
+    },
+  });
+}
+
 async function main() {
-  const adminEmail =
-    process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "admin@local.test";
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "admin@local.test";
   const adminPassword = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
   const tenantName = process.env.ADMIN_TENANT_NAME ?? "Admin Tenant";
-  const tenantSlug =
-    process.env.ADMIN_TENANT_SLUG?.trim().toLowerCase() ?? "admin";
+  const tenantSlug = process.env.ADMIN_TENANT_SLUG?.trim().toLowerCase() ?? "admin";
 
   await prisma.appMeta.upsert({
     where: { key: "schemaVersion" },
@@ -77,11 +187,7 @@ async function main() {
   const adminPasswordHash = await hash(adminPassword, 12);
   const defaultPasswordHash = await hash(DEFAULT_PASSWORD, 12);
 
-  const admin = await upsertUser({
-    email: adminEmail,
-    passwordHash: adminPasswordHash,
-    isPlatformAdmin: true,
-  });
+  const admin = await upsertUser({ email: adminEmail, passwordHash: adminPasswordHash, isPlatformAdmin: true });
 
   const adminTenant = await prisma.tenant.upsert({
     where: { slug: tenantSlug },
@@ -94,8 +200,6 @@ async function main() {
     update: { status: "ACTIVE", isOwner: true, role: "OWNER" },
     create: { tenantId: adminTenant.id, userId: admin.id, status: "ACTIVE", isOwner: true, role: "OWNER" },
   });
-
-  // --- 3 Realistic Business Tenants ---
 
   const defaultFeatures = { inventory: true, orders: true, payments: true, marketplace: false };
 
@@ -156,12 +260,15 @@ async function main() {
     { name: "Fasteners", slug: "fasteners" },
     { name: "Electrical", slug: "electrical" },
     { name: "Safety Equipment", slug: "safety-equipment" },
+    { name: "Tools", slug: "tools" },
     { name: "Flour & Grains", slug: "flour-grains" },
     { name: "Dairy & Cheese", slug: "dairy-cheese" },
     { name: "Sauces & Condiments", slug: "sauces-condiments" },
+    { name: "Dry Goods", slug: "dry-goods" },
     { name: "Beverages", slug: "beverages" },
     { name: "Snacks", slug: "snacks" },
     { name: "Cleaning Supplies", slug: "cleaning-supplies" },
+    { name: "Personal Care", slug: "personal-care" },
   ];
 
   for (const c of categoryData) {
@@ -175,388 +282,341 @@ async function main() {
   const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
   const cat = Object.fromEntries(categories.map((c) => [c.slug, c.id]));
 
-  // --- Helper: upsert product + SKU (stockOnHand starts at 0) ---
-
-  async function upsertProductSku(opts: {
-    tenantId: string;
-    categoryId: string;
-    productName: string;
-    skuCode: string;
-    skuName: string;
-    priceCents: number;
-    costCents: number;
-    lowStockThreshold: number;
-  }) {
-    const existing = await prisma.product.findFirst({
-      where: { tenantId: opts.tenantId, name: opts.productName },
-      select: { id: true },
-    });
-
-    const product = existing
-      ? await prisma.product.update({
-          where: { id: existing.id },
-          data: { categoryId: opts.categoryId, isActive: true },
-        })
-      : await prisma.product.create({
-          data: {
-            tenantId: opts.tenantId,
-            categoryId: opts.categoryId,
-            name: opts.productName,
-            isActive: true,
-          },
-        });
-
-    const sku = await prisma.sku.upsert({
-      where: { tenantId_code: { tenantId: opts.tenantId, code: opts.skuCode } },
-      update: {
-        productId: product.id,
-        name: opts.skuName,
-        priceCents: opts.priceCents,
-        costCents: opts.costCents,
-        lowStockThreshold: opts.lowStockThreshold,
-        isActive: true,
-      },
-      create: {
-        tenantId: opts.tenantId,
-        productId: product.id,
-        code: opts.skuCode,
-        name: opts.skuName,
-        priceCents: opts.priceCents,
-        costCents: opts.costCents,
-        stockOnHand: 0,
-        lowStockThreshold: opts.lowStockThreshold,
-        isActive: true,
-      },
-    });
-
-    return sku;
-  }
-
-  // --- Peak Hardware Supply ---
+  // ===========================
+  // PEAK HARDWARE SUPPLY
+  // ===========================
 
   const boltSku = await upsertProductSku({
-    tenantId: hardwareTenant.id,
-    categoryId: cat["fasteners"],
-    productName: "Hex Bolt M8",
-    skuCode: "PHW-BOLT-M8",
-    skuName: "Hex Bolt M8 x 25mm",
-    priceCents: 150,
-    costCents: 60,
-    lowStockThreshold: 50,
+    tenantId: hardwareTenant.id, categoryId: cat["fasteners"],
+    productName: "Hex Bolt M8", skuCode: "PHW-BOLT-M8",
+    skuName: "Hex Bolt M8 × 25mm", priceCents: 150, costCents: 60, lowStockThreshold: 50,
   });
-
   const washerSku = await upsertProductSku({
-    tenantId: hardwareTenant.id,
-    categoryId: cat["fasteners"],
-    productName: "Flat Washer M8",
-    skuCode: "PHW-WASH-M8",
-    skuName: "Flat Washer M8",
-    priceCents: 50,
-    costCents: 15,
-    lowStockThreshold: 100,
+    tenantId: hardwareTenant.id, categoryId: cat["fasteners"],
+    productName: "Flat Washer M8", skuCode: "PHW-WASH-M8",
+    skuName: "Flat Washer M8", priceCents: 50, costCents: 15, lowStockThreshold: 100,
   });
-
+  const nutSku = await upsertProductSku({
+    tenantId: hardwareTenant.id, categoryId: cat["fasteners"],
+    productName: "Hex Nut M8", skuCode: "PHW-NUT-M8",
+    skuName: "Hex Nut M8", priceCents: 45, costCents: 12, lowStockThreshold: 100,
+  });
   const cableSku = await upsertProductSku({
-    tenantId: hardwareTenant.id,
-    categoryId: cat["electrical"],
-    productName: "Electrical Cable 2.5mm",
-    skuCode: "PHW-CABLE-25",
-    skuName: "Electrical Cable 2.5mm (per meter)",
-    priceCents: 8500,
-    costCents: 5200,
-    lowStockThreshold: 20,
+    tenantId: hardwareTenant.id, categoryId: cat["electrical"],
+    productName: "Electrical Cable 2.5mm", skuCode: "PHW-CABLE-25",
+    skuName: "Electrical Cable 2.5mm (per meter)", priceCents: 8500, costCents: 5200, lowStockThreshold: 20,
+  });
+  const extCordSku = await upsertProductSku({
+    tenantId: hardwareTenant.id, categoryId: cat["electrical"],
+    productName: "Extension Cord 5m", skuCode: "PHW-EXT-5M",
+    skuName: "Extension Cord 5m 3-outlet", priceCents: 45000, costCents: 28000, lowStockThreshold: 5,
+  });
+  const glovesSku = await upsertProductSku({
+    tenantId: hardwareTenant.id, categoryId: cat["safety-equipment"],
+    productName: "Safety Gloves", skuCode: "PHW-GLOVE-L",
+    skuName: "Safety Gloves Large (pair)", priceCents: 18500, costCents: 10000, lowStockThreshold: 10,
+  });
+  const hardhatSku = await upsertProductSku({
+    tenantId: hardwareTenant.id, categoryId: cat["safety-equipment"],
+    productName: "Hard Hat", skuCode: "PHW-HHAT-YLW",
+    skuName: "Hard Hat Yellow", priceCents: 95000, costCents: 55000, lowStockThreshold: 5,
+  });
+  // Archived SKU — discontinued item
+  await upsertProductSku({
+    tenantId: hardwareTenant.id, categoryId: cat["tools"],
+    productName: "Manual Hand Drill (Discontinued)", skuCode: "PHW-DRILL-MAN",
+    skuName: "Manual Hand Drill", priceCents: 350000, costCents: 200000, lowStockThreshold: 2,
+    isArchived: true,
   });
 
-  // Peak Hardware — initial stock IN movements
-  if (boltSku.stockOnHand === 0) {
-    await logMovement(hardwareTenant.id, boltSku.id, MovementType.IN, 200, ReferenceType.MANUAL, "Initial stock");
-  }
-  if (washerSku.stockOnHand === 0) {
-    await logMovement(hardwareTenant.id, washerSku.id, MovementType.IN, 500, ReferenceType.MANUAL, "Initial stock");
-  }
-  if (cableSku.stockOnHand === 0) {
-    await logMovement(hardwareTenant.id, cableSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock");
+  // Stock for Peak Hardware
+  const hwStockCheck = await prisma.sku.findUnique({ where: { id: boltSku.id }, select: { stockOnHand: true } });
+  if ((hwStockCheck?.stockOnHand ?? 0) < 100) {
+    await logMovement(hardwareTenant.id, boltSku.id, MovementType.IN, 2000, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, washerSku.id, MovementType.IN, 3000, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, nutSku.id, MovementType.IN, 3000, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, cableSku.id, MovementType.IN, 500, ReferenceType.MANUAL, "Initial stock");
     await logMovement(hardwareTenant.id, cableSku.id, MovementType.OUT, 15, ReferenceType.MANUAL, "Sold to contractor");
+    await logMovement(hardwareTenant.id, extCordSku.id, MovementType.IN, 80, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, glovesSku.id, MovementType.IN, 120, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, hardhatSku.id, MovementType.IN, 40, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(hardwareTenant.id, boltSku.id, MovementType.ADJUSTMENT, -50, ReferenceType.MANUAL, "Inventory count correction");
   }
 
-  // --- Metro Pizza Supply ---
+  // Orders for Peak Hardware — create batch once (idempotent: skip if already seeded)
+  const hwOrderCount = await prisma.order.count({ where: { tenantId: hardwareTenant.id } });
+  if (hwOrderCount < 20) {
+    const hw = hardwareTenant.id;
+    const b = boltSku, w = washerSku, n = nutSku, c = cableSku, e = extCordSku, g = glovesSku, h = hardhatSku;
 
-  const flourSku = await upsertProductSku({
-    tenantId: foodTenant.id,
-    categoryId: cat["flour-grains"],
-    productName: "All-Purpose Flour",
-    skuCode: "MPS-FLOUR-25K",
-    skuName: "All-Purpose Flour 25kg Sack",
-    priceCents: 189000,
-    costCents: 120000,
-    lowStockThreshold: 5,
-  });
+    const orders = [
+      // PENDING orders (current payables)
+      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: b.id, quantity: 100, priceCents: b.priceCents! }, { skuId: w.id, quantity: 200, priceCents: w.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: c.id, quantity: 5, priceCents: c.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: g.id, quantity: 10, priceCents: g.priceCents! }, { skuId: h.id, quantity: 3, priceCents: h.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: e.id, quantity: 6, priceCents: e.priceCents! }, { skuId: b.id, quantity: 50, priceCents: b.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: n.id, quantity: 500, priceCents: n.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: w.id, quantity: 300, priceCents: w.priceCents! }, { skuId: n.id, quantity: 300, priceCents: n.priceCents! }] }),
+      // CONFIRMED orders (stock deducted)
+      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: c.id, quantity: 10, priceCents: c.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: b.id, quantity: 200, priceCents: b.priceCents! }, { skuId: w.id, quantity: 200, priceCents: w.priceCents! }, { skuId: n.id, quantity: 200, priceCents: n.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: g.id, quantity: 8, priceCents: g.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: h.id, quantity: 5, priceCents: h.priceCents! }, { skuId: g.id, quantity: 5, priceCents: g.priceCents! }] }),
+      // COMPLETED orders
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 300, priceCents: b.priceCents! }, { skuId: w.id, quantity: 300, priceCents: w.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: e.id, quantity: 12, priceCents: e.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: c.id, quantity: 20, priceCents: c.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: g.id, quantity: 15, priceCents: g.priceCents! }, { skuId: h.id, quantity: 8, priceCents: h.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 400, priceCents: b.priceCents! }, { skuId: n.id, quantity: 400, priceCents: n.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: w.id, quantity: 150, priceCents: w.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: e.id, quantity: 8, priceCents: e.priceCents! }, { skuId: c.id, quantity: 15, priceCents: c.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: h.id, quantity: 10, priceCents: h.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 250, priceCents: b.priceCents! }, { skuId: w.id, quantity: 250, priceCents: w.priceCents! }, { skuId: n.id, quantity: 250, priceCents: n.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: g.id, quantity: 20, priceCents: g.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: c.id, quantity: 30, priceCents: c.priceCents! }] }),
+      // CANCELLED orders
+      await createOrder({ tenantId: hw, status: OrderStatus.CANCELLED, items: [{ skuId: e.id, quantity: 4, priceCents: e.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.CANCELLED, items: [{ skuId: h.id, quantity: 2, priceCents: h.priceCents! }, { skuId: g.id, quantity: 4, priceCents: g.priceCents! }] }),
+      await createOrder({ tenantId: hw, status: OrderStatus.CANCELLED, items: [{ skuId: c.id, quantity: 8, priceCents: c.priceCents! }] }),
+    ];
 
-  const mozzaSku = await upsertProductSku({
-    tenantId: foodTenant.id,
-    categoryId: cat["dairy-cheese"],
-    productName: "Mozzarella Block",
-    skuCode: "MPS-MOZZ-2K",
-    skuName: "Mozzarella Block 2kg",
-    priceCents: 145000,
-    costCents: 95000,
-    lowStockThreshold: 10,
-  });
-
-  const sauceSku = await upsertProductSku({
-    tenantId: foodTenant.id,
-    categoryId: cat["sauces-condiments"],
-    productName: "Pizza Sauce",
-    skuCode: "MPS-SAUCE-3K",
-    skuName: "Pizza Sauce 3kg Can",
-    priceCents: 62000,
-    costCents: 38000,
-    lowStockThreshold: 8,
-  });
-
-  // Metro Pizza — initial stock IN movements
-  if (flourSku.stockOnHand === 0) {
-    await logMovement(foodTenant.id, flourSku.id, MovementType.IN, 40, ReferenceType.MANUAL, "Initial stock");
-    await logMovement(foodTenant.id, flourSku.id, MovementType.OUT, 8, ReferenceType.MANUAL, "Delivered to client");
-  }
-  if (mozzaSku.stockOnHand === 0) {
-    await logMovement(foodTenant.id, mozzaSku.id, MovementType.IN, 30, ReferenceType.MANUAL, "Initial stock");
-  }
-  if (sauceSku.stockOnHand === 0) {
-    await logMovement(foodTenant.id, sauceSku.id, MovementType.IN, 24, ReferenceType.MANUAL, "Initial stock");
-    await logMovement(foodTenant.id, sauceSku.id, MovementType.OUT, 6, ReferenceType.MANUAL, "Sold to restaurant");
-  }
-
-  // --- Corner General Store ---
-
-  const colaSku = await upsertProductSku({
-    tenantId: retailTenant.id,
-    categoryId: cat["beverages"],
-    productName: "Cola 355ml Can",
-    skuCode: "CGS-COLA-355",
-    skuName: "Cola 355ml Can",
-    priceCents: 6500,
-    costCents: 3800,
-    lowStockThreshold: 24,
-  });
-
-  const chipsSku = await upsertProductSku({
-    tenantId: retailTenant.id,
-    categoryId: cat["snacks"],
-    productName: "Potato Chips Original",
-    skuCode: "CGS-CHIPS-OR",
-    skuName: "Potato Chips Original 150g",
-    priceCents: 9900,
-    costCents: 5500,
-    lowStockThreshold: 12,
-  });
-
-  const cleanerSku = await upsertProductSku({
-    tenantId: retailTenant.id,
-    categoryId: cat["cleaning-supplies"],
-    productName: "All-Purpose Cleaner",
-    skuCode: "CGS-CLEAN-1L",
-    skuName: "All-Purpose Cleaner 1L",
-    priceCents: 28500,
-    costCents: 16000,
-    lowStockThreshold: 6,
-  });
-
-  // Corner General — initial stock IN movements
-  if (colaSku.stockOnHand === 0) {
-    await logMovement(retailTenant.id, colaSku.id, MovementType.IN, 144, ReferenceType.MANUAL, "Initial stock");
-    await logMovement(retailTenant.id, colaSku.id, MovementType.OUT, 36, ReferenceType.MANUAL, "Daily sales");
-  }
-  if (chipsSku.stockOnHand === 0) {
-    await logMovement(retailTenant.id, chipsSku.id, MovementType.IN, 60, ReferenceType.MANUAL, "Initial stock");
-    await logMovement(retailTenant.id, chipsSku.id, MovementType.ADJUSTMENT, -3, ReferenceType.MANUAL, "Damaged stock written off");
-  }
-  if (cleanerSku.stockOnHand === 0) {
-    await logMovement(retailTenant.id, cleanerSku.id, MovementType.IN, 24, ReferenceType.MANUAL, "Initial stock");
-  }
-
-  // --- Helper: create order with items ---
-
-  async function seedOrder(opts: {
-    tenantId: string;
-    items: Array<{ skuId: string; quantity: number; priceCents: number }>;
-    status: OrderStatus;
-  }) {
-    const existing = await prisma.order.count({ where: { tenantId: opts.tenantId, status: opts.status } });
-    if (existing > 0) return; // idempotent — skip if orders already exist for this tenant+status
-
-    const totalCents = opts.items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
-
-    const order = await prisma.order.create({
-      data: {
-        tenantId: opts.tenantId,
-        status: opts.status,
-        totalCents,
-        items: {
-          create: opts.items.map((i) => ({
-            skuId: i.skuId,
-            quantity: i.quantity,
-            priceAtTime: i.priceCents,
-          })),
-        },
-      },
-    });
-
-    // If CONFIRMED, log OUT movements
-    if (opts.status === OrderStatus.CONFIRMED) {
-      for (const item of opts.items) {
-        await logMovement(opts.tenantId, item.skuId, MovementType.OUT, item.quantity, ReferenceType.ORDER, order.id);
+    // Payments for CONFIRMED and COMPLETED orders
+    for (const order of orders) {
+      if (order.status === OrderStatus.CONFIRMED) {
+        await createPaymentIfAbsent({ tenantId: hw, orderId: order.id, amountCents: order.totalCents, status: PaymentStatus.PENDING, proofUrl: "https://example.com/receipts/phw-payment.jpg" });
+      } else if (order.status === OrderStatus.COMPLETED) {
+        await createPaymentIfAbsent({ tenantId: hw, orderId: order.id, amountCents: order.totalCents, status: PaymentStatus.VERIFIED, proofUrl: "https://example.com/receipts/phw-verified.jpg" });
       }
     }
   }
 
-  // --- Seed Orders ---
+  // ===========================
+  // METRO PIZZA SUPPLY
+  // ===========================
 
-  // Peak Hardware: PENDING (2 items), CONFIRMED (1 item), COMPLETED (3 items — multi-item showcase)
-  await seedOrder({
-    tenantId: hardwareTenant.id,
-    items: [
-      { skuId: boltSku.id, quantity: 50, priceCents: boltSku.priceCents ?? 150 },
-      { skuId: washerSku.id, quantity: 100, priceCents: washerSku.priceCents ?? 50 },
-    ],
-    status: OrderStatus.PENDING,
+  const flourSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["flour-grains"],
+    productName: "All-Purpose Flour", skuCode: "MPS-FLOUR-25K",
+    skuName: "All-Purpose Flour 25kg Sack", priceCents: 189000, costCents: 120000, lowStockThreshold: 5,
   });
-  await seedOrder({
-    tenantId: hardwareTenant.id,
-    items: [{ skuId: cableSku.id, quantity: 10, priceCents: cableSku.priceCents ?? 8500 }],
-    status: OrderStatus.CONFIRMED,
+  const mozzaSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["dairy-cheese"],
+    productName: "Mozzarella Block", skuCode: "MPS-MOZZ-2K",
+    skuName: "Mozzarella Block 2kg", priceCents: 145000, costCents: 95000, lowStockThreshold: 10,
   });
-  await seedOrder({
-    tenantId: hardwareTenant.id,
-    items: [
-      { skuId: boltSku.id,   quantity: 200, priceCents: boltSku.priceCents ?? 150 },
-      { skuId: washerSku.id, quantity: 200, priceCents: washerSku.priceCents ?? 50 },
-      { skuId: cableSku.id,  quantity: 5,   priceCents: cableSku.priceCents ?? 8500 },
-    ],
-    status: OrderStatus.COMPLETED,
+  const sauceSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["sauces-condiments"],
+    productName: "Pizza Sauce", skuCode: "MPS-SAUCE-3K",
+    skuName: "Pizza Sauce 3kg Can", priceCents: 62000, costCents: 38000, lowStockThreshold: 8,
   });
-
-  // Metro Pizza: PENDING (2 items), COMPLETED (1 item), CONFIRMED (3 items — multi-item showcase)
-  await seedOrder({
-    tenantId: foodTenant.id,
-    items: [
-      { skuId: flourSku.id, quantity: 5, priceCents: flourSku.priceCents ?? 189000 },
-      { skuId: sauceSku.id, quantity: 6, priceCents: sauceSku.priceCents ?? 62000 },
-    ],
-    status: OrderStatus.PENDING,
+  const yeastSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["flour-grains"],
+    productName: "Dry Active Yeast", skuCode: "MPS-YEAST-1K",
+    skuName: "Dry Active Yeast 1kg", priceCents: 88000, costCents: 52000, lowStockThreshold: 10,
   });
-  await seedOrder({
-    tenantId: foodTenant.id,
-    items: [{ skuId: mozzaSku.id, quantity: 8, priceCents: mozzaSku.priceCents ?? 145000 }],
-    status: OrderStatus.COMPLETED,
+  const oliveOilSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["sauces-condiments"],
+    productName: "Extra Virgin Olive Oil", skuCode: "MPS-EVOO-5L",
+    skuName: "Extra Virgin Olive Oil 5L", priceCents: 320000, costCents: 210000, lowStockThreshold: 4,
   });
-  await seedOrder({
-    tenantId: foodTenant.id,
-    items: [
-      { skuId: flourSku.id, quantity: 10, priceCents: flourSku.priceCents ?? 189000 },
-      { skuId: mozzaSku.id, quantity: 15, priceCents: mozzaSku.priceCents ?? 145000 },
-      { skuId: sauceSku.id, quantity: 12, priceCents: sauceSku.priceCents ?? 62000 },
-    ],
-    status: OrderStatus.CONFIRMED,
+  const pepperoniSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["dry-goods"],
+    productName: "Pepperoni Slices", skuCode: "MPS-PEPPER-500G",
+    skuName: "Pepperoni Slices 500g Pack", priceCents: 95000, costCents: 62000, lowStockThreshold: 15,
+  });
+  const tomatoesSku = await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["sauces-condiments"],
+    productName: "Canned Tomatoes", skuCode: "MPS-TOMATO-400G",
+    skuName: "Crushed Canned Tomatoes 400g", priceCents: 38000, costCents: 22000, lowStockThreshold: 20,
+  });
+  // Archived SKU — discontinued
+  await upsertProductSku({
+    tenantId: foodTenant.id, categoryId: cat["dairy-cheese"],
+    productName: "Parmesan Block (Discontinued)", skuCode: "MPS-PARM-1K",
+    skuName: "Parmesan Block 1kg", priceCents: 280000, costCents: 190000, lowStockThreshold: 3,
+    isArchived: true,
   });
 
-  // Corner General: PENDING (2 items), CANCELLED (1 item), COMPLETED (3 items — multi-item showcase)
-  await seedOrder({
-    tenantId: retailTenant.id,
-    items: [
-      { skuId: colaSku.id,  quantity: 24, priceCents: colaSku.priceCents ?? 6500 },
-      { skuId: chipsSku.id, quantity: 12, priceCents: chipsSku.priceCents ?? 9900 },
-    ],
-    status: OrderStatus.PENDING,
-  });
-  await seedOrder({
-    tenantId: retailTenant.id,
-    items: [{ skuId: cleanerSku.id, quantity: 6, priceCents: cleanerSku.priceCents ?? 28500 }],
-    status: OrderStatus.CANCELLED,
-  });
-  await seedOrder({
-    tenantId: retailTenant.id,
-    items: [
-      { skuId: colaSku.id,    quantity: 48, priceCents: colaSku.priceCents ?? 6500 },
-      { skuId: chipsSku.id,   quantity: 24, priceCents: chipsSku.priceCents ?? 9900 },
-      { skuId: cleanerSku.id, quantity: 12, priceCents: cleanerSku.priceCents ?? 28500 },
-    ],
-    status: OrderStatus.COMPLETED,
-  });
-
-  // --- Seed Payments ---
-
-  async function seedPayment(opts: {
-    tenantId: string;
-    orderId: string;
-    amountCents: number;
-    status: PaymentStatus;
-    proofUrl?: string;
-  }) {
-    const existing = await prisma.payment.count({ where: { orderId: opts.orderId } });
-    if (existing > 0) return;
-
-    await prisma.payment.create({
-      data: {
-        tenantId: opts.tenantId,
-        orderId: opts.orderId,
-        amountCents: opts.amountCents,
-        status: opts.status,
-        proofUrl: opts.proofUrl ?? null,
-      },
-    });
+  // Stock for Metro Pizza
+  const mpsStockCheck = await prisma.sku.findUnique({ where: { id: flourSku.id }, select: { stockOnHand: true } });
+  if ((mpsStockCheck?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, flourSku.id, MovementType.IN, 200, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, flourSku.id, MovementType.OUT, 8, ReferenceType.MANUAL, "Delivered to client");
+    await logMovement(foodTenant.id, mozzaSku.id, MovementType.IN, 150, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, sauceSku.id, MovementType.IN, 120, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, sauceSku.id, MovementType.OUT, 6, ReferenceType.MANUAL, "Sold to restaurant");
+    await logMovement(foodTenant.id, yeastSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, oliveOilSku.id, MovementType.IN, 30, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, pepperoniSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, tomatoesSku.id, MovementType.IN, 200, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(foodTenant.id, mozzaSku.id, MovementType.ADJUSTMENT, -5, ReferenceType.MANUAL, "Spoilage write-off");
   }
 
-  // Get seeded orders to attach payments to
-  const hwConfirmed = await prisma.order.findFirst({
-    where: { tenantId: hardwareTenant.id, status: OrderStatus.CONFIRMED },
-  });
-  const foodCompleted = await prisma.order.findFirst({
-    where: { tenantId: foodTenant.id, status: OrderStatus.COMPLETED },
-  });
-  const retailPending = await prisma.order.findFirst({
-    where: { tenantId: retailTenant.id, status: OrderStatus.PENDING },
-  });
+  // Orders for Metro Pizza — create batch once (idempotent: skip if already seeded)
+  const mpsOrderCount = await prisma.order.count({ where: { tenantId: foodTenant.id } });
+  if (mpsOrderCount < 18) {
+    const tid = foodTenant.id;
+    const f = flourSku, m = mozzaSku, s = sauceSku, y = yeastSku, o = oliveOilSku, p = pepperoniSku, t = tomatoesSku;
 
-  if (hwConfirmed) {
-    await seedPayment({
-      tenantId: hardwareTenant.id,
-      orderId: hwConfirmed.id,
-      amountCents: hwConfirmed.totalCents,
-      status: PaymentStatus.VERIFIED,
-      proofUrl: "https://example.com/receipts/peak-hw-001.jpg",
-    });
+    const orders = [
+      // PENDING
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: f.id, quantity: 5, priceCents: f.priceCents! }, { skuId: s.id, quantity: 6, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: m.id, quantity: 8, priceCents: m.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: p.id, quantity: 20, priceCents: p.priceCents! }, { skuId: t.id, quantity: 30, priceCents: t.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: o.id, quantity: 4, priceCents: o.priceCents! }, { skuId: y.id, quantity: 10, priceCents: y.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: f.id, quantity: 10, priceCents: f.priceCents! }, { skuId: m.id, quantity: 5, priceCents: m.priceCents! }] }),
+      // CONFIRMED
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: f.id, quantity: 10, priceCents: f.priceCents! }, { skuId: m.id, quantity: 15, priceCents: m.priceCents! }, { skuId: s.id, quantity: 12, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: p.id, quantity: 30, priceCents: p.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: y.id, quantity: 15, priceCents: y.priceCents! }, { skuId: o.id, quantity: 3, priceCents: o.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: t.id, quantity: 48, priceCents: t.priceCents! }] }),
+      // COMPLETED
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: m.id, quantity: 8, priceCents: m.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: f.id, quantity: 15, priceCents: f.priceCents! }, { skuId: s.id, quantity: 10, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: p.id, quantity: 24, priceCents: p.priceCents! }, { skuId: t.id, quantity: 36, priceCents: t.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: o.id, quantity: 5, priceCents: o.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: y.id, quantity: 20, priceCents: y.priceCents! }, { skuId: f.id, quantity: 8, priceCents: f.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: m.id, quantity: 12, priceCents: m.priceCents! }, { skuId: s.id, quantity: 15, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: t.id, quantity: 60, priceCents: t.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: f.id, quantity: 20, priceCents: f.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: p.id, quantity: 40, priceCents: p.priceCents! }, { skuId: m.id, quantity: 10, priceCents: m.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: s.id, quantity: 18, priceCents: s.priceCents! }, { skuId: o.id, quantity: 2, priceCents: o.priceCents! }] }),
+      // CANCELLED
+      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: o.id, quantity: 6, priceCents: o.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: f.id, quantity: 8, priceCents: f.priceCents! }, { skuId: y.id, quantity: 5, priceCents: y.priceCents! }] }),
+    ];
+
+    for (const order of orders) {
+      if (order.status === OrderStatus.CONFIRMED) {
+        await createPaymentIfAbsent({ tenantId: tid, orderId: order.id, amountCents: order.totalCents, status: PaymentStatus.PENDING, proofUrl: "https://example.com/receipts/mps-payment.jpg" });
+      } else if (order.status === OrderStatus.COMPLETED) {
+        await createPaymentIfAbsent({ tenantId: tid, orderId: order.id, amountCents: order.totalCents, status: PaymentStatus.VERIFIED, proofUrl: "https://example.com/receipts/mps-verified.jpg" });
+      }
+    }
   }
 
-  if (foodCompleted) {
-    await seedPayment({
-      tenantId: foodTenant.id,
-      orderId: foodCompleted.id,
-      amountCents: foodCompleted.totalCents,
-      status: PaymentStatus.VERIFIED,
-      proofUrl: "https://example.com/receipts/metro-pizza-001.jpg",
-    });
+  // ===========================
+  // CORNER GENERAL STORE
+  // ===========================
+
+  const colaSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["beverages"],
+    productName: "Cola 355ml Can", skuCode: "CGS-COLA-355",
+    skuName: "Cola 355ml Can", priceCents: 6500, costCents: 3800, lowStockThreshold: 24,
+  });
+  const chipsSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["snacks"],
+    productName: "Potato Chips Original", skuCode: "CGS-CHIPS-OR",
+    skuName: "Potato Chips Original 150g", priceCents: 9900, costCents: 5500, lowStockThreshold: 12,
+  });
+  const cleanerSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["cleaning-supplies"],
+    productName: "All-Purpose Cleaner", skuCode: "CGS-CLEAN-1L",
+    skuName: "All-Purpose Cleaner 1L", priceCents: 28500, costCents: 16000, lowStockThreshold: 6,
+  });
+  const waterSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["beverages"],
+    productName: "Bottled Water 500ml", skuCode: "CGS-WATER-500",
+    skuName: "Bottled Water 500ml", priceCents: 3500, costCents: 1800, lowStockThreshold: 48,
+  });
+  const noodlesSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["snacks"],
+    productName: "Instant Noodles", skuCode: "CGS-NOODLE-1PK",
+    skuName: "Instant Noodles Chicken Flavor", priceCents: 4500, costCents: 2500, lowStockThreshold: 24,
+  });
+  const detergentSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["cleaning-supplies"],
+    productName: "Laundry Detergent", skuCode: "CGS-DETERG-1K",
+    skuName: "Laundry Detergent Powder 1kg", priceCents: 35000, costCents: 20000, lowStockThreshold: 8,
+  });
+  const tissueSku = await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["personal-care"],
+    productName: "Tissue Box", skuCode: "CGS-TISSUE-200",
+    skuName: "Facial Tissue Box 200 sheets", priceCents: 18500, costCents: 10000, lowStockThreshold: 10,
+  });
+  // Archived SKU — discontinued
+  await upsertProductSku({
+    tenantId: retailTenant.id, categoryId: cat["personal-care"],
+    productName: "Bar Soap (Discontinued)", skuCode: "CGS-SOAP-100G",
+    skuName: "Bar Soap 100g", priceCents: 5500, costCents: 3000, lowStockThreshold: 20,
+    isArchived: true,
+  });
+
+  // Stock for Corner General
+  const cgsStockCheck = await prisma.sku.findUnique({ where: { id: colaSku.id }, select: { stockOnHand: true } });
+  if ((cgsStockCheck?.stockOnHand ?? 0) < 100) {
+    await logMovement(retailTenant.id, colaSku.id, MovementType.IN, 1440, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, colaSku.id, MovementType.OUT, 36, ReferenceType.MANUAL, "Daily sales");
+    await logMovement(retailTenant.id, chipsSku.id, MovementType.IN, 600, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, chipsSku.id, MovementType.ADJUSTMENT, -12, ReferenceType.MANUAL, "Damaged stock");
+    await logMovement(retailTenant.id, cleanerSku.id, MovementType.IN, 240, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, waterSku.id, MovementType.IN, 2400, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, waterSku.id, MovementType.OUT, 144, ReferenceType.MANUAL, "Daily sales");
+    await logMovement(retailTenant.id, noodlesSku.id, MovementType.IN, 480, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, detergentSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock");
+    await logMovement(retailTenant.id, tissueSku.id, MovementType.IN, 120, ReferenceType.MANUAL, "Initial stock");
   }
 
-  if (retailPending) {
-    await seedPayment({
-      tenantId: retailTenant.id,
-      orderId: retailPending.id,
-      amountCents: retailPending.totalCents,
-      status: PaymentStatus.PENDING,
-    });
+  // Orders for Corner General — create batch once (idempotent: skip if already seeded)
+  const cgsOrderCount = await prisma.order.count({ where: { tenantId: retailTenant.id } });
+  if (cgsOrderCount < 18) {
+    const tid = retailTenant.id;
+    const co = colaSku, ch = chipsSku, cl = cleanerSku, wa = waterSku, no = noodlesSku, de = detergentSku, ti = tissueSku;
+
+    const orders = [
+      // PENDING
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: co.id, quantity: 24, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 12, priceCents: ch.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: wa.id, quantity: 48, priceCents: wa.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: no.id, quantity: 24, priceCents: no.priceCents! }, { skuId: ti.id, quantity: 6, priceCents: ti.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: de.id, quantity: 8, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 6, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: co.id, quantity: 48, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 96, priceCents: wa.priceCents! }] }),
+      // CONFIRMED
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: co.id, quantity: 72, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 36, priceCents: ch.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: de.id, quantity: 12, priceCents: de.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: wa.id, quantity: 120, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 48, priceCents: no.priceCents! }] }),
+      // COMPLETED
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 48, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 24, priceCents: ch.priceCents! }, { skuId: cl.id, quantity: 12, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: wa.id, quantity: 96, priceCents: wa.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: no.id, quantity: 60, priceCents: no.priceCents! }, { skuId: ti.id, quantity: 12, priceCents: ti.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: de.id, quantity: 15, priceCents: de.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 96, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 144, priceCents: wa.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: ch.id, quantity: 48, priceCents: ch.priceCents! }, { skuId: ti.id, quantity: 18, priceCents: ti.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: cl.id, quantity: 24, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: no.id, quantity: 72, priceCents: no.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: de.id, quantity: 10, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 10, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 120, priceCents: co.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: wa.id, quantity: 200, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 100, priceCents: no.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: ch.id, quantity: 60, priceCents: ch.priceCents! }, { skuId: ti.id, quantity: 24, priceCents: ti.priceCents! }] }),
+      // CANCELLED
+      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: cl.id, quantity: 6, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: co.id, quantity: 12, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 6, priceCents: ch.priceCents! }] }),
+    ];
+
+    for (const order of orders) {
+      if (order.status === OrderStatus.CONFIRMED) {
+        await createPaymentIfAbsent({ tenantId: tid, orderId: order.id, amountCents: order.totalCents, status: PaymentStatus.PENDING, proofUrl: "https://example.com/receipts/cgs-payment.jpg" });
+      } else if (order.status === OrderStatus.COMPLETED) {
+        await createPaymentIfAbsent({ tenantId: tid, orderId: order.id, amountCents: order.totalCents, status: PaymentStatus.VERIFIED, proofUrl: "https://example.com/receipts/cgs-verified.jpg" });
+      }
+    }
   }
+
+  // Summary
+  const [orderTotal, paymentTotal, skuTotal, movementTotal] = await Promise.all([
+    prisma.order.count(),
+    prisma.payment.count(),
+    prisma.sku.count(),
+    prisma.inventoryMovement.count(),
+  ]);
 
   console.log("✓ Admin:", admin.email);
   console.log("✓ Tenants:", hardwareTenant.slug, "|", foodTenant.slug, "|", retailTenant.slug);
-  console.log("✓ Categories:", categoryData.map((c) => c.slug).join(", "));
+  console.log("✓ SKUs:", skuTotal, "| Orders:", orderTotal, "| Payments:", paymentTotal, "| Movements:", movementTotal);
   console.log("✓ Default password:", DEFAULT_PASSWORD);
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
+  .then(async () => { await prisma.$disconnect(); })
   .catch(async (err) => {
     console.error(err);
     await prisma.$disconnect();
