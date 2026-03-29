@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
+import { Check, Eye, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -396,26 +398,38 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                   </span>
 
                   <div className="flex justify-end gap-1">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => openOrder(payment.orderId)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      View
+                    </Button>
+
                     {payment.status === "PENDING" ? (
                       <>
-                        <button
-                          className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                        <Button
+                          variant="outline"
                           type="button"
+                          className="h-7 px-2 text-xs"
                           onClick={() => verifyPayment(payment.id, "VERIFIED")}
                         >
-                          ✓ Verify
-                        </button>
-                        <button
-                          className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                          <Check className="h-3.5 w-3.5" />
+                          Verify
+                        </Button>
+                        <Button
+                          variant="outline"
                           type="button"
+                          className="h-7 px-2 text-xs"
                           onClick={() => verifyPayment(payment.id, "REJECTED")}
                         >
-                          ✕ Reject
-                        </button>
+                          <X className="h-3.5 w-3.5" />
+                          Reject
+                        </Button>
                       </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ))}
