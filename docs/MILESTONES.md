@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — MS9 in progress: CSV import + team management built. Phase map updated.
+> Last updated: 2026-03-30 — MS9 in progress. Deployment order revised: multi-branch v1 moves before staging (scaffolded as invisible default branch). Marketing page (MS11) moved before staging. Tenant self-registration and dashboard added as pre-staging requirements.
 
 ---
 
@@ -13,7 +13,7 @@
 | **Phase 3** | MS4–MS6 | Operations — Inventory, Orders, Payments | ✅ Done |
 | **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | ✅ Done |
 | **Phase 5** | MS9–MS10 | Extensions — CSV Import, Multi-Branch | 🚧 MS9 in progress |
-| **Phase 6** | MS11 | Go-to-Market — Marketing Website | 📋 Planned |
+| **Phase 6** | MS11 | Go-to-Market — Marketing Website | 🚧 Pulled forward (before staging) |
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
 | **Phase 8** | — | Mobile + POS | 🚫 Prohibited |
 | **Phase 9** | — | AWS Scale + Subdomain Routing | 🔒 Do not build yet |
@@ -24,6 +24,17 @@
 - 🔒 = architecturally designed, not yet scheduled. Do not build until explicitly pulled in.
 - 🚫 = never implement before reaching that phase. Not a matter of timing — it requires explicit product decision to unlock.
 - Do not pull work from a future phase into a current milestone. Ever.
+
+## Pre-Staging Checklist (must complete before deploying to staging)
+
+> These items must be done — in order — before any real client touches the product.
+
+- [ ] **MS9 close** — quick fixes: staff password change, negative stock floor, `customerRef` on orders
+- [ ] **Marketing page** — `apps/marketing`, local first, then deployed alongside staging
+- [ ] **Multi-branch v1** — scaffolded but invisible at single-branch (no UI until 2nd branch added). Prevents risky production migration later.
+- [ ] **Tenant self-registration** — "Get Started" flow from marketing page → creates tenant + owner account
+- [ ] **Dashboard / home screen** — summary of today's orders, pending payments, low stock. Makes the demo compelling.
+- [ ] **Staging deployment** — Vercel (web + marketing) + Render (API) + Neon (DB)
 
 ---
 
@@ -261,14 +272,22 @@
 
 ### Milestone 10 — Multi-Branch Support
 
-**Why:** Many SMBs in PH operate multiple locations (e.g. main store + warehouse + branch outlet). Each location manages its own stock, orders, and staff, but the owner sees the consolidated picture.
+**Why:** SMBs in PH often operate multiple physical locations. Example: Manager's Pizza has a central kitchen + satellite outlets; Megabox has a main warehouse + retail counter. Each location manages its own stock, orders, and staff, but the owner sees the consolidated picture.
+
+**Context:** Manager's Pizza (food wholesale + retail distribution) and Megabox (pizza equipment/materials supplier) are two separate *tenants* — that's already solved. Multi-branch is about locations *within* each tenant.
+
+**Deployment strategy:** Multi-branch v1 ships **before staging** as a scaffolded but invisible feature:
+- Every tenant auto-gets a **Default Branch** on creation.
+- Branch switcher UI only appears when a tenant has more than 1 branch.
+- Single-branch tenants see zero UI change.
+- This avoids a risky production data migration later when the first client needs a second location.
 
 **Prerequisites:** Stable inventory model (done in MS4). Stable tenant model (done in MS8).
 
 **Design answers locked:**
 - Branches have independent inventory pools.
 - Tenant dashboard can filter by branch or show aggregated totals.
-- Staff can be assigned to multiple branches.
+- Staff can be assigned to one or more branches (empty = all branches).
 - Orders belong to a specific branch.
 
 #### Data model changes
@@ -320,7 +339,7 @@ BranchInventory {
 
 ---
 
-## PHASE 6 — Go-to-Market (MS11) 📋
+## PHASE 6 — Go-to-Market (MS11) 🚧 Pulled forward
 
 ---
 
@@ -328,7 +347,9 @@ BranchInventory {
 
 A standalone site (`apps/marketing`) for prospect demos and client pitches. Fully independent of the platform — runs against the prod API URL.
 
-**Starts after:** MS9 is done and at least one real client is onboarded. The marketing site needs real screenshots and validated copy.
+**Timing revised:** Marketing page now builds *before* staging deployment, not after. Reason: the "Get Started" CTA and demo pages are required for client acquisition. Staging with no marketing page = nowhere to send prospects.
+
+**Starts after:** MS9 quick fixes are done. Does not require MS10.
 
 #### Definition of done
 

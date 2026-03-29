@@ -2,7 +2,7 @@
 
 This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-> Last updated: 2026-03-30 — Phase map aligned with MILESTONES.md. Scope Control System updated to distinguish Phase 5 (planned extensions) from prohibited phases (7–8).
+> Last updated: 2026-03-30 — Pre-staging checklist added. Multi-branch v1 pulled forward (before staging, scaffolded as invisible default branch). Marketing page (MS11) pulled forward (before staging). Tenant self-registration and dashboard added as pre-staging requirements. Scope Control System updated accordingly.
 
 ---
 
@@ -42,9 +42,17 @@ Every proposed change must be classified before implementation:
 |---|---|---|
 | MVP-CRITICAL | Required for the system to function at its current phase | IMPLEMENT |
 | MVP-ENHANCEMENT | Improves UX/DX but not required for DoD | DEFER — ask user first |
-| PHASE 5 | CSV Import, Multi-Branch (MS9–MS10). Starts only after MS8 ships. | PLAN NOW, BUILD LATER |
-| PHASE 6 | Go-to-Market / Marketing Website (MS11) | DEFER |
+| PRE-STAGING | Required before first real client touches staging | IMPLEMENT before deploy |
+| PHASE 5 | CSV Import (MS9 ✅), Multi-Branch v1 (pulled into pre-staging) | BUILD NOW (multi-branch) |
+| PHASE 6 | Marketing Website (MS11) — pulled forward, build before staging | BUILD NOW |
 | PROHIBITED | Mobile, POS, Marketplace, AWS Scale (Phase 7–9) | DO NOT IMPLEMENT |
+
+**PRE-STAGING items (in order):**
+1. Staff password change + negative stock floor + `customerRef` on orders
+2. Marketing page (`apps/marketing`) — local first
+3. Multi-branch v1 — scaffolded, invisible at single-branch
+4. Tenant self-registration — "Get Started" from marketing CTA
+5. Dashboard / home screen — summary view on login
 
 If not MVP-CRITICAL → document it, assign to the appropriate future phase, do not build.
 
