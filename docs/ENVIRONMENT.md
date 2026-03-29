@@ -37,14 +37,21 @@ API — Rate limiting
 - `THROTTLE_TTL` — time window in ms (default: `60000` = 1 minute)
 - `THROTTLE_LIMIT` — max requests per window on auth endpoints (default: `10`)
 
-API — Email (password reset)
+API — Email (password reset + staff invitations)
 
-- `SMTP_HOST` — e.g. `smtp.resend.com` or `smtp.gmail.com`
-- `SMTP_PORT` — e.g. `587`
-- `SMTP_USER`
-- `SMTP_PASS`
+- `SMTP_HOST` — **Production: `smtp.resend.com`**. Local dev: `localhost` (Mailpit)
+- `SMTP_PORT` — **Production: `587`**. Local dev: `1025` (Mailpit)
+- `SMTP_USER` — **Production: `resend`** (literal string, as required by Resend). Local dev: leave empty
+- `SMTP_PASS` — **Production: your Resend API key**. Local dev: leave empty
 - `SMTP_FROM` — sender address, e.g. `noreply@yourplatform.com`
-- `APP_BASE_URL` — used to build reset links, e.g. `https://yourplatform.com`
+- `APP_BASE_URL` — used to build reset links, e.g. `https://yourplatform.com`. **Local dev: `http://localhost:3000`**
+
+**Local email testing — Mailpit:**
+Mailpit is a local SMTP server + web UI for catching and inspecting outgoing emails during development. No real emails are sent.
+- Run via Docker: add `mailpit` service to `docker-compose.yml` (image: `axllent/mailpit`).
+- SMTP: `localhost:1025`
+- Web UI (view emails): `http://localhost:8025`
+- Covers: password reset emails, staff invitation emails, and any future transactional email in local dev.
 
 API — CORS
 

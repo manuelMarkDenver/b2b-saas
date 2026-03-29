@@ -1,6 +1,7 @@
 # Data Model
 
 > Last updated: 2026-03-29 — Audit pass: added Tenant.status, Sku.isArchived, Sku.lowStockThreshold, Order.customerRef/note, fixed MembershipStatus enum.
+> Added i18n/currency fields to Tenant + User (post-MVP). Added Integration + TenantRole to Future Models.
 > Bug fixes: negative stock prevention enforced (OUT movements + order confirmation); CONFIRMED→CANCELLED now restores inventory.
 > Added quantity cap (max 10,000/line) and totalCents overflow guard (~$21M). Future: migrate totalCents to Decimal/BigInt.
 
@@ -59,6 +60,10 @@
 - Hard delete is NOT supported. Suspension is the permanent end state.
 - `businessType` is used ONLY for setting default feature flags on tenant creation. It must NOT control any logic.
 - `features` is controlled by Super Admin only. Frontend must never mutate it directly.
+
+**Post-MVP fields (i18n — add when i18n module ships):**
+- `locale: String` — default `"en"`. Sets the UI language for all staff in this tenant unless overridden per user.
+- `currency: String` — default `"PHP"`. Sets the display currency for prices and totals tenant-wide.
 
 ---
 
@@ -208,6 +213,32 @@
 
 ---
 
+### Notification (platform/tenant-owned) — MS8
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | PK |
+| tenantId | UUID? | Null for Super Admin notifications; FK → Tenant for tenant-scoped events |
+| userId | UUID | Recipient — FK → User |
+| type | Enum | `ORDER_CREATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `PAYMENT_SUBMITTED`, `PAYMENT_VERIFIED`, `PAYMENT_REJECTED`, `LOW_STOCK`, `STAFF_ADDED`, `TENANT_SUSPENDED`, `PLATFORM_ALERT` |
+| title | String | Short label shown in the bell panel (e.g. "New order received") |
+| body | String | Detail line (e.g. "Order #abc for $850 is awaiting confirmation") |
+| entityType | String? | `order`, `payment`, `sku` — used to build the action link |
+| entityId | UUID? | ID of the related entity — click navigates to it |
+| isRead | Boolean | `false` by default. Set `true` when user opens or clicks the notification. |
+| createdAt | DateTime | |
+
+**Rules:**
+- Written server-side only when the triggering event occurs — never created from the frontend.
+- In-app notifications are always created; external channel dispatch is post-MVP and opt-in.
+- `GET /notifications` returns the list scoped to the authenticated user plus an unread count for the badge.
+- `PATCH /notifications/:id/read` marks one read. `PATCH /notifications/read-all` marks all read.
+- `DELETE /notifications/:id` dismisses (hard-deletes) one notification.
+- Notifications older than 90 days are purged on a scheduled job to prevent unbounded growth.
+- `entityType` + `entityId` together form the action link. Frontend constructs the route (e.g. `/t/:slug/orders/:entityId`).
+
+---
+
 ## Audit / Logging Events
 
 | Event | Trigger |
@@ -224,11 +255,14 @@
 
 ## Future Models (DO NOT IMPLEMENT)
 
-| Model | Phase |
-|---|---|
-| CustomerProfile | Phase 7 (Marketplace) |
-| Cart / CartItem | Phase 7 (Marketplace) |
-| MarketplaceListing | Phase 7 (Marketplace) |
-| PosSession | Phase 6 (POS) |
-| AuditLog | Post-MVP (queryable audit trail) |
-| NotificationSettings | Post-MVP (per-tenant channel config for Messenger/email/SMS) |
+| Model | Phase | Notes |
+|---|---|---|
+| CustomerProfile | Phase 7 (Marketplace) | End-user customers — completely separate from TenantMembership |
+| Cart / CartItem | Phase 7 (Marketplace) | Customer shopping session |
+| MarketplaceListing | Phase 7 (Marketplace) | Tenant's public product listing |
+| PosSession | Phase 6 (POS) | In-person point-of-sale session |
+| AuditLog | Post-MVP | Queryable audit trail — replaces logger-only events |
+| UserNotificationPreferences | Post-MVP | Per-user channel opt-in: email / Messenger / WhatsApp / SMS + per-event subscription overrides |
+| TenantRole | Post-MVP (Custom Roles) | Custom named roles per tenant: `id`, `tenantId`, `name`, `basedOn` (base role enum), `permissions` (JSONB overrides) |
+| Integration | Post-MVP (Platform Integrations) | Connector config per tenant: `id`, `tenantId`, `type` (Shopee / Lazada / Custom / Courier), `config` (JSONB), `isActive` |
+| IntegrationEvent | Post-MVP (Platform Integrations) | Append-only webhook event log: `id`, `integrationId`, `payload` (JSONB), `status` (OK / FAILED), `processedAt` |
