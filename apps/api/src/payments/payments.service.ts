@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitPaymentDto } from './dto/submit-payment.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 
@@ -13,7 +14,10 @@ import { VerifyPaymentDto } from './dto/verify-payment.dto';
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async submitPayment(tenantId: string, dto: SubmitPaymentDto) {
     const order = await this.prisma.order.findUnique({
@@ -55,6 +59,13 @@ export class PaymentsService {
 
     this.logger.log(
       `payment.submitted tenantId=${tenantId} paymentId=${payment.id} orderId=${dto.orderId}`,
+    );
+    void this.notifications.notifyTenant(
+      tenantId,
+      'PAYMENT_SUBMITTED',
+      'Payment submitted',
+      `A payment of $${(dto.amountCents / 100).toFixed(2)} was submitted for order ${dto.orderId.slice(0, 8)}.`,
+      { entityType: 'payment', entityId: payment.id },
     );
     return payment;
   }
@@ -119,6 +130,14 @@ export class PaymentsService {
     const event =
       dto.status === PaymentStatus.VERIFIED ? 'payment.verified' : 'payment.rejected';
     this.logger.log(`${event} tenantId=${tenantId} paymentId=${paymentId}`);
+
+    void this.notifications.notifyTenant(
+      tenantId,
+      dto.status === PaymentStatus.VERIFIED ? 'PAYMENT_VERIFIED' : 'PAYMENT_REJECTED',
+      dto.status === PaymentStatus.VERIFIED ? 'Payment verified' : 'Payment rejected',
+      `Payment ${paymentId.slice(0, 8)} has been ${dto.status.toLowerCase()}.`,
+      { entityType: 'payment', entityId: paymentId },
+    );
 
     return updated;
   }

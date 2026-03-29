@@ -75,7 +75,15 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
         );
         if (current?.tenant.features) {
           setFeatures(current.tenant.features);
+        } else {
+          // Not a member of this tenant — redirect to first active tenant or login
+          const first = memberships.find((m) => m.status === 'ACTIVE');
+          router.replace(first ? `/t/${first.tenant.slug}` : '/login');
+          return;
         }
+      } else if (membershipsRes.status === 401) {
+        router.replace('/login');
+        return;
       }
 
       if (meRes.ok) {
