@@ -26,6 +26,7 @@ export function configuration(env: Env) {
       from: env.SMTP_FROM,
     },
     appBaseUrl: env.APP_BASE_URL,
+    appFrontendUrl: env.APP_FRONTEND_URL,
     storage: {
       type: env.STORAGE_TYPE,
       aws: {

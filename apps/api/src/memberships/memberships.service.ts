@@ -183,7 +183,7 @@ export class MembershipsService {
       },
     });
 
-    const baseUrl = this.config.get<string>('appBaseUrl');
+    const baseUrl = this.config.get<string>('appFrontendUrl');
     const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
     await this.emailService.sendStaffInvite(normalizedEmail, inviteUrl, membership.tenant.name);
 
