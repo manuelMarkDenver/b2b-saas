@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Settings, Users, Plus, Mail } from 'lucide-react';
+import { Settings, Users, Plus, Mail, UserX } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,8 +37,10 @@ type Member = {
   id: string;
   role: string;
   status: string;
+  jobTitle: string | null;
   isOwner: boolean;
-  user: { email: string };
+  createdAt: string;
+  user: { email: string; avatarUrl?: string | null };
 };
 
 const SETTINGS_NAV = [
@@ -54,24 +56,38 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
   const { pushToast } = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Invite dialog
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<string>('STAFF');
+  const [inviteJobTitle, setInviteJobTitle] = useState('');
   const [inviting, setInviting] = useState(false);
+
+  // Deactivate
+  const [deactivating, setDeactivating] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
     setLoading(true);
-    const res = await apiFetch('/memberships/team', { tenantSlug });
-    if (res.ok) {
-      const data = await res.json() as Member[];
-      setMembers(data);
+    const [teamRes, membershipsRes] = await Promise.all([
+      apiFetch('/memberships/team', { tenantSlug }),
+      apiFetch('/memberships'),
+    ]);
+    if (teamRes.ok) {
+      setMembers(await teamRes.json() as Member[]);
+    }
+    if (membershipsRes.ok) {
+      const all = await membershipsRes.json() as Array<{ tenant: { slug: string }; status: string; role: string }>;
+      const current = all.find((m) => m.tenant.slug === tenantSlug && m.status === 'ACTIVE');
+      if (current) setUserRole(current.role);
     }
     setLoading(false);
   }, [tenantSlug]);
 
-  useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+  useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  const canManage = userRole === 'OWNER' || userRole === 'ADMIN';
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -80,7 +96,11 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
       const res = await apiFetch('/memberships/invite', {
         method: 'POST',
         tenantSlug,
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+          jobTitle: inviteJobTitle || undefined,
+        }),
       });
       if (!res.ok) {
         const err = await res.json() as { message?: string };
@@ -90,9 +110,31 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
         setInviteOpen(false);
         setInviteEmail('');
         setInviteRole('STAFF');
+        setInviteJobTitle('');
+        void loadMembers();
       }
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleDeactivate(member: Member) {
+    if (!confirm(`Deactivate ${member.user.email}? They will lose access immediately.`)) return;
+    setDeactivating(member.id);
+    try {
+      const res = await apiFetch(`/memberships/${member.id}`, {
+        method: 'PATCH',
+        tenantSlug,
+        body: JSON.stringify({ deactivate: true }),
+      });
+      if (!res.ok) {
+        pushToast({ variant: 'error', title: 'Failed to deactivate', message: 'Please try again.' });
+      } else {
+        pushToast({ variant: 'success', title: 'Member deactivated', message: `${member.user.email} has been removed.` });
+        void loadMembers();
+      }
+    } finally {
+      setDeactivating(null);
     }
   }
 
@@ -129,12 +171,10 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
           <h2 className="text-base font-semibold">Roles</h2>
           <p className="mt-1 text-sm text-muted-foreground">Permission reference for each role.</p>
           <dl className="mt-4 space-y-3">
-            {Object.entries(ROLE_DESCRIPTIONS).map(([role, message]) => (
+            {Object.entries(ROLE_DESCRIPTIONS).map(([role, desc]) => (
               <div key={role} className="flex items-start gap-3">
-                <Badge variant={ROLE_BADGE[role] ?? 'outline'} className="mt-0.5 shrink-0">
-                  {role}
-                </Badge>
-                <span className="text-sm text-muted-foreground">{message}</span>
+                <Badge variant={ROLE_BADGE[role] ?? 'outline'} className="mt-0.5 shrink-0">{role}</Badge>
+                <span className="text-sm text-muted-foreground">{desc}</span>
               </div>
             ))}
           </dl>
@@ -145,12 +185,16 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
           <div className="flex items-center justify-between border-b border-border p-4">
             <div>
               <h2 className="text-base font-semibold">Members</h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {members.length} member{members.length !== 1 ? 's' : ''}
+              </p>
             </div>
-            <Button size="default" onClick={() => setInviteOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              Invite
-            </Button>
+            {canManage && (
+              <Button size="default" onClick={() => setInviteOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Invite
+              </Button>
+            )}
           </div>
 
           {loading ? (
@@ -160,17 +204,35 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
           ) : (
             <div className="divide-y divide-border">
               {members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium uppercase">
+                <div key={member.id} className="flex items-center justify-between px-4 py-3 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Avatar */}
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
                       {member.user.email[0]}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{member.user.email}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{member.status.toLowerCase()}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{member.user.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {member.jobTitle ?? (member.status === 'INVITED' ? 'Invite pending' : 'No title set')}
+                      </p>
                     </div>
                   </div>
-                  <Badge variant={ROLE_BADGE[member.role] ?? 'outline'}>{member.role}</Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant={ROLE_BADGE[member.role] ?? 'outline'}>{member.role}</Badge>
+                    {member.status === 'INVITED' && (
+                      <Badge variant="outline" className="text-muted-foreground">Pending</Badge>
+                    )}
+                    {canManage && !member.isOwner && (
+                      <button
+                        onClick={() => handleDeactivate(member)}
+                        disabled={deactivating === member.id}
+                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                        title="Deactivate member"
+                      >
+                        <UserX className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -208,6 +270,17 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
                   <SelectItem value="VIEWER">Viewer</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-job-title">Job title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                id="invite-job-title"
+                type="text"
+                placeholder="e.g. Manager, Cashier, Delivery"
+                value={inviteJobTitle}
+                onChange={(e) => setInviteJobTitle(e.target.value)}
+                maxLength={100}
+              />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
