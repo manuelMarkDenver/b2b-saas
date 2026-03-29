@@ -22,12 +22,11 @@ export class InventoryService {
       note?: string;
     },
   ) {
-    const sku = await this.prisma.sku.findUnique({
-      where: { id: data.skuId },
-      select: { id: true, tenantId: true, stockOnHand: true },
+    const sku = await this.prisma.sku.findFirst({
+      where: { id: data.skuId, tenantId },
+      select: { id: true, stockOnHand: true },
     });
     if (!sku) throw new NotFoundException('SKU not found');
-    if (sku.tenantId !== tenantId) throw new ForbiddenException();
 
     if (data.type !== MovementType.ADJUSTMENT && data.quantity <= 0) {
       throw new BadRequestException('Quantity must be positive for IN and OUT movements');
