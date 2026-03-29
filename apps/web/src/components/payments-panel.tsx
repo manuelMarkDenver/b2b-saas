@@ -60,6 +60,19 @@ async function readApiError(res: Response): Promise<string> {
   return "";
 }
 
+function unwrapList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
 export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [payments, setPayments] = React.useState<Payment[]>([]);
   const [orders, setOrders] = React.useState<Order[]>([]);
@@ -83,12 +96,15 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       if (!ordersRes.ok) throw new Error(`Orders failed: ${ordersRes.status}`);
 
       const [paymentsData, ordersData] = await Promise.all([
-        paymentsRes.json() as Promise<Payment[]>,
-        ordersRes.json() as Promise<Order[]>,
+        paymentsRes.json() as Promise<unknown>,
+        ordersRes.json() as Promise<unknown>,
       ]);
 
-      setPayments(paymentsData);
-      const payableOrders = ordersData.filter((o) => o.status !== "CANCELLED");
+      const paymentsList = unwrapList<Payment>(paymentsData);
+      const ordersList = unwrapList<Order>(ordersData);
+
+      setPayments(paymentsList);
+      const payableOrders = ordersList.filter((o) => o.status !== "CANCELLED");
       setOrders(payableOrders);
       setStatus(null);
     } catch (err) {

@@ -66,7 +66,13 @@ describe('Inventory hardening (e2e)', () => {
           .post('/inventory/movements')
           .set('Authorization', `Bearer ${peakToken}`)
           .set('x-tenant-slug', 'peak-hardware')
-          .send({ skuId, type: 'IN', quantity: 1, note: `pagination-test-${i}` });
+          .send({
+            skuId,
+            type: 'IN',
+            quantity: 1,
+            referenceType: 'MANUAL',
+            note: `pagination-test-${i}`,
+          });
       }
 
       const page1 = await request(app.getHttpServer())
@@ -110,7 +116,13 @@ describe('Inventory hardening (e2e)', () => {
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ skuId, type: 'IN', quantity: 10, note: 'Received from supplier' });
+        .send({
+          skuId,
+          type: 'IN',
+          quantity: 10,
+          referenceType: 'MANUAL',
+          note: 'Received from supplier',
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.type).toBe('IN');
@@ -134,7 +146,12 @@ describe('Inventory hardening (e2e)', () => {
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ skuId: skuWithLowStock, type: 'OUT', quantity: 9999 });
+        .send({
+          skuId: skuWithLowStock,
+          type: 'OUT',
+          quantity: 9999,
+          referenceType: 'MANUAL',
+        });
 
       expect(res.status).toBe(400);
       expect(res.body.message).toMatch(/insufficient stock/i);
@@ -154,7 +171,12 @@ describe('Inventory hardening (e2e)', () => {
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ skuId: skuWithLowStock, type: 'OUT', quantity: qty });
+        .send({
+          skuId: skuWithLowStock,
+          type: 'OUT',
+          quantity: qty,
+          referenceType: 'MANUAL',
+        });
 
       expect(res.status).toBe(201);
 
@@ -173,7 +195,12 @@ describe('Inventory hardening (e2e)', () => {
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ skuId, type: 'OUT', quantity: 0 });
+        .send({
+          skuId,
+          type: 'OUT',
+          quantity: 0,
+          referenceType: 'MANUAL',
+        });
 
       expect(res.status).toBe(400);
     });
@@ -192,7 +219,13 @@ describe('Inventory hardening (e2e)', () => {
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ skuId, type: 'ADJUSTMENT', quantity: 5, note: 'Cycle count correction' });
+        .send({
+          skuId,
+          type: 'ADJUSTMENT',
+          quantity: 5,
+          referenceType: 'MANUAL',
+          note: 'Cycle count correction',
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.type).toBe('ADJUSTMENT');
@@ -212,7 +245,12 @@ describe('Inventory hardening (e2e)', () => {
         .post('/inventory/movements')
         .set('Authorization', `Bearer ${peakToken}`)
         .set('x-tenant-slug', 'peak-hardware')
-        .send({ skuId, type: 'ADJUSTMENT', quantity: 0 });
+        .send({
+          skuId,
+          type: 'ADJUSTMENT',
+          quantity: 0,
+          referenceType: 'MANUAL',
+        });
 
       expect(res.status).toBe(400);
     });

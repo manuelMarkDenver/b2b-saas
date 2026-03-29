@@ -31,6 +31,19 @@ async function readApiError(res: Response): Promise<string> {
   return "";
 }
 
+function unwrapList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
 type Category = {
   id: string;
   name: string;
@@ -87,14 +100,14 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       if (!skusRes.ok) throw new Error(`Skus failed: ${skusRes.status}`);
 
       const [cats, prods, skus] = await Promise.all([
-        catsRes.json(),
-        productsRes.json(),
-        skusRes.json(),
+        catsRes.json() as Promise<unknown>,
+        productsRes.json() as Promise<unknown>,
+        skusRes.json() as Promise<unknown>,
       ]);
 
-      setCategories(cats);
-      setProducts(prods);
-      setSkus(skus);
+      setCategories(unwrapList<Category>(cats));
+      setProducts(unwrapList<Product>(prods));
+      setSkus(unwrapList<Sku>(skus));
       setStatus(null);
     } catch (err) {
       setStatus({

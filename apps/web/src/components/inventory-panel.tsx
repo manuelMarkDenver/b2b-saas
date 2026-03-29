@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { Plus, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -81,6 +80,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           skuId: form.skuId,
           type: form.type,
           quantity: parseInt(form.quantity, 10),
+          referenceType: 'MANUAL',
           note: form.note || undefined,
         }),
       });
@@ -99,33 +99,69 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">{meta.total} total movements</span>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Log movement
-        </Button>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-lg font-semibold tracking-tight">Inventory</div>
+          <div className="mt-0.5 text-sm text-muted-foreground">
+            Track stock movements and levels. Manual movements are recorded as immutable logs.
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-card px-3 py-1.5 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{meta.total}</span>
+            <span>movements</span>
+            {meta.totalPages > 1 ? (
+              <span className="ml-1">· Page {meta.page}/{meta.totalPages}</span>
+            ) : null}
+          </div>
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Log movement
+          </Button>
+        </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="grid grid-cols-[1fr_80px_80px_1fr_120px] gap-0 border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="border-b border-border/60 bg-gradient-to-b from-muted/30 to-transparent px-4 py-3">
+          <div className="text-sm font-medium">Recent movements</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            IN increases stock, OUT decreases stock, ADJUSTMENT corrects counts.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[1fr_84px_92px_1fr_110px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>SKU</span>
           <span>Type</span>
           <span className="text-right">Qty</span>
-          <span>Note</span>
+          <span className="hidden sm:block">Note</span>
           <span className="text-right">Date</span>
         </div>
 
         {movements.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">No movements recorded.</div>
+          <div className="px-4 py-10 text-center">
+            <div className="text-sm font-medium">No movements yet</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              Log your first stock movement to start tracking inventory.
+            </div>
+            <div className="mt-4">
+              <Button onClick={() => setAddOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Log movement
+              </Button>
+            </div>
+          </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/60">
             {movements.map((m) => {
               const Icon = MOVEMENT_ICON[m.type] ?? ArrowLeftRight;
               const color = MOVEMENT_COLOR[m.type] ?? '';
               return (
-                <div key={m.id} className="grid grid-cols-[1fr_80px_80px_1fr_120px] items-center gap-0 px-4 py-2.5 text-sm hover:bg-muted/30">
+                <div
+                  key={m.id}
+                  className="grid grid-cols-[1fr_84px_92px_1fr_110px] items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30"
+                >
                   <div>
                     <span className="font-medium">{m.sku.code}</span>
                     <span className="ml-1.5 text-xs text-muted-foreground">{m.sku.name}</span>
@@ -137,7 +173,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   <div className={`text-right font-mono font-medium ${color}`}>
                     {m.type === 'OUT' ? '-' : m.type === 'ADJUSTMENT' && m.quantity < 0 ? '' : '+'}{Math.abs(m.quantity)}
                   </div>
-                  <div className="text-xs text-muted-foreground truncate">{m.note ?? '—'}</div>
+                  <div className="hidden truncate text-xs text-muted-foreground sm:block">{m.note ?? '—'}</div>
                   <div className="text-right text-xs text-muted-foreground">
                     {new Date(m.createdAt).toLocaleDateString()}
                   </div>
@@ -149,15 +185,28 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
         {/* Pagination */}
         {meta.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-2">
+          <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
             <span className="text-xs text-muted-foreground">
-              Page {meta.page} of {meta.totalPages}
+              Page <span className="font-medium text-foreground">{meta.page}</span> of{' '}
+              <span className="font-medium text-foreground">{meta.totalPages}</span>
             </span>
             <div className="flex gap-1">
-              <Button variant="outline" size="icon" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                aria-label="Previous page"
+              >
                 ‹
               </Button>
-              <Button variant="outline" size="icon" disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)}>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={page >= meta.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                aria-label="Next page"
+              >
                 ›
               </Button>
             </div>
