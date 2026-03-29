@@ -96,7 +96,11 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
       }
 
       if (meRes.ok) {
-        const data = await meRes.json() as { user: { email: string; avatarUrl?: string | null } };
+        const data = await meRes.json() as { user: { email: string; avatarUrl?: string | null; isPlatformAdmin: boolean } };
+        if (data.user.isPlatformAdmin) {
+          router.replace('/admin');
+          return;
+        }
         setUserEmail(data.user.email);
         setUserAvatarUrl(data.user.avatarUrl ?? null);
       }

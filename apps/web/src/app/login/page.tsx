@@ -43,6 +43,16 @@ export default function LoginPage() {
       const data = await res.json() as { token: string };
       setToken(data.token);
 
+      // Check if platform admin — redirect to /admin dashboard
+      const meRes = await apiFetch('/auth/me');
+      if (meRes.ok) {
+        const meData = await meRes.json() as { user: { isPlatformAdmin: boolean } };
+        if (meData.user.isPlatformAdmin) {
+          window.location.href = '/admin';
+          return;
+        }
+      }
+
       const membershipsRes = await apiFetch('/memberships');
       if (!membershipsRes.ok) {
         setError('Logged in but could not load memberships.');

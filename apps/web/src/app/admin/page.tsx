@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { getToken } from "@/lib/auth";
+import { getToken, clearToken } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 
@@ -53,6 +53,11 @@ export default function AdminPage() {
   const [authChecked, setAuthChecked] = React.useState(false);
   const { pushToast } = useToast();
 
+  function handleLogout() {
+    clearToken();
+    router.push('/login');
+  }
+
   React.useEffect(() => {
     if (!getToken()) {
       router.replace("/login");
@@ -101,6 +106,17 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+          <span className="text-sm font-semibold">Super Admin</span>
+          <button
+            onClick={handleLogout}
+            className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
       <main className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">Super Admin</h1>

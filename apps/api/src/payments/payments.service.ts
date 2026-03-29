@@ -20,14 +20,12 @@ export class PaymentsService {
   ) {}
 
   async submitPayment(tenantId: string, dto: SubmitPaymentDto) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: dto.orderId },
-      select: { id: true, tenantId: true, status: true },
+    const order = await this.prisma.order.findFirst({
+      where: { id: dto.orderId, tenantId },
+      select: { id: true, status: true },
     });
 
-    if (!order || order.tenantId !== tenantId) {
-      throw new NotFoundException('Order not found');
-    }
+    if (!order) throw new NotFoundException('Order not found');
 
     if (order.status === 'CANCELLED') {
       throw new BadRequestException('Cannot submit payment for a cancelled order');
@@ -64,7 +62,7 @@ export class PaymentsService {
       tenantId,
       'PAYMENT_SUBMITTED',
       'Payment submitted',
-      `A payment of $${(dto.amountCents / 100).toFixed(2)} was submitted for order ${dto.orderId.slice(0, 8)}.`,
+      `A payment of ₱${(dto.amountCents / 100).toFixed(2)} was submitted for order ${dto.orderId.slice(0, 8)}.`,
       { entityType: 'payment', entityId: payment.id },
     );
     return payment;
@@ -89,29 +87,25 @@ export class PaymentsService {
   }
 
   async getPayment(tenantId: string, paymentId: string) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId },
       include: {
         order: { select: { id: true, status: true, totalCents: true } },
       },
     });
 
-    if (!payment || payment.tenantId !== tenantId) {
-      throw new NotFoundException('Payment not found');
-    }
+    if (!payment) throw new NotFoundException('Payment not found');
 
     return payment;
   }
 
   async verifyPayment(tenantId: string, paymentId: string, dto: VerifyPaymentDto) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: { id: true, tenantId: true, status: true },
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId },
+      select: { id: true, status: true },
     });
 
-    if (!payment || payment.tenantId !== tenantId) {
-      throw new NotFoundException('Payment not found');
-    }
+    if (!payment) throw new NotFoundException('Payment not found');
 
     if (payment.status !== PaymentStatus.PENDING) {
       throw new BadRequestException(

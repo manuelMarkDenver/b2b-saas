@@ -104,8 +104,8 @@ export class OrdersService {
   }
 
   async getOrder(tenantId: string, orderId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
       include: {
         items: {
           include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
@@ -113,19 +113,15 @@ export class OrdersService {
       },
     });
 
-    if (!order || order.tenantId !== tenantId) {
-      throw new NotFoundException('Order not found');
-    }
+    if (!order) throw new NotFoundException('Order not found');
 
     return order;
   }
 
   async updateOrder(tenantId: string, orderId: string, dto: UpdateOrderDto) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, tenantId } });
 
-    if (!order || order.tenantId !== tenantId) {
-      throw new NotFoundException('Order not found');
-    }
+    if (!order) throw new NotFoundException('Order not found');
 
     if (order.status !== OrderStatus.PENDING) {
       throw new BadRequestException('Only PENDING orders can be edited');
@@ -188,14 +184,12 @@ export class OrdersService {
     orderId: string,
     dto: UpdateOrderStatusDto,
   ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
       include: { items: true },
     });
 
-    if (!order || order.tenantId !== tenantId) {
-      throw new NotFoundException('Order not found');
-    }
+    if (!order) throw new NotFoundException('Order not found');
 
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
@@ -216,7 +210,7 @@ export class OrdersService {
         // Fetch current stock inside the transaction to prevent race conditions
         const skuIds = order.items.map((i) => i.skuId);
         const skus = await tx.sku.findMany({
-          where: { id: { in: skuIds } },
+          where: { id: { in: skuIds }, tenantId },
           select: { id: true, name: true, stockOnHand: true },
         });
         const skuMap = new Map(skus.map((s) => [s.id, s]));

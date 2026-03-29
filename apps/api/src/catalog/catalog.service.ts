@@ -61,12 +61,11 @@ export class CatalogService {
     description?: string;
     isActive?: boolean;
   }) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-      select: { id: true, tenantId: true },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { id: true },
     });
     if (!product) throw new NotFoundException('Product not found');
-    if (product.tenantId !== tenantId) throw new ForbiddenException();
 
     if (data.categoryId) {
       const category = await this.prisma.category.findUnique({
@@ -153,12 +152,11 @@ export class CatalogService {
     isActive?: boolean;
     imageUrl?: string;
   }) {
-    const sku = await this.prisma.sku.findUnique({
-      where: { id: skuId },
-      select: { id: true, tenantId: true },
+    const sku = await this.prisma.sku.findFirst({
+      where: { id: skuId, tenantId },
+      select: { id: true },
     });
     if (!sku) throw new NotFoundException('SKU not found');
-    if (sku.tenantId !== tenantId) throw new ForbiddenException();
 
     return this.prisma.sku.update({
       where: { id: skuId },
@@ -178,12 +176,11 @@ export class CatalogService {
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new ForbiddenException('Only OWNER or ADMIN can archive SKUs');
     }
-    const sku = await this.prisma.sku.findUnique({
-      where: { id: skuId },
-      select: { id: true, tenantId: true },
+    const sku = await this.prisma.sku.findFirst({
+      where: { id: skuId, tenantId },
+      select: { id: true },
     });
     if (!sku) throw new NotFoundException('SKU not found');
-    if (sku.tenantId !== tenantId) throw new ForbiddenException();
 
     return this.prisma.sku.update({
       where: { id: skuId },
@@ -195,12 +192,11 @@ export class CatalogService {
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new ForbiddenException('Only OWNER or ADMIN can archive products');
     }
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-      select: { id: true, tenantId: true },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { id: true },
     });
     if (!product) throw new NotFoundException('Product not found');
-    if (product.tenantId !== tenantId) throw new ForbiddenException();
 
     await this.prisma.$transaction([
       this.prisma.product.update({

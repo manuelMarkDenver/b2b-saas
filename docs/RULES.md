@@ -2,7 +2,7 @@
 
 This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-> Last updated: 2026-03-29 — Added Confirm-Before-Act rule. Added Mailpit for local email testing. Added image upload infrastructure rules. Added static file serving rule.
+> Last updated: 2026-03-30 — Phase map aligned with MILESTONES.md. Scope Control System updated to distinguish Phase 5 (planned extensions) from prohibited phases (7–8).
 
 ---
 
@@ -42,9 +42,13 @@ Every proposed change must be classified before implementation:
 |---|---|---|
 | MVP-CRITICAL | Required for the system to function at its current phase | IMPLEMENT |
 | MVP-ENHANCEMENT | Improves UX/DX but not required for DoD | DEFER — ask user first |
-| FUTURE FEATURE | Belongs to Phase 5+ (mobile, POS, marketplace, AWS) | DO NOT IMPLEMENT |
+| PHASE 5 | CSV Import, Multi-Branch (MS9–MS10). Starts only after MS8 ships. | PLAN NOW, BUILD LATER |
+| PHASE 6 | Go-to-Market / Marketing Website (MS11) | DEFER |
+| PROHIBITED | Mobile, POS, Marketplace, AWS Scale (Phase 7–9) | DO NOT IMPLEMENT |
 
 If not MVP-CRITICAL → document it, assign to the appropriate future phase, do not build.
+
+**Phase reference:** See `docs/MILESTONES.md` Phase Map for the full phase-to-milestone breakdown.
 
 Use `/scope-check <feature>` to classify any proposed addition before touching code.
 
@@ -64,16 +68,26 @@ Use `/scope-check <feature>` to classify any proposed addition before touching c
 - Feature flags (enable/disable modules per tenant)
 - Basic Super Admin dashboard
 
-**MVP EXCLUDES (prohibited — DO NOT BUILD):**
+**PHASE 5 — Planned, not yet buildable (MS9–MS10):**
 
-- Mobile app (React Native / Expo)
-- Offline support
-- POS system
-- Barcode scanning workflows
-- Marketplace / customer-facing UI
+- CSV import for products, inventory, orders
+- Multi-branch inventory and staff assignment
+
+**PROHIBITED — DO NOT BUILD (Phase 7–8, requires explicit product decision):**
+
+- Mobile app (React Native / Expo) 🚫
+- Offline support 🚫
+- POS system 🚫
+- Barcode scanning workflows 🚫
+- Marketplace / customer-facing UI 🔒
+- AWS Scale + Subdomain Routing 🔒
+
+**NOT IN MVP (defer to appropriate phase):**
+
 - Advanced reporting or analytics
 - Automation systems
 - Accounting features
+- Payroll module 🔒 (Post-Phase 5 — requires explicit product decision)
 - Payment gateway integrations (Stripe, PayMongo, etc.)
 - Self-serve tenant signup
 
