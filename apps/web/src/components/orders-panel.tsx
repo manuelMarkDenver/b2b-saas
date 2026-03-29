@@ -5,7 +5,7 @@ import { Minus, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
-import { ProductThumb, OrderThumb } from "@/components/product-thumb";
+import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
@@ -270,7 +270,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
       {/* ── Orders table ── */}
       <div className="mt-5 overflow-hidden rounded-md border border-border/60">
-        <div className="grid grid-cols-[1fr_80px_120px_120px_1fr_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[1fr_60px_120px_120px_160px_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
           <span>Status</span>
@@ -299,22 +299,19 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                 key={order.id}
                 type="button"
                 onClick={() => openDetail(order)}
-                className="grid w-full grid-cols-[1fr_80px_120px_120px_1fr_100px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+                className="grid w-full grid-cols-[1fr_60px_120px_120px_160px_100px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <OrderThumb items={order.items} size={40} className="rounded-lg" />
-                  <div className="min-w-0">
-                    <div className="truncate font-medium font-mono text-xs">{order.id.slice(0, 8)}…</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {order.items[0]
-                        ? `${order.items[0].sku.code} · ${order.items[0].sku.name}`
-                        : "No items"}
-                      {order.items.length > 1 ? ` · +${order.items.length - 1} more` : ""}
-                    </div>
+                <div className="min-w-0">
+                  <div className="font-mono text-xs font-semibold text-foreground">{order.id.slice(0, 8)}…</div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {order.items[0]
+                      ? `${order.items[0].sku.code} · ${order.items[0].sku.name}`
+                      : "No items"}
+                    {order.items.length > 1 ? ` +${order.items.length - 1} more` : ""}
                   </div>
                 </div>
 
-                <span className="text-center text-xs text-muted-foreground">{order.items.length}</span>
+                <span className="text-center text-sm font-medium tabular-nums">{order.items.length}</span>
 
                 <Badge variant={STATUS_VARIANT[order.status]} className="min-w-[80px] justify-center">
                   {STATUS_LABELS[order.status]}

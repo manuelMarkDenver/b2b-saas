@@ -4,7 +4,7 @@ import * as React from "react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
-import { ProductThumb, OrderThumb } from "@/components/product-thumb";
+import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -288,7 +288,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[1fr_52px_120px_120px_1fr_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[1fr_60px_120px_120px_160px_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
           <span>Status</span>
@@ -303,17 +303,14 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               key={o.id}
               type="button"
               onClick={() => openOrder(o.id)}
-              className="grid w-full grid-cols-[1fr_52px_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+              className="grid w-full grid-cols-[1fr_60px_120px_120px_160px_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
             >
-              <div className="flex min-w-0 items-center gap-2">
-                <OrderThumb items={o.items ?? []} size={40} className="rounded-lg" />
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {o.items?.[0] ? `${o.items[0].sku.code} · ${o.items[0].sku.name}` : "No items"}
-                    {(o.items?.length ?? 0) > 1 ? ` · +${(o.items?.length ?? 0) - 1} more` : ""}
-                    {pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
-                  </div>
+              <div className="min-w-0">
+                <div className="font-mono text-xs font-semibold text-foreground">{o.id.slice(0, 8)}…</div>
+                <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {o.items?.[0] ? `${o.items[0].sku.code} · ${o.items[0].sku.name}` : "No items"}
+                  {(o.items?.length ?? 0) > 1 ? ` +${(o.items?.length ?? 0) - 1} more` : ""}
+                  {pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
                 </div>
               </div>
 
