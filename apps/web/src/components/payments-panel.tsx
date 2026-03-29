@@ -43,16 +43,16 @@ const STATUS_LABELS: Record<Payment["status"], string> = {
 };
 
 const STATUS_COLORS: Record<Payment["status"], string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
-  VERIFIED: "bg-green-500/15 text-green-600 dark:text-green-400",
-  REJECTED: "bg-red-500/15 text-red-500",
+  PENDING: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+  VERIFIED: "bg-green-500/15 text-green-700 dark:text-green-300",
+  REJECTED: "bg-red-500/15 text-red-600 dark:text-red-400",
 };
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
-  CONFIRMED: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  COMPLETED: "bg-green-500/15 text-green-600 dark:text-green-400",
-  CANCELLED: "bg-red-500/15 text-red-500",
+  PENDING: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+  CONFIRMED: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  COMPLETED: "bg-green-500/15 text-green-700 dark:text-green-300",
+  CANCELLED: "bg-red-500/15 text-red-600 dark:text-red-400",
 };
 
 function formatCents(cents: number) {
@@ -436,50 +436,51 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-mono text-xs text-muted-foreground">
-                  {payment.id.slice(0, 8)}…
-                </div>
-                <div className="mt-1 font-medium">{formatCents(payment.amountCents)}</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Order: {payment.orderId.slice(0, 8)}… · {payment.order.status}
-                </div>
-                {payment.proofUrl ? (
-                  <a
-                    href={payment.proofUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 block text-xs text-primary underline"
-                  >
-                    View proof
-                  </a>
-                ) : (
-                  <div className="mt-1 text-xs text-muted-foreground">No proof attached</div>
-                )}
+                <div className="font-mono text-xs text-muted-foreground">{payment.id.slice(0, 8)}…</div>
+                <div className="mt-1 font-medium tabular-nums">{formatCents(payment.amountCents)}</div>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[payment.status]}`}>
-                  {STATUS_LABELS[payment.status]}
-                </span>
-                {payment.status === "PENDING" ? (
-                  <div className="flex gap-1">
-                    <button
-                      className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                      type="button"
-                      onClick={() => verifyPayment(payment.id, "VERIFIED")}
-                    >
-                      ✓ Verify
-                    </button>
-                    <button
-                      className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                      type="button"
-                      onClick={() => verifyPayment(payment.id, "REJECTED")}
-                    >
-                      ✕ Reject
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[payment.status]}`}
+              >
+                {STATUS_LABELS[payment.status]}
+              </span>
             </div>
+
+            <div className="mt-2 text-xs text-muted-foreground">
+              Order: {payment.orderId.slice(0, 8)}… · {payment.order.status}
+            </div>
+
+            {payment.proofUrl ? (
+              <a
+                href={payment.proofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-xs text-primary underline"
+              >
+                View proof
+              </a>
+            ) : (
+              <div className="mt-1 text-xs text-muted-foreground">No proof attached</div>
+            )}
+
+            {payment.status === "PENDING" ? (
+              <div className="mt-3 flex justify-end gap-1">
+                <button
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                  type="button"
+                  onClick={() => verifyPayment(payment.id, "VERIFIED")}
+                >
+                  ✓ Verify
+                </button>
+                <button
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                  type="button"
+                  onClick={() => verifyPayment(payment.id, "REJECTED")}
+                >
+                  ✕ Reject
+                </button>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>

@@ -38,10 +38,10 @@ const STATUS_LABELS: Record<Order["status"], string> = {
 };
 
 const STATUS_COLORS: Record<Order["status"], string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
-  CONFIRMED: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  COMPLETED: "bg-green-500/15 text-green-600 dark:text-green-400",
-  CANCELLED: "bg-red-500/15 text-red-500",
+  PENDING: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+  CONFIRMED: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  COMPLETED: "bg-green-500/15 text-green-700 dark:text-green-300",
+  CANCELLED: "bg-red-500/15 text-red-600 dark:text-red-400",
 };
 
 const NEXT_STATUSES: Partial<Record<Order["status"], Order["status"][]>> = {
