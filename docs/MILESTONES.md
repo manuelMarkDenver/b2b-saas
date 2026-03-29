@@ -176,10 +176,10 @@ Definition of done:
 **Team & Permissions (PBAC management UI):**
 - Accessible from Settings → Team & Permissions.
 - Two tabs: **Roles** (read-only reference) and **Members** (editable).
-- Roles tab: shows each role (OWNER, ADMIN, MEMBER, VIEWER) and its default permission bundle as a read-only tree grouped by module (Inventory, Orders, Payments, Catalog, Team). Informs tenant owners what each role can do before assigning it.
+- Roles tab: shows each role (OWNER, ADMIN, STAFF, VIEWER) and its default permission bundle as a read-only tree grouped by module (Inventory, Orders, Payments, Catalog, Team). Informs tenant owners what each role can do before assigning it.
 - Members tab: lists all active tenant members. Expanding a member shows their role + all permissions as checkboxes. Overridden permissions (changed from role default) are visually highlighted.
 - Permission groups are feature-gated: if the `orders` module flag is disabled by the Super Admin, the Orders permission group shows "Module not enabled" — greyed out, not editable.
-- Edit rules: OWNER can edit ADMIN, MEMBER, VIEWER. ADMIN can edit MEMBER, VIEWER only. MEMBER/VIEWER see their own permissions as read-only (viewable in their profile).
+- Edit rules: OWNER can edit ADMIN, STAFF, VIEWER. ADMIN can edit STAFF, VIEWER only. STAFF/VIEWER see their own permissions as read-only (viewable in their profile).
 - Saving a membership permission override calls `PATCH /memberships/:id/permissions`.
 
 **Other UI items:**
@@ -258,8 +258,8 @@ Location: Settings → Notifications (added to the sidebar when this module ship
 Notification subscriptions are derived from permissions — you can only subscribe to events you have the permission to act on. If a staff member doesn't have `can_verify_payments`, the PAYMENT_SUBMITTED row is hidden from their preferences. If they must verify payments, PAYMENT_SUBMITTED is mandatory and the checkbox is locked on.
 
 Three-level hierarchy:
-1. **System defaults** — hardcoded per-role event map (OWNER gets everything, MEMBER gets operational events only)
-2. **Tenant role defaults** — OWNER can override defaults per role ("turn off ORDER_CREATED for all MEMBERs in my tenant")
+1. **System defaults** — hardcoded per-role event map (OWNER gets everything, STAFF gets operational events only)
+2. **Tenant role defaults** — OWNER can override defaults per role ("turn off ORDER_CREATED for all STAFF in my tenant")
 3. **Per-user overrides** — individual user can opt out of non-mandatory notifications, within what their role allows
 
 **UI shape:**
@@ -271,8 +271,8 @@ Three-level hierarchy:
 
 **Who controls what:**
 - OWNER: full access — can edit their own prefs and set defaults for any role below OWNER.
-- ADMIN: can edit their own prefs and set defaults for MEMBER/VIEWER.
-- MEMBER/VIEWER: can only edit their own non-mandatory preferences.
+- ADMIN: can edit their own prefs and set defaults for STAFF/VIEWER.
+- STAFF/VIEWER: can only edit their own non-mandatory preferences.
 
 **Why deferred:** In-app is always-on so no preferences UI is needed for it. External channel preferences only matter once email/Messenger/WhatsApp are wired. Building the prefs UI before the channels exist is premature.
 
@@ -416,7 +416,7 @@ This platform becomes the single source of truth for a tenant's inventory across
 
 - New permission: `can_manage_integrations` — configure integration credentials, enable/disable connectors.
 - New permission: `can_view_integration_log` — view the integration event history.
-- Defaults: OWNER gets both. ADMIN gets view only. MEMBER/VIEWER: none.
+- Defaults: OWNER gets both. ADMIN gets view only. STAFF/VIEWER: none.
 
 **Why deferred:** Core ERP must be stable before adding external dependencies. Integration reliability, webhook security (signature verification), and retry logic add significant complexity. Scope for a dedicated phase after marketplace discovery.
 
@@ -424,7 +424,7 @@ This platform becomes the single source of truth for a tenant's inventory across
 
 ## Post-MVP: Custom Roles (after MS8)
 
-Currently roles are fixed: OWNER, ADMIN, MEMBER, VIEWER. Custom roles allow tenants to create named role presets that fit their org structure (e.g. "Warehouse Staff", "Sales Rep").
+Currently roles are fixed: OWNER, ADMIN, STAFF, VIEWER. Custom roles allow tenants to create named role presets that fit their org structure (e.g. "Warehouse Staff", "Sales Rep").
 
 ### Design
 
@@ -452,7 +452,7 @@ These are documented to inform future milestone planning — not blockers for MS
 | Challenge | Impact | Mitigation |
 |---|---|---|
 | **Permission drift** | Staff accumulate custom overrides; changing their role later may leave conflicting overrides. | Add "reset to role default" action in PBAC UI (MS8). |
-| **Privilege escalation** | ADMIN must not grant MEMBER permissions exceeding ADMIN's own ceiling. | Guards validate acting user's scope, not just target role. |
+| **Privilege escalation** | ADMIN must not grant STAFF permissions exceeding ADMIN's own ceiling. | Guards validate acting user's scope, not just target role. |
 | **Role deletion guard** | Custom role can't be deleted if active members are assigned to it. | Block delete endpoint + show reassignment prompt in UI. |
 | **JWT token lag** | Deactivating a membership or changing permissions takes effect at next login (24h JWT). | Check `membership.status` on every protected request, not just at token issue. |
 | **Messenger / WhatsApp template constraint** | Meta only allows free-form messages within a 24h reply window. Arbitrary event notifications need pre-approved templates outside that window. | Register message templates per notification type before launch. |

@@ -163,21 +163,21 @@ Notifications      (platform-level alerts only)
 Two tabs:
 
 **Roles tab (read-only reference):**
-Displays the default permission bundle for each role (OWNER, ADMIN, MEMBER, VIEWER) as a collapsible tree grouped by module. Used as a reference before assigning roles to staff — not editable.
+Displays the default permission bundle for each role (OWNER, ADMIN, STAFF, VIEWER) as a collapsible tree grouped by module. Used as a reference before assigning roles to staff — not editable.
 
 **Members tab (editable):**
 Lists all active members. Each row expands to show the member's role and all permissions as checkboxes, grouped by module. Permissions that differ from the role default are highlighted.
 
 Permission group visibility:
 - If a module feature flag is disabled by Super Admin, that group shows "Module not enabled" and is greyed out.
-- Permissions outside the viewing user's scope are hidden (MEMBER can't see OWNER-only permissions).
+- Permissions outside the viewing user's scope are hidden (STAFF can't see OWNER-only permissions).
 
 Edit access:
 | Acting role | Can edit |
 |---|---|
-| OWNER | ADMIN, MEMBER, VIEWER |
-| ADMIN | MEMBER, VIEWER only |
-| MEMBER / VIEWER | Read-only (own permissions visible in profile) |
+| OWNER | ADMIN, STAFF, VIEWER |
+| ADMIN | STAFF, VIEWER only |
+| STAFF / VIEWER | Read-only (own permissions visible in profile) |
 
 Saving a permission override calls `PATCH /memberships/:id/permissions`.
 
