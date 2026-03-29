@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — Full restructure: phase map added, milestones grouped by phase, MS9→MS11 renumbered, CSV Import and Multi-Branch added as Phase 5 (MS9–MS10), Feature Backlog consolidated, prohibited phases clearly labelled.
+> Last updated: 2026-03-30 — MS9 in progress: CSV import + team management built. Phase map updated.
 
 ---
 
@@ -11,8 +11,8 @@
 | **Phase 1** | MS1–MS2 | Foundation — Auth, Tenants, Users | ✅ Done |
 | **Phase 2** | MS3 | Catalog — Products, SKUs, Categories | ✅ Done |
 | **Phase 3** | MS4–MS6 | Operations — Inventory, Orders, Payments | ✅ Done |
-| **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | 🚧 MS8 in progress |
-| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Multi-Branch | 📋 Planned |
+| **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | ✅ Done |
+| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Multi-Branch | 🚧 MS9 in progress |
 | **Phase 6** | MS11 | Go-to-Market — Marketing Website | 📋 Planned |
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
 | **Phase 8** | — | Mobile + POS | 🚫 Prohibited |
@@ -130,7 +130,7 @@
 
 ---
 
-### Milestone 8 — Hardening + UI Overhaul + Prod Prep 🚧
+### Milestone 8 — Hardening + UI Overhaul + Prod Prep ✅
 
 #### Security + API hardening
 
@@ -217,29 +217,45 @@
 
 ---
 
-### Milestone 9 — CSV Import + Onboarding
+### Milestone 9 — CSV Import + Team Management 🚧
 
-**Why:** A new client can export their product catalogue from Excel/Sheets and import it in one step. Without this, onboarding a business with 200 SKUs requires manual entry — a real blocker for adoption.
+**Why:** A new client can export their product catalogue from Excel/Sheets and import it in one step. Without this, onboarding a business with 200 SKUs requires manual entry — a real blocker for adoption. Team management allows owners to onboard staff (with or without email).
 
 **Prerequisites:** Stable Product + SKU data model (done in MS3). S3 or local file handling (done in MS8).
 
 #### Definition of done
 
-**Backend:**
-- `POST /catalog/import` — multipart CSV upload, tenant-scoped, JwtAuthGuard.
-- Supported columns: `productName`, `skuCode`, `skuName`, `priceCents` (or `pricePhp`), `costCents` (or `costPhp`), `categorySlug`, `lowStockThreshold`.
-- `pricePhp` / `costPhp` auto-converted to cents (multiply × 100, round).
-- Row-level validation: missing required fields, duplicate `skuCode` within the file, unknown `categorySlug`.
-- Idempotent upsert: existing SKU by `(tenantId, code)` is updated, not duplicated. New codes are created.
-- Response: `{ imported: N, updated: N, skipped: N, errors: [{ row, reason }] }`.
-- E2E tests: happy path, validation errors, duplicate handling, tenant isolation.
+**CSV Import — Backend:**
+- ✅ `POST /catalog/import` — multipart CSV upload, tenant-scoped, JwtAuthGuard + TenantGuard.
+- ✅ Supported columns: `productName`, `skuCode`, `skuName`, `priceCents` (or `pricePhp`), `costCents` (or `costPhp`), `categorySlug`, `lowStockThreshold`. Snake_case aliases supported.
+- ✅ `pricePhp` / `costPhp` auto-converted to cents (multiply × 100, round).
+- ✅ Row-level validation: missing required fields, duplicate `skuCode` within the file, unknown `categorySlug`.
+- ✅ Idempotent upsert: existing SKU by `(tenantId, code)` is updated, not duplicated. New codes are created.
+- ✅ Response: `{ imported: N, updated: N, skipped: N, errors: [{ row, reason }] }`.
+- ✅ E2E tests: happy path, idempotent upsert, validation errors, duplicate handling, 401, tenant isolation.
 
-**Frontend:**
-- Drag-drop CSV upload zone in Catalog panel (or dedicated Import page).
-- Preview table showing first 10 rows before confirming.
-- Post-import result: imported / updated / error counts. Error rows listed with reasons.
-- "Download template" link — sample CSV with correct column headers.
-- Column mapping UI: if headers don't match exactly, allow user to map CSV column → field.
+**CSV Import — Frontend:**
+- ✅ Drag-drop CSV upload zone in Catalog panel.
+- ✅ Post-import result: imported / updated / error counts. Error rows listed with reasons.
+- ✅ "Download template" button — generates CSV with correct headers.
+- **Preview table (deferred):** show first 10 rows before confirming — deferred to post-MS10. Slot reserved in the UI design.
+- Column mapping UI: deferred — exact headers required; snake_case aliases reduce friction.
+
+**Team Management — Backend:**
+- ✅ `GET /memberships/team` — returns all statuses (ACTIVE, INVITED, DISABLED). Fixed missing JwtAuthGuard.
+- ✅ `POST /memberships/invite` — email invite with 48h token, link points to `APP_FRONTEND_URL/accept-invite`.
+- ✅ `POST /memberships/add-direct` — create staff without email; accepts any unique identifier (nickname, phone, etc.); account immediately ACTIVE.
+- ✅ `PATCH /memberships/:id` — update role, job title, deactivate (`status: DISABLED`) or reactivate.
+- ✅ `jobTitle` field on `TenantMembership` — informational only, no access control impact.
+- ✅ Login DTO accepts any string identifier, not just email format.
+
+**Team Management — Frontend:**
+- ✅ Team settings UI: member list with status filter (All / Active / Pending / Deactivated).
+- ✅ Inline status badges (Pending, Disabled) on each member row.
+- ✅ Edit button → modal to change role and job title.
+- ✅ Deactivate / Cancel invite / Reactivate buttons per row (OWNER/ADMIN only, not on own row).
+- ✅ Add member dialog: toggle between "Invite by email" and "Add directly" modes.
+- ✅ Invite fix: emails now link to frontend (`localhost:3000`), not the API.
 
 ---
 
