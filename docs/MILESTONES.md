@@ -340,8 +340,9 @@ Three-level hierarchy:
 
 - Super Admin PBAC: configurable permissions per platform admin (read-only admin, billing-only admin, etc.) — currently `isPlatformAdmin` is boolean only.
 - Cross-tenant relationships: tenant A granting tenant B specific access (supplier/reseller model) — needs design work before implementation; could overlap with Marketplace phase.
+- **Super Admin impersonation**: Super Admin can temporarily act as a tenant user (log in as them) for support and debugging purposes. Issues a short-lived impersonation JWT signed with `sub: targetUserId, impersonatedBy: adminId`. All audit log entries created during an impersonation session are tagged with `actorType: IMPERSONATED`. Requires a dedicated UI in the admin panel and an explicit exit-impersonation flow.
 
-**Why deferred:** Current Super Admin model (boolean `isPlatformAdmin`) is sufficient for MVP. Cross-tenant relationships need product design before engineering.
+**Why deferred:** Current Super Admin model (boolean `isPlatformAdmin`) is sufficient for MVP. Cross-tenant relationships need product design before engineering. Impersonation requires careful audit trail design before implementation — must not be added without full logging.
 
 ---
 
