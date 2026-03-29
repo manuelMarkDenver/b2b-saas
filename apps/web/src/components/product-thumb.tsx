@@ -6,7 +6,7 @@ import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Deterministic hue from a string so each label gets a consistent color. */
-function labelHue(label: string): number {
+export function labelHue(label: string): number {
   let hash = 0;
   for (let i = 0; i < label.length; i++) {
     hash = label.charCodeAt(i) + ((hash << 5) - hash);
@@ -98,5 +98,60 @@ export function ProductThumb({
       height={size}
       className={cn("shrink-0 rounded-md border border-border/60", className)}
     />
+  );
+}
+
+/**
+ * Order-level thumbnail for table rows.
+ * - 1 item  → single full-square colored initial (same as ProductThumb)
+ * - 2+ items → 2×2 color-chip collage, each chip representing one SKU
+ *
+ * This avoids the misleading "single product image" for multi-item orders.
+ */
+export function OrderThumb({
+  items,
+  size = 40,
+  className,
+}: {
+  items: Array<{ sku: { code: string } }>;
+  size?: number;
+  className?: string;
+}) {
+  if (items.length === 0) {
+    return <ProductThumb label="?" size={size} className={className} />;
+  }
+
+  if (items.length === 1) {
+    return <ProductThumb label={items[0].sku.code} size={size} className={className} />;
+  }
+
+  // Multi-item: 2×2 collage (up to 4 chips; 4th shows overflow count if needed)
+  const chips = items.slice(0, 4);
+  const overflow = items.length > 4 ? items.length - 3 : 0;
+
+  return (
+    <div
+      aria-label={`Order with ${items.length} items`}
+      className={cn("grid shrink-0 grid-cols-2 overflow-hidden rounded-md bg-border", className)}
+      style={{ width: size, height: size, gap: 1 }}
+    >
+      {chips.map((item, i) => {
+        const hue = labelHue(item.sku.code);
+        const isOverflowCell = overflow > 0 && i === 3;
+        return (
+          <div
+            key={i}
+            className="flex items-center justify-center"
+            style={{ background: isOverflowCell ? `hsl(0,0%,30%)` : `hsl(${hue},55%,38%)` }}
+          >
+            <span className="select-none font-bold leading-none text-white" style={{ fontSize: 9 }}>
+              {isOverflowCell
+                ? `+${overflow}`
+                : item.sku.code.replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase()}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }

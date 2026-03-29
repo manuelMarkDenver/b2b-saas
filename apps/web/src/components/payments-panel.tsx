@@ -4,7 +4,7 @@ import * as React from "react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
-import { ProductThumb } from "@/components/product-thumb";
+import { ProductThumb, OrderThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -306,11 +306,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               className="grid w-full grid-cols-[1fr_52px_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <ProductThumb
-                  label={o.items?.[0]?.sku.code ?? o.id.slice(0, 4)}
-                  size={40}
-                  className="rounded-lg"
-                />
+                <OrderThumb items={o.items ?? []} size={40} className="rounded-lg" />
                 <div className="min-w-0">
                   <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
                   <div className="truncate text-xs text-muted-foreground">
