@@ -31,6 +31,10 @@ export class TenantGuard implements CanActivate {
       throw new NotFoundException('Tenant not found');
     }
 
+    if (tenant.status === 'SUSPENDED') {
+      throw new ForbiddenException('Tenant is suspended');
+    }
+
     const membership = await this.prisma.tenantMembership.findUnique({
       where: {
         tenantId_userId: {
