@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Sheet,
   SheetContent,
@@ -105,8 +106,12 @@ function unwrapList<T>(payload: unknown): T[] {
 }
 
 export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
+  type Meta = { total: number; page: number; limit: number; totalPages: number };
+
   const [payments, setPayments] = React.useState<Payment[]>([]);
   const [orders, setOrders] = React.useState<Order[]>([]);
+  const [ordersMeta, setOrdersMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [ordersPage, setOrdersPage] = React.useState(1);
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
@@ -116,12 +121,12 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData() {
+  async function loadData(oPage = ordersPage) {
     setStatus({ kind: "info", text: "Loading payments..." });
     try {
       const [paymentsRes, ordersRes] = await Promise.all([
         apiFetch("/payments", { tenantSlug }),
-        apiFetch("/orders", { tenantSlug }),
+        apiFetch(`/orders?page=${oPage}&limit=20`, { tenantSlug }),
       ]);
 
       if (!paymentsRes.ok) throw new Error(`Payments failed: ${paymentsRes.status}`);
@@ -133,7 +138,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       ]);
 
       const paymentsList = unwrapList<Payment>(paymentsData);
-      const ordersList = unwrapList<Order>(ordersData);
+      const parsedOrders = ordersData as { data?: Order[]; meta?: Meta };
+      const ordersList = parsedOrders.data ?? unwrapList<Order>(ordersData);
+      if (parsedOrders.meta) setOrdersMeta(parsedOrders.meta);
 
       setPayments(paymentsList);
       const payableOrders = ordersList
@@ -151,9 +158,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    loadData();
+    void loadData(ordersPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug]);
+  }, [tenantSlug, ordersPage]);
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
@@ -333,6 +340,16 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             </button>
           ))}
         </div>
+        {ordersMeta.totalPages > 1 && (
+          <Pagination
+            page={ordersMeta.page}
+            totalPages={ordersMeta.totalPages}
+            total={ordersMeta.total}
+            limit={ordersMeta.limit}
+            onPage={(p) => setOrdersPage(p)}
+            className="border-t border-border/60"
+          />
+        )}
       </div>
 
         </TabsContent>

@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Sheet,
   SheetContent,
@@ -103,8 +104,12 @@ function unwrapList<T>(payload: unknown): T[] {
   return [];
 }
 
+type Meta = { total: number; page: number; limit: number; totalPages: number };
+
 export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = React.useState<Order[]>([]);
+  const [meta, setMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [page, setPage] = React.useState(1);
   const [skus, setSkus] = React.useState<Sku[]>([]);
   const [pageStatus, setPageStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
@@ -126,11 +131,11 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData() {
+  async function loadData(p = page) {
     setPageStatus({ kind: "info", text: "Loading orders..." });
     try {
       const [ordersRes, skusRes] = await Promise.all([
-        apiFetch("/orders", { tenantSlug }),
+        apiFetch(`/orders?page=${p}&limit=20`, { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
       ]);
       if (!ordersRes.ok) throw new Error(`Orders failed: ${ordersRes.status}`);
@@ -139,7 +144,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
         ordersRes.json() as Promise<unknown>,
         skusRes.json() as Promise<unknown>,
       ]);
-      setOrders(unwrapList<Order>(ordersData));
+      const parsed = ordersData as { data?: Order[]; meta?: Meta };
+      setOrders(parsed.data ?? unwrapList<Order>(ordersData));
+      if (parsed.meta) setMeta(parsed.meta);
       setSkus(unwrapList<Sku>(skusData).filter((s) => s.priceCents !== null));
       setPageStatus(null);
     } catch (err) {
@@ -148,9 +155,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    loadData();
+    void loadData(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug]);
+  }, [tenantSlug, page]);
 
   // ── Cart helpers ─────────────────────────────────────────────────────────────
 
@@ -403,6 +410,16 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
               </button>
             ))}
           </div>
+        )}
+        {meta.totalPages > 1 && (
+          <Pagination
+            page={meta.page}
+            totalPages={meta.totalPages}
+            total={meta.total}
+            limit={meta.limit}
+            onPage={(p) => setPage(p)}
+            className="border-t border-border/60"
+          />
         )}
       </div>
 
