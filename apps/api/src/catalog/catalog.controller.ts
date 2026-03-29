@@ -55,6 +55,12 @@ export class CatalogController {
     return this.catalogService.updateProduct(req.tenant!.id, id, body);
   }
 
+  @Patch('products/:id/archive')
+  @UseGuards(TenantGuard)
+  archiveProduct(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.catalogService.archiveProduct(req.tenant!.id, id, req.membership!.role);
+  }
+
   // SKUs (tenant-scoped)
   @Get('skus')
   @UseGuards(TenantGuard)
@@ -76,5 +82,11 @@ export class CatalogController {
     @Body() body: UpdateSkuDto,
   ) {
     return this.catalogService.updateSku(req.tenant!.id, id, body);
+  }
+
+  @Patch('skus/:id/archive')
+  @UseGuards(TenantGuard)
+  archiveSku(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.catalogService.archiveSku(req.tenant!.id, id, req.membership!.role);
   }
 }
