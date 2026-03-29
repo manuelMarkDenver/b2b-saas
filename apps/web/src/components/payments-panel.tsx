@@ -323,9 +323,13 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               <span className="text-right font-mono tabular-nums">{formatCents(o.totalCents)}</span>
               <span className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleString()}</span>
 
-              <span className="ml-auto text-xs font-medium text-primary">
-                {o.status === "COMPLETED" || o.status === "CANCELLED" ? "View" : "Pay →"}
-              </span>
+              {o.status === "COMPLETED" || o.status === "CANCELLED" ? (
+                <span className="text-right text-xs text-muted-foreground">View</span>
+              ) : (
+                <span className="ml-auto inline-flex items-center rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary ring-1 ring-primary/30">
+                  Pay →
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -401,11 +405,11 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                     {PAYMENT_STATUS_LABELS[payment.status]}
                   </Badge>
 
-                  <div className="flex flex-wrap justify-end gap-1">
+                  <div className="flex flex-wrap justify-end gap-1.5">
                     <Button
                       variant="outline"
                       type="button"
-                      className="h-7 px-2 text-xs"
+                      className="h-8 px-3 text-xs"
                       onClick={() => openOrder(payment.orderId)}
                     >
                       View
@@ -414,9 +418,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                     {payment.status === "PENDING" ? (
                       <>
                         <Button
-                          variant="outline"
                           type="button"
-                          className="h-7 px-2 text-xs"
+                          className="h-8 px-3 text-xs"
                           onClick={() => verifyPayment(payment.id, "VERIFIED")}
                         >
                           Verify
@@ -424,7 +427,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                         <Button
                           variant="outline"
                           type="button"
-                          className="h-7 px-2 text-xs"
+                          className="h-8 px-3 text-xs border-destructive/60 text-destructive hover:bg-destructive/10"
                           onClick={() => verifyPayment(payment.id, "REJECTED")}
                         >
                           Reject

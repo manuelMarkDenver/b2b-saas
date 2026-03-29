@@ -132,6 +132,70 @@ describe('Orders (e2e)', () => {
     });
   });
 
+  describe('PATCH /orders/:id', () => {
+    let orderId: string;
+
+    beforeEach(async () => {
+      const res = await request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 1 }] });
+      orderId = res.body.id as string;
+    });
+
+    it('replaces items and recalculates total on a PENDING order', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 5 }] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].quantity).toBe(5);
+      expect(res.body.totalCents).toBe(res.body.items[0].priceAtTime * 5);
+    });
+
+    it('returns 400 when editing a non-PENDING order', async () => {
+      // Confirm the order first
+      await request(app.getHttpServer())
+        .patch(`/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ status: 'CONFIRMED' });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 2 }] });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/pending/i);
+    });
+
+    it('returns 404 for cross-tenant edit (tenant isolation)', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${cornerToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [{ skuId, quantity: 1 }] });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 400 for empty items array', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/orders/${orderId}`)
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
+        .send({ items: [] });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('PATCH /orders/:id/status', () => {
     let orderId: string;
     let stockBefore: number;

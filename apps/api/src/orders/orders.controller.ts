@@ -17,6 +17,7 @@ import { FeatureFlagGuard, RequireFeature } from '../common/auth/feature-flag.gu
 import type { RequestWithUser } from '../common/auth/auth.types';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Controller('orders')
@@ -41,6 +42,15 @@ export class OrdersController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.ordersService.getOrder(req.tenant!.id, id);
+  }
+
+  @Patch(':id')
+  updateOrder(
+    @Req() req: RequestWithUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateOrderDto,
+  ) {
+    return this.ordersService.updateOrder(req.tenant!.id, id, body);
   }
 
   @Patch(':id/status')
