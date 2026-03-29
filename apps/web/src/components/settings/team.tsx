@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Settings, Users, Plus, Mail, UserX, UserCheck } from 'lucide-react';
+import { Settings, Users, Plus, Mail, UserX, UserCheck, Pencil } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,12 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
 
   const [submitting, setSubmitting] = useState(false);
   const [actioning, setActioning] = useState<string | null>(null);
+
+  // Edit member dialog
+  const [editTarget, setEditTarget] = useState<Member | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [editJobTitle, setEditJobTitle] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const loadMembers = useCallback(async () => {
     setLoading(true);
@@ -203,6 +209,35 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
     }
   }
 
+  function openEdit(member: Member) {
+    setEditTarget(member);
+    setEditRole(member.role);
+    setEditJobTitle(member.jobTitle ?? '');
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget) return;
+    setEditSaving(true);
+    try {
+      const res = await apiFetch(`/memberships/${editTarget.id}`, {
+        method: 'PATCH',
+        tenantSlug,
+        body: JSON.stringify({ role: editRole, jobTitle: editJobTitle || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Update failed', message: err.message ?? 'Unknown error' });
+      } else {
+        pushToast({ variant: 'success', title: 'Member updated', message: 'Changes saved.' });
+        setEditTarget(null);
+        void loadMembers();
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   return (
     <div className="flex gap-6">
       {/* Settings nav */}
@@ -299,25 +334,40 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
                         {member.status === 'INVITED' ? 'Pending' : 'Disabled'}
                       </span>
                     )}
-                    {canManage && !member.isOwner && member.status !== 'DISABLED' && (
-                      <button
-                        onClick={() => handleDeactivate(member)}
-                        disabled={actioning === member.id}
-                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-                        title="Deactivate"
-                      >
-                        <UserX className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canManage && member.status === 'DISABLED' && (
-                      <button
-                        onClick={() => handleReactivate(member)}
-                        disabled={actioning === member.id}
-                        className="rounded p-1 text-muted-foreground hover:bg-green-500/10 hover:text-green-600 disabled:opacity-40"
-                        title="Reactivate"
-                      >
-                        <UserCheck className="h-4 w-4" />
-                      </button>
+                    {canManage && !member.isOwner && (
+                      <div className="flex items-center gap-1 ml-1">
+                        {member.status !== 'DISABLED' && (
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                            onClick={() => openEdit(member)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                        )}
+                        {member.status !== 'DISABLED' ? (
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                            onClick={() => handleDeactivate(member)}
+                            disabled={actioning === member.id}
+                          >
+                            <UserX className="h-3 w-3" />
+                            {member.status === 'INVITED' ? 'Cancel' : 'Deactivate'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-500/10 disabled:opacity-40"
+                            onClick={() => handleReactivate(member)}
+                            disabled={actioning === member.id}
+                          >
+                            <UserCheck className="h-3 w-3" />
+                            Reactivate
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -426,6 +476,48 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit member dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit member</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <form onSubmit={handleEdit} className="space-y-4">
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                {editTarget.user.email}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-role">Role</Label>
+                <Select value={editRole} onValueChange={setEditRole}>
+                  <SelectTrigger id="edit-role"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="STAFF">Staff</SelectItem>
+                    <SelectItem value="VIEWER">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-job-title">Job title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  id="edit-job-title"
+                  type="text"
+                  placeholder="e.g. Manager, Cashier, Delivery"
+                  value={editJobTitle}
+                  onChange={(e) => setEditJobTitle(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+                <Button type="submit" disabled={editSaving}>{editSaving ? 'Saving…' : 'Save changes'}</Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
