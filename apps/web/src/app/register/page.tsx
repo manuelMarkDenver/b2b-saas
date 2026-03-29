@@ -56,7 +56,9 @@ export default function RegisterPage() {
 
       const active = memberships.find((m) => m.status === 'ACTIVE');
       if (!active) {
-        setError('Registered, but no active tenant found.');
+        // Self-registered users have no tenant yet — platform admin must invite them.
+        // Show a clear holding message instead of a confusing error.
+        window.location.href = '/pending-access';
         return;
       }
 
