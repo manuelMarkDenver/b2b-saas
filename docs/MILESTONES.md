@@ -30,11 +30,12 @@
 > These items must be done — in order — before any real client touches the product.
 
 - [ ] **MS9 close** — quick fixes: staff password change, negative stock floor, `customerRef` on orders
-- [ ] **Marketing page** — `apps/marketing`, local first, then deployed alongside staging
+- [ ] **Marketing page** — `apps/marketing`, local first, then deployed alongside staging. CTA = "Request a Demo" → Calendly booking. No self-registration (no pricing model yet).
 - [ ] **Multi-branch v1** — scaffolded but invisible at single-branch (no UI until 2nd branch added). Prevents risky production migration later.
-- [ ] **Tenant self-registration** — "Get Started" flow from marketing page → creates tenant + owner account
 - [ ] **Dashboard / home screen** — summary of today's orders, pending payments, low stock. Makes the demo compelling.
 - [ ] **Staging deployment** — Vercel (web + marketing) + Render (API) + Neon (DB)
+
+> **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → owner demos → owner creates their tenant. Self-serve signup only unlocks when a pricing model and tiers are defined.
 
 ---
 
@@ -353,12 +354,13 @@ A standalone site (`apps/marketing`) for prospect demos and client pitches. Full
 
 #### Definition of done
 
-- Hero section: headline, subheadline, CTA buttons (Request Demo / Get Started).
-- Features grid: one card per module. Config-driven via `features.config.ts` — add/remove by editing config, no hardcoded content.
+- Hero section: headline, subheadline, single CTA — **"Book a Demo"** → Calendly link.
+- Features grid: one card per module. Config-driven via `features.config.ts`.
 - How-it-works walkthrough: core B2B workflow (add products → receive stock → create order → verify payment).
-- Stats / social proof section (placeholder until real data).
-- Pricing / plans placeholder (CTA to contact).
+- Social proof section (placeholder until real client logos/quotes available).
+- **No pricing page.** No tiers. No "Get Started" self-signup. Replace with "Contact us" or Calendly.
 - Footer with links.
+- No server runtime — fully static (`next export` / static generation).
 - SEO: meta tags, Open Graph, structured data.
 - Fully static (`next export`) — no server runtime.
 - AI-generated hero + feature illustrations via `/generate-image` skill.

@@ -2,23 +2,26 @@
 
 This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-> Last updated: 2026-03-30 — Pre-staging checklist added. Multi-branch v1 pulled forward (before staging, scaffolded as invisible default branch). Marketing page (MS11) pulled forward (before staging). Tenant self-registration and dashboard added as pre-staging requirements. Scope Control System updated accordingly.
+> Last updated: 2026-03-30 — Confirm-before-act rule strengthened. Tenant self-registration removed (no pricing model yet — demo-only via Calendly). Pre-staging checklist updated. Multi-branch v1 + marketing page pulled forward.
 
 ---
 
-## Confirm-Before-Act Rule (Non-Negotiable)
+## ⛔ Confirm-Before-Act Rule (Absolute — No Exceptions)
 
-Before making ANY change — code, docs, migrations, config — Claude must:
+Before making **ANY** change — code, docs, migrations, config, memory files — Claude must:
 
 1. **State the action plan in plain text** — what will change, which files, why.
-2. **Wait for explicit user confirmation** (a "yes", "go ahead", or equivalent).
+2. **Wait for explicit user confirmation** ("yes", "go ahead", or equivalent).
 3. **Only then execute.**
 
-This applies to everything: code changes, documentation updates, schema migrations, config edits.
+**This rule has been violated before. It must not be violated again.**
 
-**No exceptions.** Even if the change seems obvious. Even for docs-only updates. Confirm first.
+- Applies to ALL changes — including "obvious" ones, docs-only updates, and memory writes.
+- Applies even mid-task. If scope shifts unexpectedly, stop and confirm the new direction.
+- Confirmation is per-task, not a blanket. Agreeing to fix bug A does not authorize fixing bug B.
+- **Wasted tokens from unwanted changes cost more than the few tokens spent confirming.**
 
-The goal: no back-and-forth to undo unwanted changes.
+The goal: the user never has to undo something Claude did without asking.
 
 ---
 
@@ -48,11 +51,13 @@ Every proposed change must be classified before implementation:
 | PROHIBITED | Mobile, POS, Marketplace, AWS Scale (Phase 7–9) | DO NOT IMPLEMENT |
 
 **PRE-STAGING items (in order):**
-1. Staff password change + negative stock floor + `customerRef` on orders
-2. Marketing page (`apps/marketing`) — local first
+1. Staff password change + negative stock floor + `customerRef` on orders (MS9 close)
+2. Marketing page (`apps/marketing`) — local first; CTA = "Request a Demo" → Calendly (no self-registration)
 3. Multi-branch v1 — scaffolded, invisible at single-branch
-4. Tenant self-registration — "Get Started" from marketing CTA
-5. Dashboard / home screen — summary view on login
+4. Dashboard / home screen — summary view on login
+5. Staging deployment
+
+**No tenant self-registration.** There is no pricing model and no tiers yet. All tenants are manually provisioned by Super Admin. Prospects book a demo via Calendly; owner onboards them.
 
 If not MVP-CRITICAL → document it, assign to the appropriate future phase, do not build.
 
