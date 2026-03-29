@@ -511,6 +511,26 @@ Connectors listen for webhook events from external platforms and create `Invento
 
 ---
 
+### Payroll Module (Post-Phase 5) 🔒
+
+> Do not build until explicitly pulled in. Requires dedicated product decision — overlaps with accounting software territory.
+
+A payroll module scoped to tenants with staff memberships.
+
+**Scope (when built):**
+- `Employee` model linked to `Membership` — stores employment type, rate, pay period.
+- Time tracking: clock-in / clock-out logs, tied to `Branch` when multi-branch ships.
+- Payroll computation: base pay, deductions (SSS, PhilHealth, Pag-IBIG for PH), net pay.
+- Payslip generation (PDF) per pay period.
+- Payroll run history — immutable records per run.
+- Feature-flagged: `features.payroll`, enabled per tenant by Super Admin.
+
+**Why deferred:** Payroll is a regulated, compliance-heavy domain (tax law, government remittances). Building it prematurely risks legal exposure and significant scope. Must validate demand before committing to this surface.
+
+**Prerequisite:** Multi-Branch (MS10) should ship first — payroll per branch needs branch structure in place.
+
+---
+
 ### AI Chatbot + RAG (Post-Phase 5)
 
 Staff ask natural-language questions about their own data: "What's the stock on Bolt M8?", "Show me unpaid orders this week."

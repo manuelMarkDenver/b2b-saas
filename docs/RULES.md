@@ -87,6 +87,7 @@ Use `/scope-check <feature>` to classify any proposed addition before touching c
 - Advanced reporting or analytics
 - Automation systems
 - Accounting features
+- Payroll module 🔒 (Post-Phase 5 — requires explicit product decision)
 - Payment gateway integrations (Stripe, PayMongo, etc.)
 - Self-serve tenant signup
 
