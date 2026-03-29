@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Settings, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { ImageUpload } from '@/components/image-upload';
 import { cn } from '@/lib/utils';
 
 type TenantInfo = {
@@ -14,6 +15,7 @@ type TenantInfo = {
   businessType: string;
   features: Record<string, boolean>;
   status?: string;
+  logoUrl?: string | null;
 };
 
 const BUSINESS_TYPE_LABELS: Record<string, string> = {
@@ -34,17 +36,33 @@ const SETTINGS_NAV = [
 
 export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps) {
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       const res = await apiFetch('/memberships');
       if (!res.ok) return;
-      const memberships = await res.json() as Array<{ tenant: TenantInfo; status: string }>;
+      const memberships = await res.json() as Array<{ tenant: TenantInfo; status: string; role: string }>;
       const current = memberships.find((m) => m.tenant.slug === tenantSlug && m.status === 'ACTIVE');
-      if (current) setTenant(current.tenant);
+      if (current) {
+        setTenant(current.tenant);
+        setRole(current.role);
+      }
     }
     load();
   }, [tenantSlug]);
+
+  const canEditLogo = role === 'OWNER' || role === 'ADMIN';
+
+  async function handleLogoUploaded(url: string) {
+    await apiFetch('/tenant/logo', { tenantSlug, method: 'PATCH', body: JSON.stringify({ logoUrl: url }) });
+    setTenant((t) => t ? { ...t, logoUrl: url } : t);
+  }
+
+  async function handleLogoRemoved() {
+    await apiFetch('/tenant/logo', { tenantSlug, method: 'PATCH', body: JSON.stringify({ logoUrl: null }) });
+    setTenant((t) => t ? { ...t, logoUrl: null } : t);
+  }
 
   return (
     <div className="flex gap-6">
@@ -82,6 +100,33 @@ export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps
           </p>
 
           {tenant ? (
+            <>
+              {/* Logo */}
+              <div className="mt-5 flex items-center gap-4">
+                {canEditLogo ? (
+                  <ImageUpload
+                    currentUrl={tenant.logoUrl}
+                    tenantSlug={tenantSlug}
+                    size={64}
+                    onUploaded={handleLogoUploaded}
+                    onRemoved={handleLogoRemoved}
+                  />
+                ) : tenant.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={tenant.logoUrl} alt="logo" className="h-16 w-16 rounded-md object-cover" />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-md bg-primary/10 text-xl font-bold text-primary">
+                    {tenant.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm font-medium">{tenant.name}</div>
+                  {canEditLogo ? (
+                    <div className="mt-0.5 text-xs text-muted-foreground">Click logo to upload or remove</div>
+                  ) : null}
+                </div>
+              </div>
+
             <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
               <dt className="font-medium text-muted-foreground">Name</dt>
               <dd>{tenant.name}</dd>
@@ -112,6 +157,7 @@ export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps
                   ))}
               </dd>
             </dl>
+            </>
           ) : (
             <div className="mt-5 text-sm text-muted-foreground">Loading…</div>
           )}

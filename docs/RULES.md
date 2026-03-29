@@ -346,9 +346,9 @@ MUST NOT:
 
 ### Entity image URL fields
 
-- `Sku.imageUrl`: ✅ implemented (migration `20260329_add_sku_image_url`).
-- `Tenant.logoUrl`: deferred to MS9.
-- `User.avatarUrl`: deferred to MS9.
+- `Sku.imageUrl`: ✅ implemented (migration `20260329061213_add_sku_image_url`).
+- `Tenant.logoUrl`: ✅ implemented (migration `20260329300000_add_avatar_logo_url`). `PATCH /tenant/logo` (OWNER/ADMIN only).
+- `User.avatarUrl`: ✅ implemented (same migration). `PATCH /auth/me` to update.
 - `SuperAdmin` profile image: deferred to MS9.
 
 ### Image cropping

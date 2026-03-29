@@ -158,8 +158,8 @@ Definition of done:
 - ✅ **S3 storage**: Switchable via `STORAGE_TYPE=s3` env var. Uses `@aws-sdk/client-s3` + `PutObjectCommand`. Public URL uses `AWS_S3_PUBLIC_URL/${key}`.
 - ✅ **SKU image upload**: `ImageUpload` component in CatalogPanel. Click-to-upload, hover overlay, remove button. `PATCH /skus/:id` persists `imageUrl` to DB.
 - ✅ **`imageUrl` in orders/payments UI**: SKU thumbnails shown in order rows and payment detail.
-- **Tenant logo upload**: deferred — no `logoUrl` column on `Tenant` yet.
-- **User avatar upload**: deferred — no `avatarUrl` column on `User` yet.
+- ✅ **Tenant logo upload**: `logoUrl` on `Tenant`. Sidebar header shows logo with `ImageUpload` (OWNER/ADMIN). Settings profile page also has logo upload.
+- ✅ **User avatar upload**: `avatarUrl` on `User`. User menu dropdown shows avatar with `ImageUpload`. `PATCH /auth/me` persists it.
 - **Image cropping**: deferred to MS9 (Milestone-adjacent, not DoD-required).
 
 ### Notifications backend
@@ -188,8 +188,10 @@ Definition of done:
 
 **In-app notification center (bell icon):**
 - ✅ Bell icon with unread badge count.
-- **Dropdown panel** with notification list: pending.
-- **Mark as read / dismiss** from header: pending.
+- ✅ Popover panel with notification list: title, body, timestamp, unread dot.
+- ✅ Mark as read (click notification) + dismiss (×) per notification.
+- ✅ "Mark all as read" action.
+- ✅ Polls every 60s when page is active.
 
 **Settings section (in sidebar):**
 - **Tenant Profile**: pending.
