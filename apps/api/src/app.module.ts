@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
+import { EmailModule } from './common/email/email.module';
 import { LoggerModule } from './common/logging/logger.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { ConfigModule } from './config/config.module';
@@ -31,6 +32,7 @@ import { AppService } from './app.service';
         },
       ],
     }),
+    EmailModule,
     LoggerModule,
     PrismaModule,
     HealthModule,

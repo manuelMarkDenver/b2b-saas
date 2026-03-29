@@ -27,7 +27,7 @@ export class CatalogService {
 
   listProducts(tenantId: string) {
     return this.prisma.product.findMany({
-      where: { tenantId },
+      where: { tenantId, isArchived: false },
       include: {
         category: { select: { id: true, name: true, slug: true } },
       },
@@ -92,7 +92,7 @@ export class CatalogService {
 
   async listSkus(tenantId: string, page: number, limit: number) {
     const skip = (page - 1) * limit;
-    const where = { tenantId };
+    const where = { tenantId, isArchived: false };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.sku.findMany({
         where,
@@ -170,6 +170,48 @@ export class CatalogService {
         isActive: data.isActive,
       },
     });
+  }
+
+  async archiveSku(tenantId: string, skuId: string, role: string) {
+    if (role !== 'OWNER' && role !== 'ADMIN') {
+      throw new ForbiddenException('Only OWNER or ADMIN can archive SKUs');
+    }
+    const sku = await this.prisma.sku.findUnique({
+      where: { id: skuId },
+      select: { id: true, tenantId: true },
+    });
+    if (!sku) throw new NotFoundException('SKU not found');
+    if (sku.tenantId !== tenantId) throw new ForbiddenException();
+
+    return this.prisma.sku.update({
+      where: { id: skuId },
+      data: { isArchived: true, isActive: false },
+    });
+  }
+
+  async archiveProduct(tenantId: string, productId: string, role: string) {
+    if (role !== 'OWNER' && role !== 'ADMIN') {
+      throw new ForbiddenException('Only OWNER or ADMIN can archive products');
+    }
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, tenantId: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    if (product.tenantId !== tenantId) throw new ForbiddenException();
+
+    await this.prisma.$transaction([
+      this.prisma.product.update({
+        where: { id: productId },
+        data: { isArchived: true, isActive: false },
+      }),
+      this.prisma.sku.updateMany({
+        where: { productId, tenantId },
+        data: { isArchived: true, isActive: false },
+      }),
+    ]);
+
+    return this.prisma.product.findUnique({ where: { id: productId } });
   }
 
 }
