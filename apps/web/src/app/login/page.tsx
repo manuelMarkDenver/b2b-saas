@@ -113,7 +113,7 @@ export default function LoginPage() {
           </p>
         )}
 
-        <Button type="submit" className="w-full" size="lg" disabled={loading}>
+        <Button type="submit" className="w-full h-10" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>

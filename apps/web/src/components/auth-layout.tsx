@@ -8,7 +8,7 @@ const QUOTES = [
     author: 'Built for operators, not just owners.',
   },
   {
-    text: 'Inventory that's accurate, orders that close, payments that clear — all in one place.',
+    text: "Inventory that's accurate, orders that close, payments that clear \u2014 all in one place.",
     author: 'Your operations, finally under control.',
   },
   {

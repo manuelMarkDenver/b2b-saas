@@ -10,7 +10,10 @@ import {
   Boxes,
   Settings,
 } from 'lucide-react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { ImageUpload } from '@/components/image-upload';
+import { apiFetch } from '@/lib/api';
 
 type TenantFeatures = {
   inventory?: boolean;
@@ -37,20 +40,58 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   tenantSlug: string;
+  tenantName: string;
   features: TenantFeatures;
+  logoUrl?: string | null;
+  userRole?: string | null;
+  onLogoChange?: (url: string | null) => void;
 }
 
-export function Sidebar({ tenantSlug, features }: SidebarProps) {
+export function Sidebar({ tenantSlug, tenantName, features, logoUrl, userRole, onLogoChange }: SidebarProps) {
   const pathname = usePathname();
   const base = `/t/${tenantSlug}`;
+  const canEditLogo = userRole === 'OWNER' || userRole === 'ADMIN';
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!item.featureKey) return true;
     return features[item.featureKey] !== false;
   });
 
+  async function handleLogoUploaded(url: string) {
+    await apiFetch('/tenant/logo', { tenantSlug, method: 'PATCH', body: JSON.stringify({ logoUrl: url }) });
+    onLogoChange?.(url);
+  }
+
+  async function handleLogoRemoved() {
+    await apiFetch('/tenant/logo', { tenantSlug, method: 'PATCH', body: JSON.stringify({ logoUrl: null }) });
+    onLogoChange?.(null);
+  }
+
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-background">
+      {/* Tenant logo / branding header */}
+      <div className="flex items-center gap-2.5 border-b border-border px-3 py-3">
+        {canEditLogo ? (
+          <ImageUpload
+            currentUrl={logoUrl}
+            tenantSlug={tenantSlug}
+            size={32}
+            onUploaded={handleLogoUploaded}
+            onRemoved={handleLogoRemoved}
+          />
+        ) : (
+          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-primary/10">
+            {logoUrl ? (
+              <Image src={logoUrl} alt={tenantName} fill className="object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-primary">
+                {tenantName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+          </div>
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{tenantName}</span>
+      </div>
       <nav className="flex flex-col gap-0.5 p-3">
         {visibleItems.map((item) => {
           const href = `${base}${item.href}`;

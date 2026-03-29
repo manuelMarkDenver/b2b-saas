@@ -256,7 +256,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
         <button
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          onClick={loadData}
+          onClick={() => void loadData()}
           type="button"
         >
           Refresh

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, User, ChevronDown } from 'lucide-react';
+import { LogOut, User, ChevronDown, Camera } from 'lucide-react';
+import Image from 'next/image';
+import { ImageUpload } from '@/components/image-upload';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { NotificationBell } from '@/components/notifications/bell';
@@ -29,10 +31,12 @@ type TenantFeatures = {
 
 type Membership = {
   status: string;
+  role: string;
   tenant: {
     slug: string;
     name: string;
     features: TenantFeatures;
+    logoUrl?: string | null;
   };
 };
 
@@ -51,6 +55,9 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
     marketplace: false,
   });
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  const [tenantLogoUrl, setTenantLogoUrl] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Auth guard — redirect if no token
@@ -75,6 +82,8 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
         );
         if (current?.tenant.features) {
           setFeatures(current.tenant.features);
+          setTenantLogoUrl(current.tenant.logoUrl ?? null);
+          setUserRole(current.role);
         } else {
           // Not a member of this tenant — redirect to first active tenant or login
           const first = memberships.find((m) => m.status === 'ACTIVE');
@@ -87,8 +96,9 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
       }
 
       if (meRes.ok) {
-        const data = await meRes.json() as { user: { email: string } };
+        const data = await meRes.json() as { user: { email: string; avatarUrl?: string | null } };
         setUserEmail(data.user.email);
+        setUserAvatarUrl(data.user.avatarUrl ?? null);
       }
     }
     load();
@@ -103,7 +113,14 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
     <div className="flex h-dvh overflow-hidden">
       {/* Sidebar */}
       <div className={cn('flex shrink-0 transition-all duration-200', sidebarOpen ? 'w-56' : 'w-0 overflow-hidden')}>
-        <Sidebar tenantSlug={tenantSlug} features={features} />
+        <Sidebar
+          tenantSlug={tenantSlug}
+          tenantName={tenantName}
+          features={features}
+          logoUrl={tenantLogoUrl}
+          userRole={userRole}
+          onLogoChange={(url) => setTenantLogoUrl(url)}
+        />
       </div>
 
       {/* Main area */}
@@ -133,14 +150,40 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
             {/* User menu */}
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none">
-                <User className="h-4 w-4" />
+                <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
+                  {userAvatarUrl ? (
+                    <Image src={userAvatarUrl} alt="avatar" fill className="object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                      {userEmail ? userEmail[0].toUpperCase() : <User className="h-3 w-3" />}
+                    </div>
+                  )}
+                </div>
                 <span className="max-w-[120px] truncate hidden sm:block">
                   {userEmail ?? '…'}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{userEmail ?? 'Account'}</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <ImageUpload
+                    currentUrl={userAvatarUrl}
+                    tenantSlug={tenantSlug}
+                    size={40}
+                    onUploaded={async (url) => {
+                      setUserAvatarUrl(url);
+                      await apiFetch('/auth/me', { method: 'PATCH', body: JSON.stringify({ avatarUrl: url }) });
+                    }}
+                    onRemoved={async () => {
+                      setUserAvatarUrl(null);
+                      await apiFetch('/auth/me', { method: 'PATCH', body: JSON.stringify({ avatarUrl: null }) });
+                    }}
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium">{userEmail ?? 'Account'}</div>
+                    <div className="text-[10px] text-muted-foreground">Click photo to change</div>
+                  </div>
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />

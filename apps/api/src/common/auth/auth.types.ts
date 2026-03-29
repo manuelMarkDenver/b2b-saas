@@ -7,6 +7,7 @@ export type AuthUser = {
   email: string;
   isPlatformAdmin: boolean;
   status: 'ACTIVE' | 'DISABLED';
+  avatarUrl?: string | null;
 };
 
 export type RequestWithUser = Request & {

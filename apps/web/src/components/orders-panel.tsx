@@ -328,7 +328,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
         <div className="flex gap-2">
           <button
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            onClick={loadData}
+            onClick={() => void loadData()}
             type="button"
           >
             Refresh
