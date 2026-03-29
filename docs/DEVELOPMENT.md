@@ -84,11 +84,11 @@ After running `pnpm db:seed`:
 |---|---|---|---|
 | `admin@local.test` | (from `ADMIN_PASSWORD` in `.env`) | Platform Admin | admin |
 | `owner@peak-hardware.test` | `Password123!` | OWNER | peak-hardware |
-| `staff@peak-hardware.test` | `Password123!` | MEMBER | peak-hardware |
+| `staff@peak-hardware.test` | `Password123!` | STAFF | peak-hardware |
 | `owner@metro-pizza.test` | `Password123!` | OWNER | metro-pizza-supply |
-| `staff@metro-pizza.test` | `Password123!` | MEMBER | metro-pizza-supply |
+| `staff@metro-pizza.test` | `Password123!` | STAFF | metro-pizza-supply |
 | `owner@corner-general.test` | `Password123!` | OWNER | corner-general |
-| `staff@corner-general.test` | `Password123!` | MEMBER | corner-general |
+| `staff@corner-general.test` | `Password123!` | STAFF | corner-general |
 
 Default password for all non-admin seed users: `Password123!` (overrideable via `SEED_DEFAULT_PASSWORD` in `.env`)
 

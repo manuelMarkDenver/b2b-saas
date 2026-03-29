@@ -3,12 +3,12 @@ export enum Permission {
   MEMBERSHIPS_MANAGE = 'MEMBERSHIPS_MANAGE',
 }
 
-export type TenantRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type TenantRole = 'OWNER' | 'ADMIN' | 'STAFF' | 'VIEWER';
 
 export const ROLE_PERMISSIONS: Record<TenantRole, ReadonlySet<Permission>> = {
   OWNER: new Set([Permission.MEMBERSHIPS_READ, Permission.MEMBERSHIPS_MANAGE]),
   ADMIN: new Set([Permission.MEMBERSHIPS_READ]),
-  MEMBER: new Set([Permission.MEMBERSHIPS_READ]),
+  STAFF: new Set([Permission.MEMBERSHIPS_READ]),
   VIEWER: new Set([Permission.MEMBERSHIPS_READ]),
 };
 

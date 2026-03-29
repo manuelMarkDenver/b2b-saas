@@ -69,7 +69,7 @@
 | id | UUID | PK |
 | tenantId | UUID | FK → Tenant |
 | userId | UUID | FK → User |
-| role | Enum | `OWNER`, `ADMIN`, `MEMBER`, `VIEWER` |
+| role | Enum | `OWNER`, `ADMIN`, `STAFF`, `VIEWER` |
 | status | Enum | `ACTIVE`, `INACTIVE` — deactivated = no access, record preserved |
 | createdAt | DateTime | |
 

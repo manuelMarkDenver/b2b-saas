@@ -131,15 +131,15 @@ async function main() {
   const memberships: Array<{
     tenantId: string;
     userId: string;
-    role: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+    role: "OWNER" | "ADMIN" | "STAFF" | "VIEWER";
     isOwner?: boolean;
   }> = [
     { tenantId: hardwareTenant.id, userId: users.hardwareOwner.id, role: "OWNER", isOwner: true },
-    { tenantId: hardwareTenant.id, userId: users.hardwareMember.id, role: "MEMBER" },
+    { tenantId: hardwareTenant.id, userId: users.hardwareMember.id, role: "STAFF" },
     { tenantId: foodTenant.id, userId: users.foodOwner.id, role: "OWNER", isOwner: true },
-    { tenantId: foodTenant.id, userId: users.foodMember.id, role: "MEMBER" },
+    { tenantId: foodTenant.id, userId: users.foodMember.id, role: "STAFF" },
     { tenantId: retailTenant.id, userId: users.retailOwner.id, role: "OWNER", isOwner: true },
-    { tenantId: retailTenant.id, userId: users.retailMember.id, role: "MEMBER" },
+    { tenantId: retailTenant.id, userId: users.retailMember.id, role: "STAFF" },
   ];
 
   for (const m of memberships) {

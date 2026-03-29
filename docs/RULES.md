@@ -109,7 +109,7 @@ Use `/scope-check <feature>` to classify any proposed addition before touching c
 
 ## PBAC Rules
 
-- Roles (OWNER, ADMIN, MEMBER, VIEWER) define default permission bundles.
+- Roles (OWNER, ADMIN, STAFF, VIEWER) define default permission bundles.
 - Permissions can be overridden per membership without changing the role definition.
 - Do NOT hardcode role logic in business logic (e.g., `if role === 'ADMIN'`).
 - Use permission guards that read capabilities from membership.
