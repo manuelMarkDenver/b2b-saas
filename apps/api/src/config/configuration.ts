@@ -18,5 +18,13 @@ export function configuration(env: Env) {
       limit: env.THROTTLE_LIMIT,
     },
     corsAllowedOrigins: env.CORS_ALLOWED_ORIGINS,
+    smtp: {
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+      from: env.SMTP_FROM,
+    },
+    appBaseUrl: env.APP_BASE_URL,
   };
 }

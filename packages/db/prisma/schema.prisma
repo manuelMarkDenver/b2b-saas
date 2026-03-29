@@ -34,16 +34,19 @@ enum TenantRole {
 }
 
 model User {
-  id              String             @id @default(uuid()) @db.Uuid
-  email           String             @unique
-  passwordHash    String
-  status          UserStatus         @default(ACTIVE)
-  isPlatformAdmin Boolean            @default(false)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id                   String             @id @default(uuid()) @db.Uuid
+  email                String             @unique
+  passwordHash         String
+  status               UserStatus         @default(ACTIVE)
+  isPlatformAdmin      Boolean            @default(false)
+  resetToken           String?            @unique
+  resetTokenExpiresAt  DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  memberships     TenantMembership[]
-  tenantsCreated  Tenant[]           @relation("TenantCreatedBy")
+  memberships          TenantMembership[]
+  tenantsCreated       Tenant[]           @relation("TenantCreatedBy")
+  notifications        Notification[]
 }
 
 enum BusinessType {
@@ -126,17 +129,19 @@ model Sku {
 }
 
 model TenantMembership {
-  id        String           @id @default(uuid()) @db.Uuid
-  tenantId  String           @db.Uuid
-  userId    String           @db.Uuid
-  status    MembershipStatus @default(ACTIVE)
-  role      TenantRole       @default(STAFF)
-  isOwner   Boolean          @default(false)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id                String           @id @default(uuid()) @db.Uuid
+  tenantId          String           @db.Uuid
+  userId            String           @db.Uuid
+  status            MembershipStatus @default(ACTIVE)
+  role              TenantRole       @default(STAFF)
+  isOwner           Boolean          @default(false)
+  inviteToken       String?          @unique
+  inviteExpiresAt   DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id])
-  user      User             @relation(fields: [userId], references: [id])
+  tenant            Tenant           @relation(fields: [tenantId], references: [id])
+  user              User             @relation(fields: [userId], references: [id])
 
   @@unique([tenantId, userId])
   @@index([userId])
@@ -229,4 +234,35 @@ model InventoryMovement {
 
   @@index([tenantId])
   @@index([skuId])
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_CONFIRMED
+  ORDER_CANCELLED
+  PAYMENT_SUBMITTED
+  PAYMENT_VERIFIED
+  PAYMENT_REJECTED
+  LOW_STOCK
+  STAFF_ADDED
+  TENANT_SUSPENDED
+  PLATFORM_ALERT
+}
+
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  tenantId   String?          @db.Uuid
+  userId     String           @db.Uuid
+  type       NotificationType
+  title      String
+  body       String
+  entityType String?
+  entityId   String?          @db.Uuid
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  user       User             @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([tenantId])
 }

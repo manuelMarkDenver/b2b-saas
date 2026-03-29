@@ -212,6 +212,49 @@ Notes on data retention and soft deletes:
 
 ---
 
+## Milestone 9 - Marketing Website + GTM
+
+A standalone marketing/landing site (`apps/marketing`) separate from the platform app (`apps/web`). Purpose: prospect demos, client pitches, and showcasing platform capabilities to non-technical stakeholders.
+
+**Sequencing:** Starts after MS8 merges. Fully independent of the platform — runs against the prod/staging API URL.
+
+### Definition of done
+
+**Site structure:**
+- Hero section — headline, subheadline, CTA buttons (Request Demo / Get Started)
+- Features grid — one card per enabled module (Inventory, Orders, Payments, Catalog, Team Management). Config-driven: add/remove sections by editing `features.config.ts`, no hardcoded content.
+- How-it-works walkthrough — step-by-step visual flow showing the core B2B workflow (add products → receive stock → create order → verify payment)
+- Live demo embed or GIF previews pulled from real screen recordings of `apps/web`
+- Stats / social proof section (placeholder metrics until real data is available)
+- Pricing / plans placeholder (CTA to contact)
+- Footer with links
+
+**Dynamic feature gating:**
+- `apps/marketing/src/config/features.config.ts` — array of platform modules, each with: `id`, `enabled`, `title`, `description`, `screenshot`, `gifUrl`. Features section only renders `enabled: true` entries.
+- When a new module ships, update this config — no other changes needed to show/hide it.
+
+**AI-generated assets:**
+- Hero illustration and feature section images generated via `/generate-image` skill (DALL-E / Stability AI)
+- Optional: AI voiceover on a main demo video via `/generate-voiceover` skill (OpenAI TTS / ElevenLabs)
+- Both skills are reusable across the full platform (e.g. product image placeholders in the catalog)
+
+**Tech stack:**
+- Next.js (consistent with monorepo), Tailwind CSS, Framer Motion for scroll animations
+- `apps/marketing` workspace added to `pnpm-workspace.yaml`
+- Fully static (`next export`) — no server-side runtime needed for the marketing site
+- SEO: `next/head` meta tags, Open Graph, structured data
+
+**Content:**
+- Real screen recordings of `apps/web` as GIFs / short video clips (MP4)
+- AI-generated hero + feature illustrations
+- Copy written to a B2B hardware/food/retail audience (matches seed business types)
+
+**Skills created (reusable):**
+- `/generate-image` — generates images via AI API given a prompt and output path
+- `/generate-voiceover` — generates MP3 voiceover from a script via TTS API
+
+---
+
 ## Post-MVP: Notifications — External Delivery + Preferences UI (after MS8)
 
 The in-app notification center (bell icon + panel) ships in MS8 and is always-on. This post-MVP module adds two things: **external delivery** of those same events to email/SMS/Messenger, and a **notification preferences control page** where users configure what they receive and on which channels.
@@ -462,6 +505,43 @@ These are documented to inform future milestone planning — not blockers for MS
 | **Neon connection exhaustion** | Prisma opens a connection per request. Neon free tier has a low ceiling. | Add PgBouncer or Prisma Accelerate before any production load. |
 | **Concurrent order confirmation race** | Two simultaneous CONFIRM requests both pass the stock check before either deducts. | Mitigated by Prisma `$transaction` wrapping stock check + decrement. Document explicitly in code. |
 | **Integration webhook security** | External platforms (Shopee, Lazada) must authenticate their webhook payloads. | Verify HMAC signatures on all incoming webhook requests. Never trust payload without verification. |
+
+---
+
+## Post-MVP: AI Chatbot + RAG (after marketplace or parallel track)
+
+AI features are a natural fit for this platform — tenants already have structured operational data (inventory, orders, payments) that can power intelligent assistants.
+
+### Planned AI surfaces
+
+**1. In-app staff chatbot (post-MS8)**
+- Chat widget in the tenant dashboard sidebar or bottom-right corner.
+- Staff can query their own data in natural language: "What's the stock on Bolt M8?", "Show me unpaid orders this week", "Which SKUs are running low?"
+- Strictly tenant-scoped — the chatbot only ever sees data belonging to `tenantId`. The existing isolation model is already correct.
+- Stack: Claude API (`@anthropic/sdk`) + pgvector on Neon for embeddings (RAG over tenant data).
+- Feature-flagged: `features.ai_chatbot` — enabled per tenant by Super Admin.
+
+**2. Marketplace product discovery chatbot (Phase 7)**
+- Customer-facing: "I need 3mm fasteners under ₱50", "Find flour suppliers near me."
+- RAG over published `MarketplaceListing` + `Product` + `Category` data.
+- Cross-tenant but read-only public data — no inventory or financial data exposed.
+
+**3. Operational AI (later)**
+- Reorder suggestions: "SKU X has 2 units left and typically sells 5/week — time to reorder."
+- Demand forecasting from `InventoryMovement` history.
+- Anomaly detection: unusual stock deductions, payment pattern changes.
+- These require enough historical data to be useful — relevant after real tenants have 3–6 months of activity.
+
+### Architecture notes
+
+- All AI queries are tenant-scoped at the service layer — no special AI isolation needed beyond what already exists.
+- pgvector is available as a Neon extension — no separate vector DB needed at this scale.
+- Claude API (Anthropic) is the LLM of choice. Model: claude-haiku-4-5 for fast chatbot responses, claude-sonnet-4-6 for complex analysis.
+- RAG pattern: embed tenant data on write (InventoryMovement, Order created events) → store in pgvector → retrieve on chat query → pass to Claude with tenant context.
+- `REPLICATE_API_TOKEN` already in env for image generation. `ANTHROPIC_API_KEY` will be added when AI ships.
+- Feature flag: `features.ai_chatbot` on Tenant — Super Admin enables per tenant.
+
+**Why deferred:** Requires stable data model and real tenant data to be useful. Build after MS8 when the ERP foundation is solid.
 
 ---
 

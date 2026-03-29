@@ -1,11 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { randomUUID } from 'crypto';
 import { hash, compare } from 'bcryptjs';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { EmailService } from '../common/email/email.service';
 
 type AuthUser = {
   id: string;
@@ -25,6 +29,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(email: string, password: string): Promise<LoginResult> {
@@ -70,6 +76,44 @@ export class AuthService {
     const token = this.signToken(user, activeTenantId);
 
     return { user: this.mapUser(user), token, activeTenantId };
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.trim().toLowerCase() },
+      select: { id: true, email: true },
+    });
+    // Always return success — don't leak whether email exists
+    if (!user) return;
+
+    const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { resetToken: token, resetTokenExpiresAt: expiresAt },
+    });
+
+    const baseUrl = this.config.get<string>('appBaseUrl');
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+    await this.emailService.sendPasswordReset(user.email, resetUrl);
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { resetToken: token },
+      select: { id: true, resetTokenExpiresAt: true },
+    });
+
+    if (!user || !user.resetTokenExpiresAt || user.resetTokenExpiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    const passwordHash = await hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, resetToken: null, resetTokenExpiresAt: null },
+    });
   }
 
   signToken(user: AuthUser, activeTenantId?: string | null): string {
