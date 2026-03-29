@@ -288,6 +288,22 @@ SHOULD:
 - Store product/UI images in `apps/web/public/images/` with a clear subfolder structure (e.g. `products/`, `ui/`, `generated/`).
 - Prefer AI-generated placeholder images over lorem picsum or generic stock photos for product demos.
 
+- If the backend does not provide an image URL yet, render a deterministic default thumbnail (so lists remain scannable without introducing storage/upload scope).
+
+- For ERP-style workflows, prefer list views (table/cards) that open a focused detail view (right-side sheet) for actions; keep destructive/state-change actions inside the detail view to reduce mis-clicks.
+
+- In order detail sheets/drawers, show item thumbnails prominently. For multi-item orders, render a list of items with thumbnails and put the total + primary action (e.g. submit payment) in a bottom footer.
+
+- When introducing new list UIs, confirm whether the backing endpoint is paginated. If it is, implement pagination (or explicit limits + sorting) in the UI so behavior stays consistent across modules.
+
+- Avoid mixing multiple primary workflows in a single view (e.g. payables + payment history). If both are needed, use tabs or separate routes.
+
+- **Table layout standard (MS8+):** All list panels use a consistent grid layout — header row with uppercase labels, ProductThumb in the first column, status badges (Badge component with min-width + justify-center), monospaced amounts, and a contextual text action in the last column. Clickable rows open a right-side Sheet for detail/actions.
+
+- **New Order UX (MS8+):** Multi-item orders are created via a Sheet with a Shopee-style 2-column product grid (aspect-square images, per-card quantity controls), a cart summary section at top, and a sticky footer with large total text (text-3xl font-bold) + Place Order CTA. No dropdown-only pickers for product selection.
+
+- **ProductThumb `fill` prop:** When rendering product images in a responsive grid (cards), use `fill` mode with a parent `aspect-square relative` container. For fixed-size thumbnails in table rows, use the `size` prop (40px in rows, 72–80px in detail sheets).
+
 MUST NOT:
 
 - Commit unoptimized PNG/JPEG images directly — always convert to WebP first.

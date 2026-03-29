@@ -4,11 +4,34 @@ import * as React from "react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
+import { ProductThumb } from "@/components/product-thumb";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 type Order = {
   id: string;
   status: string;
   totalCents: number;
+  createdAt: string;
+  items: Array<{
+    id: string;
+    quantity: number;
+    priceAtTime: number;
+    sku: { code: string; name: string };
+  }>;
 };
 
 type Payment = {
@@ -21,16 +44,23 @@ type Payment = {
   order: Order;
 };
 
-const STATUS_LABELS: Record<Payment["status"], string> = {
+const PAYMENT_STATUS_LABELS: Record<Payment["status"], string> = {
   PENDING: "Pending",
   VERIFIED: "Verified",
   REJECTED: "Rejected",
 };
 
-const STATUS_COLORS: Record<Payment["status"], string> = {
-  PENDING: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
-  VERIFIED: "bg-green-500/15 text-green-600 dark:text-green-400",
-  REJECTED: "bg-red-500/15 text-red-500",
+const PAYMENT_STATUS_VARIANT: Record<Payment["status"], "pending" | "verified" | "rejected"> = {
+  PENDING: "pending",
+  VERIFIED: "verified",
+  REJECTED: "rejected",
+};
+
+const ORDER_STATUS_VARIANT: Record<string, "pending" | "confirmed" | "completed" | "cancelled"> = {
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
 };
 
 function formatCents(cents: number) {
@@ -81,6 +111,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
   const [amountDollars, setAmountDollars] = React.useState("0.00");
   const [proofUrl, setProofUrl] = React.useState("");
+  const [sheetOpen, setSheetOpen] = React.useState(false);
 
   const { pushToast } = useToast();
 
@@ -104,7 +135,10 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       const ordersList = unwrapList<Order>(ordersData);
 
       setPayments(paymentsList);
-      const payableOrders = ordersList.filter((o) => o.status !== "CANCELLED");
+      const payableOrders = ordersList
+        .filter((o) => o.status !== "CANCELLED")
+        .slice()
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(payableOrders);
       setStatus(null);
     } catch (err) {
@@ -122,16 +156,34 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
-      const first = orders[0];
-      setSelectedOrderId(first.id);
-      setAmountDollars((first.totalCents / 100).toFixed(2));
+      const preferred = orders.find((o) => o.status === "CONFIRMED" || o.status === "PENDING") ?? orders[0];
+      setSelectedOrderId(preferred.id);
+      setAmountDollars((preferred.totalCents / 100).toFixed(2));
     }
   }, [orders, selectedOrderId]);
+
+  const selectedOrder = React.useMemo(
+    () => orders.find((o) => o.id === selectedOrderId) ?? null,
+    [orders, selectedOrderId],
+  );
+
+  const pendingPaymentByOrderId = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const p of payments) {
+      if (p.status === "PENDING") set.add(p.orderId);
+    }
+    return set;
+  }, [payments]);
 
   function handleOrderChange(orderId: string) {
     setSelectedOrderId(orderId);
     const order = orders.find((o) => o.id === orderId);
     if (order) setAmountDollars((order.totalCents / 100).toFixed(2));
+  }
+
+  function openOrder(orderId: string) {
+    handleOrderChange(orderId);
+    setSheetOpen(true);
   }
 
   async function submitPayment() {
@@ -209,107 +261,297 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       ) : null}
 
-      <div className="mt-5 rounded-md border border-border/60 p-4">
-        <div className="text-sm font-medium">Submit Payment</div>
-        <div className="mt-3 space-y-2">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={selectedOrderId}
-            onChange={(e) => handleOrderChange(e.target.value)}
-          >
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.id.slice(0, 8)}… — {o.status} — {formatCents(o.totalCents)}
-              </option>
-            ))}
-          </select>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-            <input
-              className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="0.00"
-              value={amountDollars}
-              onChange={(e) => setAmountDollars(e.target.value)}
-            />
+      <Tabs defaultValue="payables" className="mt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="payables">Payables</TabsTrigger>
+            <TabsTrigger value="history">Payments</TabsTrigger>
+          </TabsList>
+          <div className="text-xs text-muted-foreground">
+            Payables: {orders.length} · Payments: {payments.length}
           </div>
-          <input
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            placeholder="Proof URL (optional)"
-            value={proofUrl}
-            onChange={(e) => setProofUrl(e.target.value)}
-          />
-          <button
-            className="h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
-            type="button"
-            onClick={submitPayment}
-            disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
-          >
-            Submit Payment
-          </button>
+        </div>
+
+        <TabsContent value="payables" className="mt-4">
+
+      <div className="overflow-hidden rounded-md border border-border/60">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
+          <div>
+            <div className="text-sm font-medium">Orders</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Click an order to view details and submit payment.
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {orders.length} total
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[1fr_120px_120px_1fr_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span>Order</span>
+          <span>Status</span>
+          <span className="text-right">Total</span>
+          <span>Created</span>
+          <span className="text-right">Action</span>
+        </div>
+
+        <div className="divide-y divide-border/60">
+          {orders.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => openOrder(o.id)}
+              className="grid w-full grid-cols-[1fr_120px_120px_1fr_80px] items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/30"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <ProductThumb label={o.id.slice(0, 8)} size={40} />
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{o.id.slice(0, 8)}…</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {o.items[0] ? `${o.items[0].sku.code} · ${o.items[0].sku.name}` : "No items"}
+                    {o.items.length > 1 ? ` · +${o.items.length - 1} more` : ""}
+                    {pendingPaymentByOrderId.has(o.id) ? " · pending payment" : ""}
+                  </div>
+                </div>
+              </div>
+
+              <Badge variant={ORDER_STATUS_VARIANT[o.status] ?? "muted"} className="min-w-[90px] justify-center">
+                {o.status}
+              </Badge>
+
+              <span className="text-right font-mono tabular-nums">{formatCents(o.totalCents)}</span>
+              <span className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleString()}</span>
+
+              <span className="ml-auto text-xs font-medium text-primary">
+                {o.status === "COMPLETED" || o.status === "CANCELLED" ? "View" : "Pay →"}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
-        {payments.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No payments yet.</div>
-        ) : null}
-        {payments.map((payment) => (
-          <div
-            key={payment.id}
-            className="rounded-md border border-border/60 bg-background p-4 text-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-mono text-xs text-muted-foreground">
-                  {payment.id.slice(0, 8)}…
-                </div>
-                <div className="mt-1 font-medium">{formatCents(payment.amountCents)}</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Order: {payment.orderId.slice(0, 8)}… · {payment.order.status}
-                </div>
-                {payment.proofUrl ? (
-                  <a
-                    href={payment.proofUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 block text-xs text-primary underline"
-                  >
-                    View proof
-                  </a>
-                ) : (
-                  <div className="mt-1 text-xs text-muted-foreground">No proof attached</div>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[payment.status]}`}>
-                  {STATUS_LABELS[payment.status]}
-                </span>
-                {payment.status === "PENDING" ? (
-                  <div className="flex gap-1">
-                    <button
-                      className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                      type="button"
-                      onClick={() => verifyPayment(payment.id, "VERIFIED")}
-                    >
-                      ✓ Verify
-                    </button>
-                    <button
-                      className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                      type="button"
-                      onClick={() => verifyPayment(payment.id, "REJECTED")}
-                    >
-                      ✕ Reject
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+
+      <div className="overflow-hidden rounded-md border border-border/60">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
+          <div>
+            <div className="text-sm font-medium">Payments</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Review payment history. Pending payments can be verified or rejected.
             </div>
           </div>
-        ))}
+          <div className="text-xs text-muted-foreground">{payments.length} total</div>
+        </div>
+
+        {payments.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-muted-foreground">No payments yet.</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span>Payment</span>
+              <span className="text-right">Amount</span>
+              <span>Order</span>
+              <span>Proof</span>
+              <span>Created</span>
+              <span>Status</span>
+              <span className="text-right">Action</span>
+            </div>
+
+            <div className="divide-y divide-border/60">
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] items-center gap-3 px-4 py-3 text-sm"
+                >
+                  <span className="font-mono text-xs text-muted-foreground">{payment.id.slice(0, 8)}…</span>
+
+                  <span className="text-right font-mono tabular-nums">{formatCents(payment.amountCents)}</span>
+
+                  <div className="min-w-0">
+                    <div className="truncate text-xs text-muted-foreground">
+                      {payment.orderId.slice(0, 8)}…
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">{payment.order.status}</div>
+                  </div>
+
+                  {payment.proofUrl ? (
+                    <a
+                      href={payment.proofUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-fit text-xs text-primary underline"
+                    >
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+
+                  <span className="text-xs text-muted-foreground">{new Date(payment.createdAt).toLocaleString()}</span>
+
+                  <Badge variant={PAYMENT_STATUS_VARIANT[payment.status]} className="min-w-[72px] justify-center">
+                    {PAYMENT_STATUS_LABELS[payment.status]}
+                  </Badge>
+
+                  <div className="flex flex-wrap justify-end gap-1">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => openOrder(payment.orderId)}
+                    >
+                      View
+                    </Button>
+
+                    {payment.status === "PENDING" ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          type="button"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => verifyPayment(payment.id, "VERIFIED")}
+                        >
+                          Verify
+                        </Button>
+                        <Button
+                          variant="outline"
+                          type="button"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => verifyPayment(payment.id, "REJECTED")}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
+
+        </TabsContent>
+      </Tabs>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-[520px]">
+          <SheetHeader>
+            <SheetTitle>Order details</SheetTitle>
+            <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 pb-28">
+            {selectedOrder ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Order</div>
+                      <div className="mt-0.5 font-mono text-sm font-medium">{selectedOrder.id.slice(0, 8)}…</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {new Date(selectedOrder.createdAt).toLocaleString()}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {selectedOrder.items.length} item{selectedOrder.items.length === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <Badge variant={ORDER_STATUS_VARIANT[selectedOrder.status] ?? "muted"}>
+                      {selectedOrder.status}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Items</div>
+                  <div className="mt-3 space-y-3">
+                    {selectedOrder.items.map((it) => (
+                      <div key={it.id} className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ProductThumb
+                            label={`${it.sku.code} ${it.sku.name}`}
+                            caption="No image"
+                            size={96}
+                            className="rounded-lg border border-border/60"
+                          />
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {it.sku.code} · {it.sku.name}
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">Qty {it.quantity}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-sm tabular-nums">
+                            {formatCents(it.priceAtTime * it.quantity)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{formatCents(it.priceAtTime)} ea</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Payment details</div>
+                  <div className="mt-3 space-y-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                      <input
+                        className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={amountDollars}
+                        onChange={(e) => setAmountDollars(e.target.value)}
+                      />
+                    </div>
+                    <input
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      placeholder="Proof URL (optional)"
+                      value={proofUrl}
+                      onChange={(e) => setProofUrl(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-card p-4">
+                  <div className="text-sm font-medium">Activity</div>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Created/updated by will appear here once audit actors are exposed by the API.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
+                Select an order from the list to view details.
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-border/60 bg-background/95 px-5 py-4 backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground">Total</div>
+                <div className="font-mono text-lg font-semibold tabular-nums">
+                  {selectedOrder ? formatCents(selectedOrder.totalCents) : "—"}
+                </div>
+              </div>
+              <button
+                className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                type="button"
+                onClick={submitPayment}
+                disabled={!selectedOrderId || parseFloat(amountDollars) <= 0}
+              >
+                Submit Payment
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

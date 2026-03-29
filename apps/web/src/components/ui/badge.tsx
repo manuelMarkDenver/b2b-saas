@@ -14,6 +14,13 @@ const badgeVariants = cva(
         destructive: 'bg-destructive/10 text-destructive',
         outline: 'border border-border text-foreground',
         muted: 'bg-muted text-muted-foreground',
+        // Domain status variants — driven by CSS vars in :root/.dark, overrideable per tenant
+        pending:   'bg-[hsl(var(--status-pending))] text-[hsl(var(--status-pending-fg))]',
+        confirmed: 'bg-[hsl(var(--status-confirmed))] text-[hsl(var(--status-confirmed-fg))]',
+        completed: 'bg-[hsl(var(--status-completed))] text-[hsl(var(--status-completed-fg))]',
+        cancelled: 'bg-[hsl(var(--status-cancelled))] text-[hsl(var(--status-cancelled-fg))]',
+        verified:  'bg-[hsl(var(--status-completed))] text-[hsl(var(--status-completed-fg))]',
+        rejected:  'bg-[hsl(var(--status-cancelled))] text-[hsl(var(--status-cancelled-fg))]',
       },
     },
     defaultVariants: { variant: 'default' },

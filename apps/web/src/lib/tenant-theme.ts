@@ -6,6 +6,15 @@ export type TenantThemeTokens = {
   accent: string;
   accentForeground: string;
   radius: string;
+  // Optional status badge overrides — falls back to globals.css defaults when omitted
+  statusPending?: string;
+  statusPendingFg?: string;
+  statusConfirmed?: string;
+  statusConfirmedFg?: string;
+  statusCompleted?: string;
+  statusCompletedFg?: string;
+  statusCancelled?: string;
+  statusCancelledFg?: string;
 };
 
 const DEFAULT_TENANT: TenantThemeTokens = {
