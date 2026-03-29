@@ -9,7 +9,6 @@ import {
   CreditCard,
   Boxes,
   Settings,
-  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -65,15 +64,17 @@ export function Sidebar({ tenantSlug, features }: SidebarProps) {
               key={item.href}
               href={href}
               className={cn(
-                'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                'group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              {isActive ? (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary" />
+              ) : null}
+              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-primary' : 'text-muted-foreground')} />
               <span className="flex-1">{item.label}</span>
-              {isActive && <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />}
             </Link>
           );
         })}
