@@ -1,6 +1,6 @@
 # Deployment
 
-> Last updated: 2026-03-28
+> Last updated: 2026-03-29
 
 This document covers the deployment strategy: current free-tier setup for early stage, and the path to scale as the platform grows.
 
@@ -39,6 +39,21 @@ This document covers the deployment strategy: current free-tier setup for early 
 
 ### 2. API (Render)
 
+The repo includes `render.yaml` at the root for Blueprint-based deploys.
+
+**Option A — Render Blueprint (recommended):**
+1. Push the repo to GitHub.
+2. On Render: New → Blueprint → connect the repo.
+3. Render reads `render.yaml` and creates the service automatically.
+4. Fill in the `sync: false` secrets in the Render dashboard:
+   - `DATABASE_URL` — Neon production connection string
+   - `JWT_SECRET` — random 64-char string
+   - `CORS_ALLOWED_ORIGINS` — your Vercel URL (set after step 3 below)
+   - `SMTP_PASS` — Resend API key
+   - `SMTP_FROM` — sender address (e.g. `noreply@yourplatform.com`)
+   - `APP_BASE_URL` — your Vercel URL (same as CORS_ALLOWED_ORIGINS)
+
+**Option B — Manual:**
 1. Create a new **Web Service** on [render.com](https://render.com).
 2. Connect your GitHub repo.
 3. Settings:
@@ -51,13 +66,14 @@ This document covers the deployment strategy: current free-tier setup for early 
 
 ### 3. Web (Vercel)
 
+The repo includes `vercel.json` at the root pointing to `apps/web`.
+
 1. Import the repo on [vercel.com](https://vercel.com).
-2. Settings:
-   - **Root directory:** `apps/web`
-   - **Framework preset:** Next.js
-   - **Environment variable:** `NEXT_PUBLIC_API_BASE_URL=https://b2b-saas-api.onrender.com`
-3. Deploy. Vercel will build and serve the Next.js app.
-4. Note the Vercel URL (e.g. `https://b2b-saas.vercel.app`).
+2. Vercel reads `vercel.json` — no manual root directory setting needed.
+3. Add environment variable in the Vercel dashboard:
+   - `NEXT_PUBLIC_API_BASE_URL` = `https://b2b-saas-api.onrender.com` (your Render URL)
+4. Deploy. Vercel will build and serve the Next.js app.
+5. Note the Vercel URL (e.g. `https://b2b-saas.vercel.app`).
 
 ### 4. Wire CORS
 
@@ -122,6 +138,23 @@ Before going live, verify all of these:
 - [ ] `LOG_PRETTY=false` (structured JSON logs in production)
 - [ ] `ADMIN_PASSWORD` is a strong password — change after first login
 - [ ] `.env` file is NOT deployed (env vars injected via platform)
+
+---
+
+## Local Email Testing (Mailpit)
+
+For local development, Mailpit catches all outgoing emails without sending real ones.
+
+```bash
+# Start Mailpit alongside the DB
+docker compose -f infra/docker-compose.yml up -d mailpit
+
+# Open the web UI to view caught emails
+open http://localhost:8025
+```
+
+The API `.env.example` is pre-configured to use Mailpit (`SMTP_HOST=localhost`, `SMTP_PORT=1025`).
+No `SMTP_USER` / `SMTP_PASS` needed locally — Mailpit accepts anonymous connections.
 
 ---
 
