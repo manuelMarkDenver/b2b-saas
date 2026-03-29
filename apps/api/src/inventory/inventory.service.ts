@@ -71,16 +71,21 @@ export class InventoryService {
     });
   }
 
-  listMovements(tenantId: string, skuId?: string) {
-    return this.prisma.inventoryMovement.findMany({
-      where: {
-        tenantId,
-        ...(skuId ? { skuId } : {}),
-      },
-      include: {
-        sku: { select: { id: true, code: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listMovements(tenantId: string, page: number, limit: number, skuId?: string) {
+    const skip = (page - 1) * limit;
+    const where = { tenantId, ...(skuId ? { skuId } : {}) };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.inventoryMovement.findMany({
+        where,
+        include: {
+          sku: { select: { id: true, code: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.inventoryMovement.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 }

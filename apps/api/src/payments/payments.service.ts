@@ -59,17 +59,22 @@ export class PaymentsService {
     return payment;
   }
 
-  listPayments(tenantId: string, orderId?: string) {
-    return this.prisma.payment.findMany({
-      where: {
-        tenantId,
-        ...(orderId ? { orderId } : {}),
-      },
-      include: {
-        order: { select: { id: true, status: true, totalCents: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listPayments(tenantId: string, page: number, limit: number, orderId?: string) {
+    const skip = (page - 1) * limit;
+    const where = { tenantId, ...(orderId ? { orderId } : {}) };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.payment.findMany({
+        where,
+        include: {
+          order: { select: { id: true, status: true, totalCents: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
   async getPayment(tenantId: string, paymentId: string) {

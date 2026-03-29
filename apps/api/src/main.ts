@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import helmet from 'helmet';
 import type { Logger as PinoLogger } from 'pino';
 import { HttpExceptionFilter } from './common/http/http-exception.filter';
 import { requestIdMiddleware } from './common/http/request-id.middleware';
@@ -13,10 +14,25 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const logger = app.get<PinoLogger>(PINO);
 
+  app.use(helmet());
   app.use(requestIdMiddleware);
   app.use(requestLoggerMiddleware(logger));
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.enableCors({ origin: true });
+
+  const rawOrigins = config.get<string>('corsAllowedOrigins');
+  const allowedOrigins = rawOrigins
+    ? rawOrigins.split(',').map((o) => o.trim())
+    : [];
+  app.enableCors({
+    origin:
+      allowedOrigins.length > 0
+        ? allowedOrigins
+        : config.get('env') === 'development'
+          ? true
+          : false,
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

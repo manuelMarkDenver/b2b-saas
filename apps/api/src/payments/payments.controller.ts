@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
 import { FeatureFlagGuard, RequireFeature } from '../common/auth/feature-flag.guard';
@@ -32,9 +33,10 @@ export class PaymentsController {
   @Get()
   listPayments(
     @Req() req: RequestWithUser,
+    @Query() pagination: PaginationDto,
     @Query('orderId') orderId?: string,
   ) {
-    return this.paymentsService.listPayments(req.tenant!.id, orderId);
+    return this.paymentsService.listPayments(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, orderId);
   }
 
   @Get(':id')
