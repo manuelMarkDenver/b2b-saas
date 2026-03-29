@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: b2b-saas-api
+    runtime: node
+    rootDir: apps/api
+    buildCommand: npm install && npm run build
+    startCommand: node dist/main
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_URL
+        sync: false   # Set in Render dashboard — Neon connection string
+      - key: JWT_SECRET
+        sync: false   # Set in Render dashboard — random 64-char string
+      - key: JWT_EXPIRES_IN_SECONDS
+        value: "86400"
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_PRETTY
+        value: "false"
+      - key: THROTTLE_TTL
+        value: "60000"
+      - key: THROTTLE_LIMIT
+        value: "10"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false   # Set in Render dashboard — your Vercel URL
+      - key: SMTP_HOST
+        value: smtp.resend.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: resend
+      - key: SMTP_PASS
+        sync: false   # Set in Render dashboard — Resend API key
+      - key: SMTP_FROM
+        sync: false   # Set in Render dashboard — e.g. noreply@yourplatform.com
+      - key: APP_BASE_URL
+        sync: false   # Set in Render dashboard — your Vercel URL
