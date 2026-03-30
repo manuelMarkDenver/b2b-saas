@@ -259,18 +259,17 @@ MUST:
 MUST:
 
 - After making a behavior change (API or web), testing is required before committing.
-- Testing is UI + API only. API tests are run by Claude. UI tests are done by the user.
 - **API tests are Claude's responsibility.** Write and run E2E tests (Jest + Supertest) — do NOT use curl for API testing. Curl wastes tokens and is not reusable. Run `pnpm --filter api test:e2e` and report pass/fail before asking the user to commit.
 - Every new API endpoint requires an E2E test covering: happy path, validation error, tenant isolation (cross-tenant 403), and invalid transitions where applicable.
 - Shared test helpers live in `apps/api/test/helpers/`. Use `createTestApp()` and `loginAs()` for all E2E tests.
-- **UI tests are the user's responsibility.** Provide exact browser steps + expected outcome for each step.
+- **UI spot-check is the user's responsibility.** Claude provides exact browser steps + expected outcome for every UI change.
 - Every test must include its **expected result** — never list a test step without saying what success looks like.
-- If any E2E test fails, diagnose and fix before surfacing to user. Do not commit broken code.
+- If any test fails, diagnose and fix before surfacing to user. Do not commit broken code.
 - **Run the seeder automatically** (`pnpm db:seed`) whenever a migration or seed change is made — do not ask the user to run it.
 
 ---
 
-## E2E Test Rules
+## E2E Test Rules (API)
 
 MUST:
 
@@ -283,8 +282,6 @@ MUST:
 - Complex business logic (e.g., delta calculation, status transitions) gets unit tests in addition to E2E.
 - Do NOT write E2E tests that mock the service layer — they must go through the full HTTP stack.
 - Do NOT use curl for API verification — always use E2E tests instead.
-
-See `docs/DEVELOPMENT.md` for how to run tests locally.
 
 ---
 

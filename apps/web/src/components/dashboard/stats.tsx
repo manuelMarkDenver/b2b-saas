@@ -5,8 +5,10 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { ShoppingCart, CreditCard, Boxes, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, CreditCard, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { formatCents } from '@/lib/format';
+import { getActiveBranchId, setActiveBranchId } from '@/lib/branch';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
 import { BranchBreakdown } from './branch-breakdown';
 
@@ -53,11 +55,16 @@ const CHART_COLORS = {
   threshold: '#d1d5db',
 };
 
+const TOOLTIP_STYLE = {
+  fontSize: 12,
+  borderRadius: 8,
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-background)',
+  color: 'var(--color-foreground)',
+};
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -113,25 +120,28 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   const [range, setRange] = useState<DateRange>(presetToRange('7d'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  // null = all branches; string = specific branch scoped in dashboard only
-  const [dashBranchId, setDashBranchId] = useState<string | null>(null);
+  // Read active branch from global sidebar state (localStorage)
+  const activeBranchId = getActiveBranchId(tenantSlug);
 
-  const load = useCallback(async (r: DateRange, branchId: string | null) => {
+  const load = useCallback(async (r: DateRange) => {
     setLoading(true);
     const url = `/dashboard?from=${r.from}&to=${r.to}`;
-    const res = await apiFetch(url, { tenantSlug, branchId });
+    // apiFetch auto-picks activeBranchId from localStorage when branchId not passed
+    const res = await apiFetch(url, { tenantSlug });
     if (res.ok) setData(await res.json());
     setLoading(false);
   }, [tenantSlug]);
 
-  useEffect(() => { load(range, dashBranchId); }, [range, dashBranchId, load]);
+  useEffect(() => { load(range); }, [range, load]);
 
   function handleRangeChange(r: DateRange) {
     setRange(r);
   }
 
+  // Clicking a branch row switches the global branch (same as sidebar switcher)
   function handleBranchSelect(branchId: string | null) {
-    setDashBranchId(branchId);
+    setActiveBranchId(tenantSlug, branchId);
+    window.location.reload();
   }
 
   if (loading && !data) {
@@ -182,27 +192,21 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
       {/* Date range control */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {dashBranchId ? (
-            <>Viewing: <span className="font-medium text-foreground">1 branch</span> —{' '}
-              <button onClick={() => handleBranchSelect(null)} className="text-primary underline-offset-2 hover:underline text-sm">
-                show all
-              </button>
-            </>
-          ) : (
-            <>Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
-            <span className="font-medium text-foreground">{range.to}</span></>
-          )}
+          Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
+          <span className="font-medium text-foreground">{range.to}</span>
         </p>
         <DateRangePicker value={range} onChange={handleRangeChange} />
       </div>
 
-      {/* Branch breakdown table — hidden for single-branch tenants */}
-      <BranchBreakdown
-        tenantSlug={tenantSlug}
-        range={range}
-        activeBranchId={dashBranchId}
-        onSelectBranch={handleBranchSelect}
-      />
+      {/* Branch breakdown — only shown when "All branches" is selected in the sidebar */}
+      {activeBranchId === null && (
+        <BranchBreakdown
+          tenantSlug={tenantSlug}
+          range={range}
+          activeBranchId={null}
+          onSelectBranch={handleBranchSelect}
+        />
+      )}
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -253,7 +257,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `₱${(v as number).toLocaleString()}`} width={70} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                  contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [`₱${(v as number).toLocaleString()}`, 'Revenue']}
                 />
                 <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.revenue} strokeWidth={2} fill="url(#revenueGrad)" dot={false} activeDot={{ r: 4 }} isAnimationActive />
@@ -273,7 +277,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} allowDecimals={false} width={30} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                  contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v, 'Orders']}
                 />
                 <Bar dataKey="orders" fill={CHART_COLORS.orders} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive />
@@ -308,7 +312,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                    contentStyle={TOOLTIP_STYLE}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -335,12 +339,14 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 layout="vertical"
                 data={lowStockData}
                 margin={{ top: 4, right: 20, left: 0, bottom: 0 }}
+                barCategoryGap="30%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={110} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                  contentStyle={TOOLTIP_STYLE}
+                  cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="threshold" fill={CHART_COLORS.threshold} radius={[0, 4, 4, 0]} maxBarSize={14} name="Threshold" isAnimationActive />

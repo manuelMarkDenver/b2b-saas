@@ -184,6 +184,7 @@ model TenantMembership {
   @@unique([tenantId, username])
   @@index([userId])
   @@index([tenantId])
+  @@index([status])
 }
 
 enum MovementType {
@@ -222,6 +223,8 @@ model Order {
 
   @@index([tenantId])
   @@index([branchId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -231,8 +234,8 @@ model OrderItem {
   quantity    Int
   priceAtTime Int
 
-  order       Order  @relation(fields: [orderId], references: [id])
-  sku         Sku    @relation(fields: [skuId], references: [id])
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  sku         Sku    @relation(fields: [skuId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([skuId])
@@ -254,11 +257,12 @@ model Payment {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  tenant      Tenant        @relation(fields: [tenantId], references: [id])
-  order       Order         @relation(fields: [orderId], references: [id])
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([orderId])
+  @@index([status])
 }
 
 model InventoryMovement {
@@ -273,8 +277,8 @@ model InventoryMovement {
   branchId      String?       @db.Uuid
   createdAt     DateTime      @default(now())
 
-  tenant        Tenant        @relation(fields: [tenantId], references: [id])
-  sku           Sku           @relation(fields: [skuId], references: [id])
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sku           Sku           @relation(fields: [skuId], references: [id], onDelete: Restrict)
   branch        Branch?       @relation(fields: [branchId], references: [id])
 
   @@index([tenantId])

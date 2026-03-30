@@ -23,6 +23,9 @@ describe('Memberships — Invite & Accept (e2e)', () => {
       'invite-accept@test.local',
       'invite-expired@test.local',
     ];
+    await prisma.notification.deleteMany({
+      where: { user: { email: { in: emails } } },
+    });
     await prisma.tenantMembership.deleteMany({
       where: { user: { email: { in: emails } } },
     });

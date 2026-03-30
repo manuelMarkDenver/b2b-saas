@@ -143,7 +143,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
         {/* ── Stock Levels tab ── */}
         <TabsContent value="stock" className="mt-4">
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="min-w-[400px]">
             <div className="border-b border-border/60 px-4 py-3">
               <div className="text-sm font-medium">Current stock</div>
               <div className="mt-0.5 text-xs text-muted-foreground">
@@ -189,12 +190,14 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 })}
               </div>
             )}
+            </div>
           </div>
         </TabsContent>
 
         {/* ── Movements tab ── */}
         <TabsContent value="movements" className="mt-4">
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="min-w-[550px]">
             <div className="border-b border-border/60 px-4 py-3">
               <div className="text-sm font-medium">Movement log</div>
               <div className="mt-0.5 text-xs text-muted-foreground">
@@ -206,7 +209,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               <span>SKU</span>
               <span>Type</span>
               <span className="text-right">Qty</span>
-              <span className="hidden sm:block">Note</span>
+              <span>Note</span>
               <span className="text-right">Date</span>
             </div>
 
@@ -248,7 +251,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                         {m.type === 'OUT' ? '-' : '+'}
                         {Math.abs(m.quantity)}
                       </div>
-                      <div className="hidden truncate text-xs text-muted-foreground sm:block">{m.note ?? '—'}</div>
+                      <div className="truncate text-xs text-muted-foreground">{m.note ?? '—'}</div>
                       <div className="text-right text-xs text-muted-foreground">
                         {new Date(m.createdAt).toLocaleDateString()}
                       </div>
@@ -271,6 +274,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </TabsContent>
       </Tabs>

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { apiFetch } from "@/lib/api";
+import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
@@ -65,9 +66,6 @@ const ORDER_STATUS_VARIANT: Record<string, "pending" | "confirmed" | "completed"
   CANCELLED: "cancelled",
 };
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toFixed(2)}`;
-}
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -282,7 +280,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         <TabsContent value="payables" className="mt-4">
 
-      <div className="overflow-hidden rounded-md border border-border/60">
+      <div className="overflow-x-auto rounded-md border border-border/60">
+        <div className="min-w-[640px]">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
           <div>
             <div className="text-sm font-medium">Orders</div>
@@ -340,6 +339,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             </button>
           ))}
         </div>
+        </div>
         {ordersMeta.totalPages > 1 && (
           <Pagination
             page={ordersMeta.page}
@@ -356,7 +356,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         <TabsContent value="history" className="mt-4">
 
-      <div className="overflow-hidden rounded-md border border-border/60">
+      <div className="overflow-x-auto rounded-md border border-border/60">
+        <div className="min-w-[800px]">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
           <div>
             <div className="text-sm font-medium">Payments</div>
@@ -457,13 +458,14 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             </div>
           </>
         )}
+        </div>
       </div>
 
         </TabsContent>
       </Tabs>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-[520px]">
+        <SheetContent side="right" className="w-full sm:w-[520px]">
           <SheetHeader>
             <SheetTitle>Order details</SheetTitle>
             <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>

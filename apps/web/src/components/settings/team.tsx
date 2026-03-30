@@ -246,10 +246,10 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
   }
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-6">
       {/* Settings nav */}
-      <aside className="w-44 shrink-0">
-        <nav className="flex flex-col gap-0.5">
+      <aside className="shrink-0 md:w-44">
+        <nav className="flex flex-row flex-wrap gap-1 md:flex-col md:gap-0.5">
           {SETTINGS_NAV.map((item) => {
             const Icon = item.icon;
             const isActive = item.href === 'team';

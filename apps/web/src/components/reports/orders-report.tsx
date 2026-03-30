@@ -92,8 +92,8 @@ export function OrdersReport({ tenantSlug }: Props) {
       ) : orders.length === 0 ? (
         <div className="py-8 text-center text-muted-foreground">No orders found for the selected period.</div>
       ) : (
-        <div className="rounded-md border">
-          <table className="w-full">
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full min-w-[640px]">
             <thead className="border-b bg-muted/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Date</th>

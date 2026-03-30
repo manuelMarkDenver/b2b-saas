@@ -38,7 +38,7 @@
 | 3 | Multi-branch v1 (MS10) | ✅ Done | Merged |
 | 4 | Dashboard / home screen (MS12) | ✅ Done | Summary cards, date range (presets + custom), 4 Recharts: area revenue, bar orders/day, donut status, horizontal bar low stock. |
 | 5 | Basic reports (orders CSV export, date filter) | ✅ Done | MS13 — GET /reports/orders + CSV export, sidebar nav, date picker. |
-| 6 | **Mobile responsive + PWA** | 📋 Planned | **Second-to-last.** Done after all features are stabilised — avoids re-doing responsive work as panels change. |
+| 6 | **Mobile responsive + PWA** | ✅ Done | MS14 — manifest, service worker, mobile drawer, horizontal-scroll tables, responsive sheets. |
 | 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
@@ -104,9 +104,9 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | # | Issue | Status | Fix |
 |---|-------|--------|-----|
 | 6 | Stock goes negative on manual ADJUSTMENT | ✅ MS9 | Stock floor check added in `InventoryService` for negative adjustments |
-| 7 | ₱ hardcoded in `payments.service.ts` notification body | ❌ Open | `payments.service.ts:65` — move to shared `formatCents()` util. Breaks for non-PHP tenants. |
-| 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ❌ Open | Extract to `@/lib/format.ts` with currency configurable per tenant |
-| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership`; missing `@@index([createdAt])` on `Order` | ❌ Open | Sequential scans at scale. Add before staging deployment. |
+| 7 | ₱ hardcoded in `payments.service.ts` notification body | ✅ Done | `payments.service.ts` — uses `toLocaleString('en-PH', { style: 'currency' })` |
+| 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ✅ Done | Extracted to `apps/web/src/lib/format.ts`; 4 local copies removed |
+| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership`; missing `@@index([createdAt])` on `Order` | ✅ Done | Migration `20260330135249_add_status_createdat_indexes` |
 | 10 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
 | 11 | 7-day JWT — deactivating User (not membership) doesn't revoke access immediately | ❌ Open | Low risk now. TenantGuard checks membership status. Revisit at staging. |
 | 12 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
@@ -442,6 +442,47 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 - This Month
 - Last Month
 - Custom range
+
+---
+
+### MS14 — PWA + Mobile Responsive ✅ Done
+
+> Make the existing app installable as a PWA and usable on phone screens. Same features, same routes — just mobile-friendly layout.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `manifest.json` + app icons | ✅ Done | `name`, `short_name`, `start_url`, 192×192 + 512×512 icons |
+| Service worker via `@ducanh2912/next-pwa` | ✅ Done | Auto-generated; offline fallback page at `/offline` |
+| Viewport meta + theme-color | ✅ Done | Fixes mobile viewport scaling |
+| App title update | ✅ Done | "B2B Platform" replacing "Create Next App" |
+| Mobile sidebar drawer | ✅ Done | Fixed overlay on mobile, inline collapse on desktop |
+| Responsive tables (horizontal scroll) | ✅ Done | `overflow-x-auto` wrapper on orders, payments, inventory, reports panels |
+| Responsive sheets | ✅ Done | `w-full sm:w-[680px/520px]` on all SheetContent panels |
+| Settings layout responsive | ✅ Done | `flex-col md:flex-row` on settings sub-nav; horizontal pills on mobile |
+| Header overflow fixed | ✅ Done | TenantSwitcher/BranchSwitcher/NotificationBell hidden on mobile; breadcrumb truncated |
+
+---
+
+### MS15 — Browser Tests (Playwright) ✅ Done
+
+> Automated browser tests for key flows. No more manual UI testing.
+
+| Suite | Status | File | What it covers |
+|-------|--------|------|----------------|
+| PWA smoke tests | ✅ Done | `e2e/pwa.spec.ts` | manifest.json, icons, offline page, viewport meta, title |
+| Auth flow | ✅ Done | `e2e/auth.spec.ts` | Login renders, invalid creds show error, success redirects, already-authed redirect |
+| Mobile responsive | ✅ Done | `e2e/mobile-responsive.spec.ts` | Sidebar hidden on mobile, hamburger toggles drawer, backdrop closes, table overflow, header height |
+| Desktop layout | ✅ Done | `e2e/mobile-responsive.spec.ts` | Sidebar visible by default, toggle inline (no backdrop on desktop) |
+
+**Run:**
+```bash
+# Start API + web dev servers first, then:
+pnpm --filter web test:e2e            # headless (all suites)
+pnpm --filter web test:e2e:ui         # interactive Playwright UI
+pnpm --filter web test:e2e:report     # view last run HTML report
+```
+
+**Browsers:** Desktop Chrome + Pixel 5 (mobile Chrome)
 
 ---
 

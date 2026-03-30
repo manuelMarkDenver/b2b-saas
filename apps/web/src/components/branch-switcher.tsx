@@ -23,6 +23,8 @@ type Branch = {
 
 interface BranchSwitcherProps {
   tenantSlug: string;
+  /** When true, renders with dark sidebar–friendly styling */
+  compact?: boolean;
 }
 
 // Thresholds for progressive disclosure
@@ -37,7 +39,7 @@ const SEARCH_THRESHOLD = 7;    // show search when >7 branches
  * - Accordion collapses branch list when >5 branches
  * - Search bar appears when >7 branches
  */
-export function BranchSwitcher({ tenantSlug }: BranchSwitcherProps) {
+export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranchId, setActive] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
@@ -86,12 +88,19 @@ export function BranchSwitcher({ tenantSlug }: BranchSwitcherProps) {
 
   return (
     <DropdownMenu onOpenChange={(open) => { if (!open) setSearch(''); }}>
-      <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none">
+      <DropdownMenuTrigger
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm focus:outline-none',
+          compact
+            ? 'w-full text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+        )}
+      >
         <GitBranch className="h-3.5 w-3.5 shrink-0" />
-        <span className="max-w-[120px] truncate hidden sm:block">
+        <span className={cn('truncate', compact ? 'flex-1 text-left' : 'max-w-[120px] hidden sm:block')}>
           {activeBranch?.name ?? 'All branches'}
         </span>
-        <ChevronDown className="h-3 w-3" />
+        <ChevronDown className="h-3 w-3 shrink-0" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="w-56">

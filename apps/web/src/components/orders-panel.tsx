@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Minus, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
@@ -69,9 +70,6 @@ const ACTION_LABEL: Record<Order["status"], string> = {
   CANCELLED: "Cancelled",
 };
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toFixed(2)}`;
-}
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -350,7 +348,8 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       ) : null}
 
       {/* ── Orders table ── */}
-      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
+      <div className="mt-5 overflow-x-auto rounded-md border border-border/60">
+        <div className="min-w-[640px]">
         <div className="grid grid-cols-[1fr_60px_120px_120px_160px_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
@@ -412,6 +411,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
             ))}
           </div>
         )}
+        </div>
         {meta.totalPages > 1 && (
           <Pagination
             page={meta.page}
@@ -428,7 +428,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
           NEW ORDER SHEET — two-view: Products ↔ Cart
       ────────────────────────────────────────────────────────────────────────── */}
       <Sheet open={newOrderOpen} onOpenChange={setNewOrderOpen}>
-        <SheetContent side="right" className="w-[680px]">
+        <SheetContent side="right" className="w-full sm:w-[680px]">
           <SheetHeader>
             <SheetTitle>
               {orderView === "products" ? "New Order" : "Review Cart"}
@@ -647,7 +647,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
           ORDER DETAIL SHEET
       ────────────────────────────────────────────────────────────────────────── */}
       <Sheet open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setEditMode(false); }}>
-        <SheetContent side="right" className="w-[680px]">
+        <SheetContent side="right" className="w-full sm:w-[680px]">
           <SheetHeader>
             <SheetTitle>
               {editMode ? "Edit Order" : `Order ${selectedOrder?.id.slice(0, 8)}…`}
