@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { Settings, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ImageUpload } from '@/components/image-upload';
+import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
 type TenantInfo = {
@@ -35,8 +39,39 @@ const SETTINGS_NAV = [
 ];
 
 export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps) {
+  const { pushToast } = useToast();
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [role, setRole] = useState<string | null>(null);
+
+  // Password change form
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      pushToast({ variant: 'error', title: 'Passwords do not match', message: 'New password and confirmation must match.' });
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await apiFetch('/auth/me/password', {
+        method: 'PATCH',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Password change failed', message: err.message ?? 'Please try again.' });
+      } else {
+        pushToast({ variant: 'success', title: 'Password updated', message: 'Your password has been changed.' });
+        setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      }
+    } finally {
+      setPwSaving(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -161,6 +196,53 @@ export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps
           ) : (
             <div className="mt-5 text-sm text-muted-foreground">Loading…</div>
           )}
+        </div>
+
+        {/* Change password */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-base font-semibold">Change Password</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Update your login password.</p>
+          <form onSubmit={handlePasswordChange} className="mt-5 space-y-4 max-w-sm">
+            <div className="space-y-1.5">
+              <Label htmlFor="current-password">Current password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                minLength={8}
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password">New password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">Confirm new password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={pwSaving}>
+              {pwSaving ? 'Updating…' : 'Update password'}
+            </Button>
+          </form>
         </div>
       </div>
     </div>

@@ -57,21 +57,48 @@ export class AuthService {
     return { user: this.mapUser(user), token, activeTenantId };
   }
 
-  async login(email: string, password: string): Promise<LoginResult> {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+  async login(identifier: string, password: string, tenantSlug?: string): Promise<LoginResult> {
+    const normalized = identifier.trim().toLowerCase();
 
-    if (!user || user.status !== 'ACTIVE') {
+    let dbUser: { id: string; email: string; isPlatformAdmin: boolean; status: string; passwordHash: string } | null = null;
+
+    if (normalized.includes('@')) {
+      // Standard email login
+      dbUser = await this.prisma.user.findUnique({
+        where: { email: normalized },
+        select: { id: true, email: true, isPlatformAdmin: true, status: true, passwordHash: true },
+      });
+    } else {
+      // Username login — requires tenantSlug to scope the lookup
+      if (!tenantSlug) {
+        throw new UnauthorizedException('Business code is required for username login');
+      }
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { slug: tenantSlug.trim().toLowerCase() },
+        select: { id: true },
+      });
+      if (!tenant) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+      const membership = await this.prisma.tenantMembership.findUnique({
+        where: { tenantId_username: { tenantId: tenant.id, username: normalized } },
+        include: {
+          user: { select: { id: true, email: true, isPlatformAdmin: true, status: true, passwordHash: true } },
+        },
+      });
+      dbUser = membership?.user ?? null;
+    }
+
+    if (!dbUser || dbUser.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const ok = await compare(password, user.passwordHash);
+    const ok = await compare(password, dbUser.passwordHash);
     if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const user = dbUser as AuthUser;
     const activeTenantId = await this.getDefaultTenantId(user.id);
     const token = this.signToken(user, activeTenantId);
 
@@ -114,6 +141,20 @@ export class AuthService {
       where: { id: user.id },
       data: { passwordHash, resetToken: null, resetTokenExpiresAt: null },
     });
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const ok = await compare(currentPassword, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Current password is incorrect');
+
+    const passwordHash = await hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   }
 
   signToken(user: AuthUser, activeTenantId?: string | null): string {

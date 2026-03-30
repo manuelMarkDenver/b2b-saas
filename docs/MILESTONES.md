@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — Full restructure: phase map added, milestones grouped by phase, MS9→MS11 renumbered, CSV Import and Multi-Branch added as Phase 5 (MS9–MS10), Feature Backlog consolidated, prohibited phases clearly labelled.
+> Last updated: 2026-03-30 — Full table restructure. Gaps & Risks analysis added. /audit added to PR workflow. Tenant self-registration removed (Calendly model). Multi-branch + marketing pulled into pre-staging. Username scoping fix added to MS9.
 
 ---
 
@@ -11,552 +11,418 @@
 | **Phase 1** | MS1–MS2 | Foundation — Auth, Tenants, Users | ✅ Done |
 | **Phase 2** | MS3 | Catalog — Products, SKUs, Categories | ✅ Done |
 | **Phase 3** | MS4–MS6 | Operations — Inventory, Orders, Payments | ✅ Done |
-| **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | 🚧 MS8 in progress |
-| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Multi-Branch | 📋 Planned |
-| **Phase 6** | MS11 | Go-to-Market — Marketing Website | 📋 Planned |
+| **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | ✅ Done |
+| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Team Mgmt, Multi-Branch | 🚧 MS9 in progress |
+| **Phase 6** | MS11 | Go-to-Market — Marketing Website | 🚧 Pulled forward (before staging) |
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
 | **Phase 8** | — | Mobile + POS | 🚫 Prohibited |
 | **Phase 9** | — | AWS Scale + Subdomain Routing | 🔒 Do not build yet |
 
 **Rules:**
-- MVP = Phase 1–4 (MS1–MS8). This is the first shippable product.
-- Phase 5 starts only after MS8 is fully merged and deployed.
-- 🔒 = architecturally designed, not yet scheduled. Do not build until explicitly pulled in.
-- 🚫 = never implement before reaching that phase. Not a matter of timing — it requires explicit product decision to unlock.
-- Do not pull work from a future phase into a current milestone. Ever.
+- MVP = Phase 1–4 (MS1–MS8). First shippable product. ✅ Complete.
+- 🔒 = architecturally designed, not yet scheduled.
+- 🚫 = prohibited until explicit product decision.
+- Never pull work from a future phase into a current milestone.
 
 ---
 
-## PHASE 1 — Foundation (MS1–MS2) ✅
+## Pre-Staging Checklist
+
+> Must complete — in this order — before any real client touches the product.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | MS9 close — username scoping, password change, negative stock floor, customerRef | 🚧 In progress | |
+| 2 | Marketing page (`apps/marketing`) | 📋 Next | CTA = "Book a Demo" → Calendly. No self-registration. |
+| 3 | Multi-branch v1 | 📋 Planned | Scaffolded, invisible at single-branch. No UI until 2nd branch added. |
+| 4 | Dashboard / home screen | 📋 Planned | Summary of orders, payments, low stock on login. |
+| 5 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
+| 6 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
+
+> **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
 ---
 
-### Milestone 1 — Foundation ✅
+## Gaps & Risks Analysis
 
-- Repo scaffold: `apps/api`, `apps/web`, `packages/db`, `infra/`.
-- Local Postgres via Docker Compose.
-- Prisma wired and first migration runs.
-- API boots, connects to DB, `GET /health` works.
-- Web boots, calls API health endpoint.
-- Structured application logging (request id + request logs).
-- Env var strategy documented and `.env.example` present.
-- Light/dark mode toggle in web + tenant theme token plumbing (stubbed).
+> Run `/audit` before every PR. This table tracks known issues across the full platform.
 
----
+### 🔴 Blocking — fix before staging
 
-### Milestone 2 — Users / Tenants / Auth Foundation ✅
+| # | Issue | Status | Fix |
+|---|-------|--------|-----|
+| 1 | Staff can't change their password | ✅ MS9 | `PATCH /auth/me/password` + settings UI card |
+| 2 | Username collision across tenants | ✅ MS9 | `username` on `TenantMembership`, scoped `@@unique([tenantId, username])` |
+| 3 | No customer reference on orders | ✅ MS9 | `customerRef String?` + `note String?` on `Order` |
+| 4 | No dashboard / home screen | ⏳ Pre-staging | Summary view: orders today, pending payments, low stock |
+| 5 | No marketing page / demo CTA | ⏳ MS10 | `apps/marketing`, static Next.js, Calendly link |
 
-- Users, tenants, memberships.
-- Auth baseline (email/password).
-- Active tenant context (path + header + membership checks).
-- Roles (OWNER, ADMIN, STAFF, VIEWER) seeded.
-- PBAC scaffolding: `can_*` permission flags per membership.
-- JWT issued on login; validated on all protected routes.
-- `GET /auth/me` returns current user.
-- Seed: 1 admin user, 1 admin tenant.
-- Docs: `ARCHITECTURE.md`, `DATA_MODEL.md` written.
+### 🟡 Warning — fix before staging
 
----
+| # | Issue | Status | Fix |
+|---|-------|--------|-----|
+| 6 | Stock goes negative on manual ADJUSTMENT | ✅ MS9 | Stock floor check added in `InventoryService` for negative adjustments |
+| 7 | ₱ hardcoded in `payments.service.ts` notification body | ❌ Open | `payments.service.ts:65` — move to shared `formatCents()` util. Breaks for non-PHP tenants. |
+| 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ❌ Open | Extract to `@/lib/format.ts` with currency configurable per tenant |
+| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership` | ❌ Open | Sequential scans at scale. Add before staging deployment. |
+| 10 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
+| 11 | 7-day JWT — deactivating User (not membership) doesn't revoke access immediately | ❌ Open | Low risk now. TenantGuard checks membership status. Revisit at staging. |
+| 12 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
 
-## PHASE 2 — Catalog (MS3) ✅
+### 🟢 Advisory — log and revisit
 
----
+| # | Issue | Status | Notes |
+|---|-------|--------|-------|
+| 13 | `UsersService.findById()` is dead code — exported, never called | ❌ Open | `users.service.ts:8`. Not a live leak. Remove to avoid confusion. |
+| 14 | `Notification.tenantId` is nullable — not documented in schema | ❌ Open | Intentional for `PLATFORM_ALERT` type. Add inline comment to schema. |
+| 15 | `OrderItem` has no `createdAt`/`updatedAt` | ❌ Open | Immutable by design (deleted+recreated on order edit). Timestamps would help audit trail. |
+| 16 | Financial FK relations lack explicit `onDelete: Restrict` | ❌ Open | Currently relies on Postgres default. Make explicit before staging to prevent migration mistakes. |
+| 17 | CSV import allows wrong `categorySlug` per business type | ❌ Open | UX issue. Pizza shop can import with `fasteners` category. Not a security risk. |
+| 18 | No pricing / tiers | ✅ Intentional | Calendly model. Revisit post-staging with real client feedback. |
+| 19 | Tenant self-registration | ✅ Intentional | Super Admin provisions manually. By design. |
 
-### Milestone 3 — Products, SKUs, Categories ✅
+### ✅ Fixed This Milestone
 
-- `Category` (platform-owned, no tenantId).
-- `Product` (tenant-owned: name, categoryId, isActive).
-- `Sku` (tenant-owned: code, name, priceCents, costCents, stockOnHand, lowStockThreshold).
-- CRUD for products and SKUs via REST API.
-- Tenant isolation enforced at service layer.
-- Seed: realistic products + SKUs for 3 demo tenants.
-
----
-
-## PHASE 3 — Operations (MS4–MS6) ✅
-
----
-
-### Milestone 4 — Inventory ✅
-
-- `InventoryMovement` (IN / OUT / ADJUSTMENT, referenceType: ORDER / MANUAL).
-- `stockOnHand` on `Sku` — only ever mutated via movement, never directly.
-- `GET /inventory/movements` — paginated list per tenant.
-- `POST /inventory/movements` — manual adjustment (ADMIN+ only).
-- Inventory panel UI in web app.
+| # | Issue | Fixed in |
+|---|-------|----------|
+| 20 | Team list showing 0 members | MS9 — `JwtAuthGuard` missing on `GET /memberships/team` |
+| 21 | Invite link pointed to API port (3001) | MS9 — `APP_FRONTEND_URL` env var |
+| 22 | Login rejected phone/nickname identifiers | MS9 — `@IsEmail()` replaced with `@IsString()` on `LoginDto` |
+| 23 | Direct-add staff have no email → can't use Forgot Password | MS9 — `PATCH /auth/me/password` endpoint + UI |
+| 24 | Username collision across tenants (two Juans, different businesses) | MS9 — `membership.username` scoped per tenant |
 
 ---
 
-### Milestone 5 — Orders ✅
+## PHASE 1 — Foundation ✅
 
-- `Order` (PENDING → CONFIRMED → COMPLETED | CANCELLED).
-- `OrderItem` (skuId, quantity, priceAtTime — captured at creation, never updated).
-- Editing an order: replaces all items, recalculates total, PENDING only.
-- Confirming an order: deducts stock via OUT movement.
-- Cancelling a CONFIRMED order: restores stock via IN movement.
-- Negative stock prevention: rejects confirmation if stock insufficient.
-- Pagination: `GET /orders?page=1&limit=20` returns `{ data, meta }`.
-- Orders panel UI with right-side detail Sheet.
+### MS1 — Repo & Infrastructure ✅
 
----
+| Feature | Status |
+|---------|--------|
+| Repo scaffold: `apps/api`, `apps/web`, `packages/db`, `infra/` | ✅ |
+| Local Postgres via Docker Compose | ✅ |
+| Prisma wired, first migration runs | ✅ |
+| `GET /health` works | ✅ |
+| Web boots, calls API health | ✅ |
+| Structured logging (request ID + request logs) | ✅ |
+| Env var strategy documented, `.env.example` present | ✅ |
+| Light/dark mode toggle + tenant theme token plumbing (stubbed) | ✅ |
 
-### Milestone 6 — Payments ✅
+### MS2 — Users / Tenants / Auth ✅
 
-- `Payment` (PENDING → VERIFIED | REJECTED).
-- Manual proof-of-payment upload (proofUrl).
-- Verify / Reject by ADMIN+.
-- Pagination: `GET /payments?page=1&limit=20`.
-- Payments panel UI with Payables + History tabs.
-
----
-
-## PHASE 4 — Hardening + Admin (MS7–MS8)
-
----
-
-### Milestone 7 — Feature Flags + Super Admin ✅
-
-- `Tenant.features` JSONB: `inventory`, `orders`, `payments`, `marketplace`.
-- Super Admin role (`isPlatformAdmin: true` on User).
-- Super Admin dashboard: tenant list, feature flag toggle, user management.
-- `POST /admin/tenants` — Super Admin creates tenants.
-- `PATCH /admin/tenants/:id/features` — toggle flags.
-- `PATCH /admin/tenants/:id/status` — suspend / reactivate.
-- `PATCH /admin/users/:id` — promote / demote Super Admin.
-- Feature-flagged sidebar items (Orders hidden if `orders: false`).
-- Super Admin dashboard: basic tenant list + feature flag toggle UI.
-- `businessType` used only for setting defaults on tenant creation — not used in logic.
-- Docs updated: `ARCHITECTURE.md`, `RULES.md`.
+| Feature | Status |
+|---------|--------|
+| Users, tenants, memberships | ✅ |
+| Auth baseline (email/password, bcrypt) | ✅ |
+| Active tenant context (path + header + membership checks) | ✅ |
+| Roles: OWNER, ADMIN, STAFF, VIEWER | ✅ |
+| PBAC scaffolding: `can_*` permission flags per membership | ✅ |
+| JWT issued on login, validated on all protected routes | ✅ |
+| `GET /auth/me` returns current user | ✅ |
+| Seed: 1 admin user, 1 admin tenant | ✅ |
+| Docs: `ARCHITECTURE.md`, `DATA_MODEL.md` written | ✅ |
 
 ---
 
-### Milestone 8 — Hardening + UI Overhaul + Prod Prep 🚧
+## PHASE 2 — Catalog ✅
 
-#### Security + API hardening
+### MS3 — Products, SKUs, Categories ✅
 
-- ✅ **Password reset flow**: `POST /auth/forgot-password` + `POST /auth/reset-password`. `/reset-password` page in web.
-- ✅ **Rate limiting**: `@nestjs/throttler` on all auth endpoints.
-- ✅ **Security headers**: Helmet middleware.
-- ✅ **CORS**: `CORS_ALLOWED_ORIGINS` env var (comma-separated).
-- ✅ **Negative stock prevention**: enforced in `OrdersService.updateOrderStatus`.
-- ✅ **Order cancellation restores inventory**: auto IN movement on CONFIRMED → CANCELLED.
-- ✅ **Pagination**: `GET /orders`, `GET /payments` accept `?page&limit`, return `{ data, meta }`.
-- ✅ **JWT expiry**: `JWT_EXPIRES_IN_SECONDS` default 604800 (7 days dev). No refresh tokens.
-
-#### Super Admin + Tenant lifecycle
-
-- ✅ **Super Admin tenant provisioning**: `POST /admin/tenants`.
-- ✅ **Tenant suspend/reactivate**: `Tenant.status` enum (ACTIVE / SUSPENDED), blocked at guard layer.
-- ✅ **Super Admin user management**: `PATCH /admin/users/:id`.
-- ✅ **Product/SKU archival**: `isArchived` on both. Archive UI in CatalogPanel.
-
-#### Deferred UX from earlier milestones
-
-- ✅ **Root `/` page**: redirects to `/login`.
-- ✅ **Tenant route guard**: `TenantShell` redirects non-members to their tenant or `/login`.
-- ✅ **Platform admin redirect**: `isPlatformAdmin` users are sent to `/admin` on login, not `/t/*`.
-- ✅ **Staff invitation flow**: `/accept-invite?token=...` page. Backend API exists. Email requires SMTP in deployment.
-
-#### Image upload infrastructure
-
-- ✅ **`POST /uploads`**: Multer diskStorage, JwtAuthGuard, 5MB limit, image types only.
-- ✅ **Local storage**: `apps/api/uploads/`, served via `express.static`. URL: `${APP_BASE_URL}/uploads/${filename}`.
-- ✅ **S3 storage**: switchable via `STORAGE_TYPE=s3`. Uses `@aws-sdk/client-s3`.
-- ✅ **SKU image upload**: `ImageUpload` component in CatalogPanel. `PATCH /skus/:id` persists `imageUrl`.
-- ✅ **Tenant logo**: `Tenant.logoUrl`. `PATCH /tenant/logo` (OWNER/ADMIN). Upload in sidebar + settings.
-- ✅ **User avatar**: `User.avatarUrl`. `PATCH /auth/me`. Upload in user menu dropdown.
-- **Image cropping**: deferred to Phase 5 or later.
-
-#### Notifications
-
-- ✅ **`Notification` model**: tenant + user scoped.
-- ✅ **`notifyTenant()` helper**: writes to all ACTIVE members.
-- ✅ **Triggers**: ORDER_CREATED, ORDER_CONFIRMED, ORDER_CANCELLED, PAYMENT_SUBMITTED, PAYMENT_VERIFIED, PAYMENT_REJECTED.
-- ✅ **API**: `GET /notifications`, `PATCH /:id/read`, `PATCH /read-all`, `DELETE /:id`.
-- ✅ **Bell UI**: Popover panel, unread badge, mark read, dismiss, "mark all as read", polls every 60s.
-
-#### Auth UI overhaul
-
-- ✅ **Split-screen auth layout** (`AuthLayout`): left form pane, right hero pane.
-- ✅ **Login, Register, ForgotPassword, ResetPassword, AcceptInvite pages**.
-
-#### UI overhaul
-
-- ✅ Sidebar: feature-flagged nav, tenant logo header, collapse toggle.
-- ✅ Header: breadcrumbs, tenant switcher, notification bell, mode toggle, user menu with avatar.
-- ✅ Status badges, pagination UI, right-side Sheet for detail/actions.
-- ✅ Orders panel: multi-item display, quantity totals, edit flow.
-- ✅ Payments panel: Payables / History tabs.
-- ✅ Catalog panel: archive buttons, SKU image upload.
-- ✅ Settings: Tenant Profile (logo upload, tenant info). Team tab (placeholder).
-- **Data tables with sorting + filtering**: pending.
-- **Settings → Team & Permissions PBAC UI**: pending — deferred to Phase 5.
-- **Mobile-responsive layout**: pending.
-
-#### QA + deployment
-
-- ✅ **Seed data**: 67 orders / 44 payments / 24 SKUs across 3 tenants. Pagination-friendly.
-- ✅ **E2E tests**: 100/100 passing (notifications, uploads included).
-- ✅ **Env vars documented**: `.env.example` current.
-- **Tenant isolation audit**: pending — run `/tenant-audit` before merge.
-- **QA checklist**: pending.
-- **Staging/prod deployment**: pending — Vercel + Render + Neon.
-
-#### Data retention rules
-
-- `Order`, `Payment`, `InventoryMovement` are immutable financial records — no delete.
-- `Product` / `Sku` use `isArchived` — never deleted.
-- `Membership` records are deactivated (`status: INACTIVE`), not deleted.
-- `User` and `Tenant` records are never hard-deleted.
+| Feature | Status |
+|---------|--------|
+| `Category` (platform-owned, no tenantId) | ✅ |
+| `Product` (tenant-owned: name, categoryId, isActive) | ✅ |
+| `Sku` (tenant-owned: code, name, priceCents, costCents, stockOnHand, lowStockThreshold) | ✅ |
+| CRUD for products and SKUs via REST API | ✅ |
+| Tenant isolation enforced at service layer | ✅ |
+| Seed: realistic products + SKUs for 3 demo tenants | ✅ |
 
 ---
 
-## PHASE 5 — Platform Extensions (MS9–MS10) 📋
+## PHASE 3 — Operations ✅
 
-> Starts after MS8 is fully merged and deployed to staging/prod.
+### MS4 — Inventory ✅
 
----
+| Feature | Status |
+|---------|--------|
+| `InventoryMovement` (IN / OUT / ADJUSTMENT, referenceType: ORDER / MANUAL) | ✅ |
+| `stockOnHand` on `Sku` — only mutated via movement, never directly | ✅ |
+| `GET /inventory/movements` — paginated list per tenant | ✅ |
+| `POST /inventory/movements` — manual adjustment (ADMIN+ only) | ✅ |
+| Inventory panel UI | ✅ |
 
-### Milestone 9 — CSV Import + Onboarding
+### MS5 — Orders ✅
 
-**Why:** A new client can export their product catalogue from Excel/Sheets and import it in one step. Without this, onboarding a business with 200 SKUs requires manual entry — a real blocker for adoption.
+| Feature | Status |
+|---------|--------|
+| `Order` (PENDING → CONFIRMED → COMPLETED \| CANCELLED) | ✅ |
+| `OrderItem` (skuId, quantity, priceAtTime — captured at creation, never updated) | ✅ |
+| Editing an order: replaces all items, recalculates total, PENDING only | ✅ |
+| Confirming: deducts stock via OUT movement | ✅ |
+| Cancelling CONFIRMED: restores stock via IN movement | ✅ |
+| Negative stock prevention on order confirmation | ✅ |
+| Pagination: `GET /orders?page&limit` → `{ data, meta }` | ✅ |
+| Orders panel UI with right-side detail Sheet | ✅ |
 
-**Prerequisites:** Stable Product + SKU data model (done in MS3). S3 or local file handling (done in MS8).
+### MS6 — Payments ✅
 
-#### Definition of done
-
-**Backend:**
-- `POST /catalog/import` — multipart CSV upload, tenant-scoped, JwtAuthGuard.
-- Supported columns: `productName`, `skuCode`, `skuName`, `priceCents` (or `pricePhp`), `costCents` (or `costPhp`), `categorySlug`, `lowStockThreshold`.
-- `pricePhp` / `costPhp` auto-converted to cents (multiply × 100, round).
-- Row-level validation: missing required fields, duplicate `skuCode` within the file, unknown `categorySlug`.
-- Idempotent upsert: existing SKU by `(tenantId, code)` is updated, not duplicated. New codes are created.
-- Response: `{ imported: N, updated: N, skipped: N, errors: [{ row, reason }] }`.
-- E2E tests: happy path, validation errors, duplicate handling, tenant isolation.
-
-**Frontend:**
-- Drag-drop CSV upload zone in Catalog panel (or dedicated Import page).
-- Preview table showing first 10 rows before confirming.
-- Post-import result: imported / updated / error counts. Error rows listed with reasons.
-- "Download template" link — sample CSV with correct column headers.
-- Column mapping UI: if headers don't match exactly, allow user to map CSV column → field.
-
----
-
-### Milestone 10 — Multi-Branch Support
-
-**Why:** Many SMBs in PH operate multiple locations (e.g. main store + warehouse + branch outlet). Each location manages its own stock, orders, and staff, but the owner sees the consolidated picture.
-
-**Prerequisites:** Stable inventory model (done in MS4). Stable tenant model (done in MS8).
-
-**Design answers locked:**
-- Branches have independent inventory pools.
-- Tenant dashboard can filter by branch or show aggregated totals.
-- Staff can be assigned to multiple branches.
-- Orders belong to a specific branch.
-
-#### Data model changes
-
-```
-Branch {
-  id          UUID PK
-  tenantId    UUID FK → Tenant
-  name        String
-  address     String?
-  status      BranchStatus (ACTIVE | INACTIVE)
-  isDefault   Boolean @default(false)
-  createdAt   DateTime
-  updatedAt   DateTime
-}
-
-BranchInventory {
-  id          UUID PK
-  branchId    UUID FK → Branch
-  skuId       UUID FK → Sku
-  stockOnHand Int @default(0)
-  @@unique([branchId, skuId])
-}
-```
-
-- `InventoryMovement.branchId` FK added (nullable — historical movements without a branch).
-- `Order.branchId` FK added (nullable — historical orders without a branch).
-- `TenantMembership.branchIds` — JSON array of Branch IDs the member is assigned to. Empty = access to all branches.
-- `Sku.stockOnHand` becomes computed (sum of BranchInventory) or deprecated — decision at design time.
-- On tenant creation: auto-create one `Branch` (isDefault: true, name = tenant name).
-- On migration: all existing movements and orders assigned to the default branch. Existing `stockOnHand` migrated to default branch's `BranchInventory`.
-
-#### API additions
-
-- `GET /branches` — list branches for tenant.
-- `POST /branches` — create branch (OWNER/ADMIN).
-- `PATCH /branches/:id` — update name, address, status.
-- Branch context: optional `x-branch-id` request header. If omitted → tenant-wide scope (aggregated).
-- All inventory movement and order queries respect branch scope.
-
-#### UI changes
-
-- Branch switcher in the sidebar or header (below tenant name).
-- Dashboard: "All Branches" default view shows aggregated stock totals, orders, payments.
-- Filtered view: select a branch → all panels show that branch's data only.
-- Staff can only see branches they're assigned to (or all if no restriction).
-- Settings → Branches tab: list, create, edit, deactivate branches.
-- Member management: assign/remove branch access per member.
+| Feature | Status |
+|---------|--------|
+| `Payment` (PENDING → VERIFIED \| REJECTED) | ✅ |
+| Manual proof-of-payment upload (proofUrl) | ✅ |
+| Verify / Reject by ADMIN+ | ✅ |
+| Pagination: `GET /payments?page&limit` | ✅ |
+| Payments panel UI with Payables + History tabs | ✅ |
 
 ---
 
-## PHASE 6 — Go-to-Market (MS11) 📋
+## PHASE 4 — Hardening + Admin ✅
+
+### MS7 — Feature Flags + Super Admin ✅
+
+| Feature | Status |
+|---------|--------|
+| `Tenant.features` JSONB: `inventory`, `orders`, `payments`, `marketplace` | ✅ |
+| Super Admin role (`isPlatformAdmin: true` on User) | ✅ |
+| Super Admin dashboard: tenant list, feature flag toggle, user management | ✅ |
+| `POST /admin/tenants` — Super Admin creates tenants | ✅ |
+| `PATCH /admin/tenants/:id/features` — toggle flags | ✅ |
+| `PATCH /admin/tenants/:id/status` — suspend / reactivate | ✅ |
+| `PATCH /admin/users/:id` — promote / demote Super Admin | ✅ |
+| Feature-flagged sidebar items | ✅ |
+
+### MS8 — Hardening + UI Overhaul + Prod Prep ✅
+
+| Feature | Status |
+|---------|--------|
+| **Security** | |
+| Password reset flow (`/forgot-password`, `/reset-password`) | ✅ |
+| Rate limiting (`@nestjs/throttler`) on auth endpoints | ✅ |
+| Security headers (Helmet) | ✅ |
+| CORS: `CORS_ALLOWED_ORIGINS` env var | ✅ |
+| Negative stock prevention on order confirmation | ✅ |
+| Order cancellation restores inventory | ✅ |
+| JWT expiry: `JWT_EXPIRES_IN_SECONDS` (default 7 days) | ✅ |
+| **Image Upload** | |
+| `POST /uploads` — Multer, 5MB limit, image types only | ✅ |
+| Local storage: `uploads/`, served via `express.static` | ✅ |
+| S3 storage: switchable via `STORAGE_TYPE=s3` | ✅ |
+| SKU image upload in CatalogPanel | ✅ |
+| Tenant logo: `PATCH /tenant/logo` (OWNER/ADMIN) | ✅ |
+| User avatar: `PATCH /auth/me` | ✅ |
+| **Notifications** | |
+| `Notification` model: tenant + user scoped | ✅ |
+| `notifyTenant()` helper | ✅ |
+| Triggers: ORDER_*, PAYMENT_* events | ✅ |
+| Bell UI: popover, unread badge, mark read, polls every 8s | ✅ |
+| **UI Overhaul** | |
+| Split-screen auth layout (`AuthLayout`) | ✅ |
+| Login, Register, ForgotPassword, ResetPassword, AcceptInvite pages | ✅ |
+| Sidebar: feature-flagged nav, tenant logo, collapse toggle | ✅ |
+| Header: breadcrumbs, tenant switcher, notification bell, user menu | ✅ |
+| Orders panel: multi-item, edit flow, Sheet detail | ✅ |
+| Payments panel: Payables / History tabs | ✅ |
+| Catalog panel: archive buttons, SKU image upload | ✅ |
+| Settings: Tenant Profile (logo upload) | ✅ |
+| **QA** | |
+| Seed data: 67 orders / 44 payments / 24 SKUs across 3 tenants | ✅ |
+| E2E tests: 107/107 passing | ✅ |
+| Tenant isolation audit completed | ✅ |
 
 ---
 
-### Milestone 11 — Marketing Website + GTM
+## PHASE 5 — Extensions 🚧
 
-A standalone site (`apps/marketing`) for prospect demos and client pitches. Fully independent of the platform — runs against the prod API URL.
+### MS9 — CSV Import + Team Management 🚧
 
-**Starts after:** MS9 is done and at least one real client is onboarded. The marketing site needs real screenshots and validated copy.
+#### CSV Import
 
-#### Definition of done
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `POST /catalog/import` — multipart CSV, TenantGuard | ✅ | |
+| Supported columns incl. snake_case aliases | ✅ | `pricePhp`, `costPhp` auto-converted to cents |
+| Row-level validation: missing fields, duplicate codes, unknown category | ✅ | |
+| Idempotent upsert by `(tenantId, skuCode)` | ✅ | |
+| Response: `{ imported, updated, skipped, errors[] }` | ✅ | |
+| E2E tests: 7 cases including tenant isolation | ✅ | |
+| Drag-drop upload zone in Catalog panel | ✅ | |
+| Download template button | ✅ | |
+| Post-import result: counts + per-row error list | ✅ | |
+| Preview table (first 10 rows before confirming) | ⏳ Deferred | Slot reserved in UI. Post-MS10. |
+| Column mapping UI | ⏳ Deferred | Exact headers required; snake_case aliases reduce friction |
 
-- Hero section: headline, subheadline, CTA buttons (Request Demo / Get Started).
-- Features grid: one card per module. Config-driven via `features.config.ts` — add/remove by editing config, no hardcoded content.
-- How-it-works walkthrough: core B2B workflow (add products → receive stock → create order → verify payment).
-- Stats / social proof section (placeholder until real data).
-- Pricing / plans placeholder (CTA to contact).
-- Footer with links.
-- SEO: meta tags, Open Graph, structured data.
-- Fully static (`next export`) — no server runtime.
-- AI-generated hero + feature illustrations via `/generate-image` skill.
+#### Team Management
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `GET /memberships/team` — all statuses (ACTIVE, INVITED, DISABLED) | ✅ | Fixed missing JwtAuthGuard |
+| `POST /memberships/invite` — email invite, 48h token | ✅ | Links to `APP_FRONTEND_URL` |
+| `POST /memberships/add-direct` — no-email staff, any identifier | ✅ | Account immediately ACTIVE |
+| `PATCH /memberships/:id` — role, job title, deactivate, reactivate | ✅ | |
+| `jobTitle` on `TenantMembership` | ✅ | Informational only |
+| Member list with status filter (All / Active / Pending / Deactivated) | ✅ | |
+| Edit button → modal (role + job title) | ✅ | OWNER/ADMIN only |
+| Deactivate / Cancel invite / Reactivate buttons per row | ✅ | |
+| Add member dialog: Invite by email / Add directly toggle | ✅ | |
+
+#### MS9 — Remaining (In Progress)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Username scoping — `username` on `TenantMembership`, not `User.email` | 🔴 Not started | Prevents collision: two "juan" at different tenants. Login adds optional "Business code" field. |
+| Staff password change (`PATCH /auth/me/password`) | 🔴 Not started | Direct-add staff have no email → can't use Forgot Password |
+| Negative stock floor on manual OUT movements | 🔴 Not started | Manual adjustments bypass the check that order confirmation enforces |
+| `customerRef` on orders | 🔴 Not started | B2B dealbreaker: who placed the order? |
+
+### MS10 — Multi-Branch Support 📋
+
+> **Deploy strategy:** Multi-branch v1 ships **before staging** as a scaffolded invisible feature. Single-branch tenants see zero UI change. Branch switcher appears only when a tenant has >1 branch.
+
+#### Context
+
+| Business | Type | Multi-branch need |
+|----------|------|-------------------|
+| Manager's Pizza (tenant 1) | Food wholesale + retail | Central kitchen + outlets |
+| Megabox (tenant 2) | Pizza equipment supplier | Warehouse + retail counter |
+
+> These are two separate **tenants** (already solved). Multi-branch = locations *within* each tenant.
+
+#### Design Decisions
+
+| Decision | Answer |
+|----------|--------|
+| Stock pools | Independent per branch |
+| Catalog (products/SKUs) | Shared across tenant |
+| Orders | Branch-scoped (fulfilled from a specific branch) |
+| Inventory movements | Branch-scoped |
+| Payments | Tenant-wide (tied to orders) |
+| Staff assignment | Optional branch restriction (empty = all branches) |
+| "All Branches" view | Aggregated totals for Owner/Admin |
+| Single-branch behavior | Branch switcher hidden; all queries use default branch implicitly |
+
+#### Data Model Changes
+
+| Change | Notes |
+|--------|-------|
+| `Branch` table: `id`, `tenantId`, `name`, `address`, `isDefault`, `status` | Auto-created on tenant creation |
+| `InventoryMovement.branchId` FK (nullable) | Nullable for historical data |
+| `Order.branchId` FK (nullable) | Nullable for historical data |
+| `TenantMembership.branchIds` JSON array | Empty = access to all branches |
+| `Sku.stockOnHand` | Stays as tenant-wide total. Per-branch via movement aggregation. `BranchInventory` table in full MS10. |
+
+#### API Additions
+
+| Endpoint | Guard | Notes |
+|----------|-------|-------|
+| `GET /branches` | TenantGuard | List branches for tenant |
+| `POST /branches` | TenantGuard (OWNER/ADMIN) | Create branch |
+| `PATCH /branches/:id` | TenantGuard (OWNER/ADMIN) | Update name, address, status |
+| `x-branch-id` header | Optional | If omitted → tenant-wide aggregated scope |
+
+#### UI Changes
+
+| Component | Change |
+|-----------|--------|
+| Sidebar / header | Branch switcher (hidden when 1 branch) |
+| All panels | Filter by active branch or show aggregated |
+| Settings | Branches tab: list, create, edit, deactivate |
+| Team members | Branch assignment per member |
+
+---
+
+## PHASE 6 — Go-to-Market 🚧 (Pulled forward — before staging)
+
+### MS11 — Marketing Website
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `apps/marketing` — standalone Next.js static app | 📋 Planned | Fully independent of platform |
+| Hero section: headline, subheadline, CTA | 📋 Planned | CTA = "Book a Demo" → Calendly |
+| Features grid (config-driven via `features.config.ts`) | 📋 Planned | Add/remove cards without code changes |
+| How-it-works walkthrough | 📋 Planned | add products → stock → order → payment |
+| Social proof section | 📋 Planned | Placeholder until real client logos |
+| Footer with links | 📋 Planned | |
+| Fully static (`next export`) — no server runtime | 📋 Planned | |
+| **No pricing page** | ✅ Decided | No tiers yet. "Contact us" only. |
+| **No "Get Started" self-signup** | ✅ Decided | Super Admin provisions manually. |
 
 ---
 
 ## PHASE 7 — Marketplace 🔒
 
-> Do not build yet. Full design is documented for reference. Unlocks after Phase 4 is stable and there is validated demand.
+> Do not build yet. Unlocks after Phase 4 is stable and validated demand exists.
 
-The marketplace is built on top of the ERP foundation — same inventory, same order system, same payment flow. Tenants need real operational data before opening a storefront.
-
-### Two entry points, one inventory truth
-
-- **Global marketplace** (`/marketplace`) — customers browse across all tenants.
-- **Per-tenant storefront** (`/shop/:tenantSlug`) — scoped to one seller.
-
-Both pull from `MarketplaceListing` + `Sku`. No duplication.
-
-### Staff side — listing management
-
-- `can_manage_listings` permission: publish/unpublish SKUs.
-- `MarketplaceListing`: can have its own `marketplacePrice` separate from internal `priceCents`.
-- Feature-flagged: `marketplace: true` per tenant, controlled by Super Admin.
-- Archived SKUs cannot be listed.
-
-### Customer side — browse + buy
-
-- Customer auth separate from staff auth. `CustomerProfile` ≠ `TenantMembership`.
-- Multi-tenant cart → splits into separate orders per tenant at checkout.
-- Customer sees grouped order summary per seller.
-
-### Routing
-
-```
-/marketplace                    → global browse
-/marketplace/search?q=...       → search results
-/marketplace/category/:slug     → category filter
-/shop/:tenantSlug               → per-tenant storefront
-/shop/:tenantSlug/products/:id  → product detail
-```
-
-### Inventory reservation at checkout
-
-- `MarketplaceListing.reservedQty` field — incremented on cart add, decremented on order confirm or cart abandon.
-- `availableQty = stockOnHand - reservedQty` — what customers see.
-- Reservation TTL: 30 minutes. Background job clears stale reservations.
-
-### Payment flow
-
-- Integrated payment gateway (Stripe / PayMongo) — NOT manual proof upload.
-- Escrow-like model: payment captured at checkout, released to tenant after fulfillment.
-- Dispute window before release (configurable).
+| Component | Description |
+|-----------|-------------|
+| Global marketplace (`/marketplace`) | Customers browse across all tenants |
+| Per-tenant storefront (`/shop/:tenantSlug`) | Scoped to one seller |
+| `MarketplaceListing` model | Links SKU to marketplace with optional separate `marketplacePrice` |
+| Customer auth | Separate from staff auth. `CustomerProfile` ≠ `TenantMembership` |
+| Multi-tenant cart | Splits into separate orders per tenant at checkout |
+| Inventory reservation | `reservedQty` on listing, 30-min TTL |
+| Payment gateway | Stripe / PayMongo — NOT manual proof upload |
+| Feature flag | `marketplace: true` per tenant, controlled by Super Admin |
 
 ---
 
 ## PHASE 8 — Mobile + POS 🚫
 
-> Prohibited. Do not implement. These phases require dedicated mobile engineers and hardware integrations.
+> Prohibited. Requires dedicated mobile engineers and hardware integrations.
 
-- **Mobile app** (React Native / Expo) — staff-focused, offline-first inventory and order management.
-- **POS + Barcode scanning** — mobile-based, integrates with Orders + Payments module.
+| Item | Status |
+|------|--------|
+| Mobile app (React Native / Expo) | 🚫 Do not implement |
+| POS + barcode scanning | 🚫 Do not implement |
 
 ---
 
 ## PHASE 9 — AWS Scale 🔒
 
-> Do not build until traffic demands it. Driven by real load data, not preemptive optimization.
+> Do not build until traffic demands it.
 
-- ECS or EKS container orchestration.
-- RDS (Postgres) replacing Neon, with read replicas.
-- S3 + CloudFront for static assets and uploads.
-- Subdomain routing per tenant: `acme.yourplatform.com`.
-- PgBouncer or Prisma Accelerate for connection pooling.
+| Item | Description |
+|------|-------------|
+| ECS / EKS | Container orchestration |
+| RDS (Postgres) | Replacing Neon, with read replicas |
+| S3 + CloudFront | Static assets + uploads |
+| Subdomain routing | `acme.yourplatform.com` per tenant |
+| PgBouncer / Prisma Accelerate | Connection pooling |
 
 ---
 
 ## Feature Backlog
 
-> These are designed and ready to scope into a milestone when there is validated need. Not phase-assigned yet. Do not implement speculatively.
+> Designed and ready to scope. Not phase-assigned. Do not implement speculatively.
 
-### External Notification Delivery (Post-Phase 4)
-
-In-app notifications (bell icon) ship in MS8. External delivery adds channels.
-
-**Channels (implement in this order):**
-1. Email — SMTP already wired in MS8. Cheapest channel to add first.
-2. Facebook Messenger — primary channel in PH/SEA. Requires Meta App review.
-3. WhatsApp Business — same Meta infrastructure. Secondary channel.
-4. SMS — Twilio or Semaphore (PH). Last resort fallback.
-
-**Architecture:** Fire-and-forget async via BullMQ job queue. Channel-agnostic strategy pattern — each channel is a swappable implementation.
-
-**Notification preferences UI:** Per-user, per-channel opt-in/out. PBAC-mirrored — you can only subscribe to events you have permission to act on. Add to Settings → Notifications.
-
-**Why deferred:** External channels add queue infrastructure and Meta API dependencies. In-app covers MVP. External delivery only matters when real users miss critical events.
-
----
-
-### Low Stock Threshold + Alerts (Post-Phase 4)
-
-- `lowStockThreshold` already exists on `Sku`.
-- When `stockOnHand` drops to or below threshold after any movement: fire `stock.low` event.
-- Dashboard widget: "Low Stock SKUs" list per tenant.
-- Integrates with external notification delivery when that ships.
-- Add cooldown per SKU (max one alert per 6h) to prevent spam.
-
-**Why deferred:** No value until external notification channels exist.
-
----
-
-### Order Customer Reference (Post-Phase 4)
-
-- Add `customerRef: String?` and `note: String?` to `Order`.
-- `customerRef`: e.g. "PO #12345", "Acme Corp order". Staff-assigned B2B reference.
-- `note`: free-text internal note.
-
-**Why deferred:** UX improvement. Does not affect correctness. Easy add when UI is stable.
-
----
-
-### Queryable Audit Log (Post-Phase 4)
-
-- `AuditLog` table: `id`, `tenantId`, `userId`, `event`, `entityType`, `entityId`, `before` (JSONB), `after` (JSONB), `createdAt`.
-- Super Admin: cross-tenant queries. Tenant Admins: own tenant.
-- "Who changed this order?" questions.
-
-**Why deferred:** Logger events sufficient for MVP. High value for enterprise clients and compliance.
-
----
-
-### OAuth / Social Login (Post-Phase 4)
-
-- Google OAuth + Facebook/Meta OAuth alongside email/password.
-- `oauthProvider` + `oauthProviderId` fields on `User`.
-- JWT still issued after OAuth — same auth contract.
-
-**Why deferred:** Email/password sufficient. OAuth requires app registration and provider testing.
-
----
-
-### i18n + Currency (Post-Phase 4)
-
-- Language switcher (en, fil, zh). Affects labels, error messages, date and number formats.
-- Currency switcher — display only. `priceCents` stays in cents; conversion is display-side.
-- `Tenant.locale` + `Tenant.currency`. Per-user overrides (`User.locale?`, `User.currency?`).
-- Stack: `react-i18next` + `Intl.NumberFormat`.
-
-**Why deferred:** UI must be stable before wiring i18n. Add after MS8 UI is validated.
-
----
-
-### Custom Roles (Post-Phase 4)
-
-- `TenantRole` table: named permission presets on top of base roles (OWNER/ADMIN/STAFF/VIEWER).
-- Displayed in PBAC UI as base role → custom roles tree.
-- Cannot delete a custom role while active members are assigned to it.
-
-**Why deferred:** Per-member permission overrides (MS8) cover 90% of this use case.
-
----
-
-### Super Admin Impersonation (Post-Phase 4)
-
-- Super Admin temporarily acts as a tenant user for support and debugging.
-- Short-lived impersonation JWT: `sub: targetUserId, impersonatedBy: adminId`.
-- All audit log entries during impersonation tagged `actorType: IMPERSONATED`.
-- Requires explicit exit-impersonation flow in admin UI.
-
-**Why deferred:** Requires full audit trail design. Must not ship without logging.
-
----
-
-### Platform Integrations — Centralized Inventory Hub (Post-Phase 5)
-
-Connectors listen for webhook events from external platforms and create `InventoryMovement` records. No special-casing in the core model.
-
-**Planned integrations:**
-- Shopee (webhook-based order events)
-- Lazada (webhook-based order events)
-- Custom supplier/distributor API (configurable webhook endpoint)
-- Courier APIs — J&T, LBC, Ninja Van (delivery status → order updates)
-
-**Schema:** `Integration` table, `IntegrationEvent` log. `InventoryMovement.referenceType` adds `INTEGRATION` value. Feature-flagged per tenant.
-
-**Why deferred:** Core ERP must be stable first. Webhook security (HMAC signature verification), retry logic, and idempotency add significant complexity.
-
----
-
-### Payroll Module (Post-Phase 5) 🔒
-
-> Do not build until explicitly pulled in. Requires dedicated product decision — overlaps with accounting software territory.
-
-A payroll module scoped to tenants with staff memberships.
-
-**Scope (when built):**
-- `Employee` model linked to `Membership` — stores employment type, rate, pay period.
-- Time tracking: clock-in / clock-out logs, tied to `Branch` when multi-branch ships.
-- Payroll computation: base pay, deductions (SSS, PhilHealth, Pag-IBIG for PH), net pay.
-- Payslip generation (PDF) per pay period.
-- Payroll run history — immutable records per run.
-- Feature-flagged: `features.payroll`, enabled per tenant by Super Admin.
-
-**Why deferred:** Payroll is a regulated, compliance-heavy domain (tax law, government remittances). Building it prematurely risks legal exposure and significant scope. Must validate demand before committing to this surface.
-
-**Prerequisite:** Multi-Branch (MS10) should ship first — payroll per branch needs branch structure in place.
-
----
-
-### AI Chatbot + RAG (Post-Phase 5)
-
-Staff ask natural-language questions about their own data: "What's the stock on Bolt M8?", "Show me unpaid orders this week."
-
-- Strictly tenant-scoped — chatbot never sees cross-tenant data.
-- Stack: Claude API (`@anthropic/sdk`) + pgvector on Neon (RAG over tenant data).
-- Feature-flagged: `features.ai_chatbot`, enabled per tenant by Super Admin.
-- Phase 7 extension: customer-facing marketplace chatbot (cross-tenant, public data only).
-
-**Why deferred:** Requires stable data model and real tenant data to be useful.
+| Feature | Priority | Phase | Prerequisite | Why Deferred |
+|---------|----------|-------|-------------|--------------|
+| Reports / CSV export (orders, payments) | 🔴 High | Pre-staging | MS9 done | Day-one client ask — "how much did we sell this month?" |
+| `customerRef` + `note` on orders | 🔴 High | MS9 | — | Moved up — B2B dealbreaker |
+| Low Stock Threshold + Alerts | 🟡 Medium | Post-Phase 4 | External notifications | `lowStockThreshold` exists on SKU. Needs notification channel. |
+| External Notification Delivery | 🟡 Medium | Post-Phase 4 | MS8 notifications | Email first, then Messenger, WhatsApp, SMS. BullMQ queue. |
+| Queryable Audit Log | 🟡 Medium | Post-Phase 4 | — | "Who changed this order?" High value for enterprise. |
+| OAuth / Social Login | 🟢 Low | Post-Phase 4 | — | Email/password sufficient. Requires app registration. |
+| i18n + Currency settings | 🟢 Low | Post-Phase 4 | Stable UI | ₱ hardcoded now. Add `Tenant.locale` + `Tenant.currency`. |
+| Custom Roles | 🟢 Low | Post-Phase 4 | — | OWNER/ADMIN/STAFF/VIEWER covers 90% of use cases. |
+| Super Admin Impersonation | 🟢 Low | Post-Phase 4 | Audit Log | Support/debug tool. Requires full audit trail first. |
+| Payroll Module | 🔒 Locked | Post-Phase 5 | Multi-Branch | Regulated domain. Validate demand before committing. |
+| Platform Integrations (Shopee, Lazada) | 🔒 Locked | Post-Phase 5 | Stable core | Webhook security, retry logic, idempotency add complexity. |
+| AI Chatbot + RAG | 🔒 Locked | Post-Phase 5 | Real tenant data | Claude API + pgvector. Feature-flagged per tenant. |
 
 ---
 
 ## Known Engineering Challenges
 
-> Documented to inform future planning — not blockers for MS8.
-
 | Challenge | Impact | Mitigation |
 |-----------|--------|------------|
-| **Permission drift** | Staff accumulate custom overrides; role changes may leave conflicts. | Add "reset to role default" action in PBAC UI. |
-| **Privilege escalation** | ADMIN must not grant permissions exceeding their own ceiling. | Guards validate acting user's scope, not just target role. |
-| **JWT token lag** | Permission changes take effect at next login (7-day JWT). | Check `membership.status` on every protected request, not just at token issue. |
-| **Concurrent order confirmation race** | Two simultaneous CONFIRM requests both pass stock check before either deducts. | Mitigated by `$transaction` wrapping stock check + decrement. |
-| **Low stock alert spam** | Stock hovering at threshold fires alert on every OUT movement. | Cooldown per SKU (max one alert per 6h) or `lastAlertedAt` field. |
-| **Messenger / WhatsApp template constraint** | Meta only allows free-form messages within 24h reply window. | Register message templates per notification type before launch. |
-| **Render cold starts** | Free tier spins down after ~15min idle. First request takes 10–30s. | Document for testing; upgrade to Render Starter ($7/mo) before real users. |
-| **Neon connection exhaustion** | Prisma opens a connection per request. Free tier has low ceiling. | Add PgBouncer or Prisma Accelerate before production load. |
-| **Branch migration risk** | MS10 changes `stockOnHand` semantics (per-branch vs total). | Plan migration carefully; existing data moves to default branch. Test on staging first. |
-| **Integration webhook security** | External platforms must authenticate their webhook payloads. | Verify HMAC signatures on all incoming requests. Never trust payload without verification. |
+| **Permission drift** | Staff accumulate custom overrides; role changes may conflict | Add "reset to role default" action in PBAC UI |
+| **Privilege escalation** | ADMIN must not grant permissions exceeding their own ceiling | Guards validate acting user's scope, not just target role |
+| **JWT token lag** | Permission changes take effect at next login (7-day JWT) | Check `membership.status` on every protected request |
+| **Concurrent order confirmation race** | Two simultaneous CONFIRM requests both pass stock check | Mitigated by `$transaction` wrapping stock check + decrement |
+| **Username collision (pre-fix)** | Two "juan" at different tenants crash | Fix: `username` on `TenantMembership` with `@@unique([tenantId, username])` |
+| **Low stock alert spam** | Stock hovering at threshold fires on every OUT movement | Cooldown per SKU (`lastAlertedAt`) — max one alert per 6h |
+| **Messenger / WhatsApp template constraint** | Meta only allows free-form within 24h reply window | Register message templates before launch |
+| **Render cold starts** | Free tier spins down after ~15min idle — 10–30s first request | Document for testing; upgrade to Render Starter before real users |
+| **Neon connection exhaustion** | Prisma opens connection per request; free tier has low ceiling | Add PgBouncer or Prisma Accelerate before production load |
+| **Branch migration risk** | MS10 changes `stockOnHand` semantics (per-branch vs total) | Plan migration carefully; existing data → default branch. Test on staging first. |
+| **Integration webhook security** | External platforms must authenticate webhook payloads | Verify HMAC signatures on all incoming requests |

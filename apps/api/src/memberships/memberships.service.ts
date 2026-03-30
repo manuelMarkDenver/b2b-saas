@@ -56,15 +56,119 @@ export class MembershipsService {
 
   listTeamMembers(tenantId: string) {
     return this.prisma.tenantMembership.findMany({
-      where: { tenantId, status: 'ACTIVE' },
+      where: { tenantId },
       select: {
         id: true,
         role: true,
         status: true,
+        jobTitle: true,
+        username: true,
         isOwner: true,
-        user: { select: { email: true } },
+        createdAt: true,
+        user: { select: { email: true, avatarUrl: true } },
       },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async addDirectStaff(
+    tenantId: string,
+    actorUserId: string,
+    identifier: string,
+    role: TenantRole,
+    password: string,
+    jobTitle?: string,
+  ) {
+    const actor = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId: actorUserId } },
+      select: { role: true },
+    });
+    if (!actor || (actor.role !== 'OWNER' && actor.role !== 'ADMIN')) {
+      throw new ForbiddenException('Only OWNER or ADMIN can add staff');
+    }
+
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+
+    // Check username uniqueness within this tenant
+    const usernameConflict = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_username: { tenantId, username: normalizedIdentifier } },
+      select: { id: true, status: true },
+    });
+    if (usernameConflict?.status === 'ACTIVE') {
+      throw new BadRequestException('That username is already taken in this business');
+    }
+
+    // Get tenant slug for placeholder email
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+
+    const passwordHash = await hash(password, 12);
+    const placeholderEmail = `direct-${randomUUID()}@${tenant!.slug}.internal`;
+
+    const user = await this.prisma.user.create({
+      data: { email: placeholderEmail, passwordHash, status: 'ACTIVE' },
+      select: { id: true },
+    });
+
+    await this.prisma.tenantMembership.upsert({
+      where: { tenantId_userId: { tenantId, userId: user.id } },
+      create: {
+        tenantId,
+        userId: user.id,
+        username: normalizedIdentifier,
+        role,
+        jobTitle: jobTitle?.trim() || null,
+        status: 'ACTIVE',
+      },
+      update: {
+        username: normalizedIdentifier,
+        role,
+        jobTitle: jobTitle?.trim() || null,
+        status: 'ACTIVE',
+      },
+    });
+
+    return { message: 'Staff member added', identifier: normalizedIdentifier };
+  }
+
+  async updateMembership(
+    tenantId: string,
+    actorUserId: string,
+    membershipId: string,
+    dto: { role?: string; jobTitle?: string; deactivate?: boolean },
+  ) {
+    const actor = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId: actorUserId } },
+      select: { role: true },
+    });
+    if (!actor || (actor.role !== 'OWNER' && actor.role !== 'ADMIN')) {
+      throw new ForbiddenException('Only OWNER or ADMIN can update memberships');
+    }
+
+    const target = await this.prisma.tenantMembership.findFirst({
+      where: { id: membershipId, tenantId },
+      select: { id: true, isOwner: true },
+    });
+    if (!target) throw new NotFoundException('Membership not found');
+    if (target.isOwner) throw new ForbiddenException('Cannot modify the tenant owner');
+
+    return this.prisma.tenantMembership.update({
+      where: { id: membershipId },
+      data: {
+        ...(dto.role ? { role: dto.role as TenantRole } : {}),
+        ...(dto.jobTitle !== undefined ? { jobTitle: dto.jobTitle || null } : {}),
+        ...(dto.deactivate === true ? { status: 'DISABLED' } : dto.deactivate === false ? { status: 'ACTIVE' } : {}),
+      },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        jobTitle: true,
+        isOwner: true,
+        user: { select: { email: true, avatarUrl: true } },
+      },
     });
   }
 
@@ -73,6 +177,7 @@ export class MembershipsService {
     inviterUserId: string,
     email: string,
     role: TenantRole,
+    jobTitle?: string,
   ) {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -124,12 +229,14 @@ export class MembershipsService {
         tenantId,
         userId: user.id,
         role,
+        jobTitle: jobTitle?.trim() || null,
         status: 'INVITED',
         inviteToken: token,
         inviteExpiresAt: expiresAt,
       },
       update: {
         role,
+        jobTitle: jobTitle?.trim() || null,
         status: 'INVITED',
         inviteToken: token,
         inviteExpiresAt: expiresAt,
@@ -139,7 +246,7 @@ export class MembershipsService {
       },
     });
 
-    const baseUrl = this.config.get<string>('appBaseUrl');
+    const baseUrl = this.config.get<string>('appFrontendUrl');
     const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
     await this.emailService.sendStaffInvite(normalizedEmail, inviteUrl, membership.tenant.name);
 

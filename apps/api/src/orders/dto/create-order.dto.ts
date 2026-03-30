@@ -3,8 +3,11 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsOptional,
+  IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -25,4 +28,14 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  customerRef?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  note?: string;
 }

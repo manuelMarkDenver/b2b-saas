@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/auth/admin.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
 import type { RequestWithUser } from '../common/auth/auth.types';
-import { Req } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
+import { CatalogImportService } from './catalog-import.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -15,7 +16,10 @@ import { UpdateSkuDto } from './dto/update-sku.dto';
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class CatalogController {
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(
+    private readonly catalogService: CatalogService,
+    private readonly importService: CatalogImportService,
+  ) {}
 
   // Categories (platform-managed)
   @Get('categories')
@@ -88,5 +92,18 @@ export class CatalogController {
   @UseGuards(TenantGuard)
   archiveSku(@Req() req: RequestWithUser, @Param('id') id: string) {
     return this.catalogService.archiveSku(req.tenant!.id, id, req.membership!.role);
+  }
+
+  @Post('catalog/import')
+  @UseGuards(TenantGuard)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  importCsv(
+    @Req() req: RequestWithUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      return { imported: 0, updated: 0, skipped: 0, errors: [{ row: 0, reason: 'No file uploaded' }] };
+    }
+    return this.importService.importCsv(req.tenant!.id, file.buffer);
   }
 }

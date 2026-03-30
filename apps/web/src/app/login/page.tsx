@@ -11,9 +11,12 @@ import { setToken } from '@/lib/auth';
 
 export default function LoginPage() {
   const [email, setEmail] = React.useState('');
+  const [tenantSlug, setTenantSlug] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+
+  const isUsernameLogin = email.trim() !== '' && !email.includes('@');
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,10 +31,13 @@ export default function LoginPage() {
     }
 
     try {
+      const body: Record<string, string> = { email, password };
+      if (isUsernameLogin && tenantSlug) body.tenantSlug = tenantSlug;
+
       const res = await fetch(`${base}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -87,17 +93,35 @@ export default function LoginPage() {
 
       <form className="mt-8 space-y-4" onSubmit={onSubmit}>
         <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email or username</Label>
           <Input
             id="email"
-            type="email"
+            type="text"
             required
-            autoComplete="email"
-            placeholder="you@company.com"
+            autoComplete="username"
+            placeholder="you@company.com or your username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
+
+        {isUsernameLogin && (
+          <div className="space-y-1.5">
+            <Label htmlFor="tenantSlug">Business code</Label>
+            <Input
+              id="tenantSlug"
+              type="text"
+              required
+              autoComplete="organization"
+              placeholder="your-business-slug"
+              value={tenantSlug}
+              onChange={(e) => setTenantSlug(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              The short code for your business (e.g. <span className="font-mono">peak-hardware</span>).
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">

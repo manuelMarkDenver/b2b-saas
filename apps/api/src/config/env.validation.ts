@@ -21,6 +21,7 @@ export const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('noreply@platform.local'),
   APP_BASE_URL: z.string().default('http://localhost:3001'),
+  APP_FRONTEND_URL: z.string().default('http://localhost:3000'),
   // Storage: 'local' uses disk; 's3' uploads to AWS S3
   STORAGE_TYPE: z.enum(['local', 's3']).default('local'),
   AWS_REGION: z.string().optional(),

@@ -73,6 +73,29 @@ type Sku = {
   product: { id: string; name: string };
 };
 
+type ImportResult = {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: Array<{ row: number; reason: string }>;
+};
+
+const CSV_TEMPLATE_HEADERS = 'productName,categorySlug,skuCode,skuName,pricePhp,costPhp,lowStockThreshold';
+
+function downloadCsvTemplate() {
+  const content = [
+    CSV_TEMPLATE_HEADERS,
+    'Example Product,fasteners,SKU-001,Standard Size,99.00,45.00,5',
+  ].join('\n');
+  const blob = new Blob([content], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'catalog-import-template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [products, setProducts] = React.useState<Product[]>([]);
@@ -89,7 +112,42 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [newSkuName, setNewSkuName] = React.useState("");
   const [newSkuLowStock, setNewSkuLowStock] = React.useState<number>(0);
 
+  const [importFile, setImportFile] = React.useState<File | null>(null);
+  const [importLoading, setImportLoading] = React.useState(false);
+  const [importResult, setImportResult] = React.useState<ImportResult | null>(null);
+  const [dragOver, setDragOver] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const { pushToast } = useToast();
+
+  async function handleImport() {
+    if (!importFile) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const res = await apiFetch('/catalog/import', {
+        tenantSlug,
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const msg = await readApiError(res);
+        setStatus({ kind: 'error', text: `Import failed: ${res.status}${msg ? ` — ${msg}` : ''}` });
+        return;
+      }
+      const result = await res.json() as ImportResult;
+      setImportResult(result);
+      setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      const summary = `${result.imported} added, ${result.updated} updated, ${result.skipped} skipped`;
+      pushToast({ variant: result.errors.length > 0 ? 'error' : 'success', title: 'Import complete', message: summary });
+      if (result.imported > 0 || result.updated > 0) await loadAll();
+    } finally {
+      setImportLoading(false);
+    }
+  }
 
   async function loadAll() {
     setStatus({ kind: "info", text: "Loading catalog..." });
@@ -412,6 +470,103 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* CSV Import */}
+      <div className="mt-6 rounded-md border border-border/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium">Import from CSV</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Upserts products and SKUs. Required headers:{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+                {CSV_TEMPLATE_HEADERS}
+              </code>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 text-xs text-primary underline-offset-2 hover:underline"
+            onClick={downloadCsvTemplate}
+          >
+            Download template
+          </button>
+        </div>
+
+        <div
+          className={`mt-3 flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-4 py-6 text-center transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-border'}`}
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files[0];
+            if (file) { setImportFile(file); setImportResult(null); }
+          }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              setImportFile(file);
+              setImportResult(null);
+            }}
+          />
+          {importFile ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">{importFile.name}</span>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); setImportFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Drop a CSV file here or <span className="text-primary">browse</span>
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="mt-3 h-9 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50"
+          disabled={!importFile || importLoading}
+          onClick={handleImport}
+        >
+          {importLoading ? 'Importing…' : 'Import'}
+        </button>
+
+        {importResult && (
+          <div className="mt-4 space-y-2 text-sm">
+            <div className="flex gap-4 text-xs">
+              <span className="font-medium text-green-600">{importResult.imported} added</span>
+              <span className="font-medium text-blue-600">{importResult.updated} updated</span>
+              <span className="font-medium text-muted-foreground">{importResult.skipped} skipped</span>
+            </div>
+            {importResult.errors.length > 0 && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                <div className="mb-1.5 text-xs font-semibold text-destructive">
+                  {importResult.errors.length} row error{importResult.errors.length !== 1 ? 's' : ''}
+                </div>
+                <div className="space-y-1">
+                  {importResult.errors.map((e, i) => (
+                    <div key={i} className="flex gap-2 text-xs text-muted-foreground">
+                      <span className="shrink-0 font-medium">Row {e.row}:</span>
+                      <span>{e.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

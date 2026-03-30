@@ -2,23 +2,26 @@
 
 This is the living rulebook for building this platform. All contributors must follow these rules strictly.
 
-> Last updated: 2026-03-30 — Phase map aligned with MILESTONES.md. Scope Control System updated to distinguish Phase 5 (planned extensions) from prohibited phases (7–8).
+> Last updated: 2026-03-30 — Confirm-before-act rule strengthened. Tenant self-registration removed (no pricing model yet — demo-only via Calendly). Pre-staging checklist updated. Multi-branch v1 + marketing page pulled forward.
 
 ---
 
-## Confirm-Before-Act Rule (Non-Negotiable)
+## ⛔ Confirm-Before-Act Rule (Absolute — No Exceptions)
 
-Before making ANY change — code, docs, migrations, config — Claude must:
+Before making **ANY** change — code, docs, migrations, config, memory files — Claude must:
 
 1. **State the action plan in plain text** — what will change, which files, why.
-2. **Wait for explicit user confirmation** (a "yes", "go ahead", or equivalent).
+2. **Wait for explicit user confirmation** ("yes", "go ahead", or equivalent).
 3. **Only then execute.**
 
-This applies to everything: code changes, documentation updates, schema migrations, config edits.
+**This rule has been violated before. It must not be violated again.**
 
-**No exceptions.** Even if the change seems obvious. Even for docs-only updates. Confirm first.
+- Applies to ALL changes — including "obvious" ones, docs-only updates, and memory writes.
+- Applies even mid-task. If scope shifts unexpectedly, stop and confirm the new direction.
+- Confirmation is per-task, not a blanket. Agreeing to fix bug A does not authorize fixing bug B.
+- **Wasted tokens from unwanted changes cost more than the few tokens spent confirming.**
 
-The goal: no back-and-forth to undo unwanted changes.
+The goal: the user never has to undo something Claude did without asking.
 
 ---
 
@@ -42,9 +45,19 @@ Every proposed change must be classified before implementation:
 |---|---|---|
 | MVP-CRITICAL | Required for the system to function at its current phase | IMPLEMENT |
 | MVP-ENHANCEMENT | Improves UX/DX but not required for DoD | DEFER — ask user first |
-| PHASE 5 | CSV Import, Multi-Branch (MS9–MS10). Starts only after MS8 ships. | PLAN NOW, BUILD LATER |
-| PHASE 6 | Go-to-Market / Marketing Website (MS11) | DEFER |
+| PRE-STAGING | Required before first real client touches staging | IMPLEMENT before deploy |
+| PHASE 5 | CSV Import (MS9 ✅), Multi-Branch v1 (pulled into pre-staging) | BUILD NOW (multi-branch) |
+| PHASE 6 | Marketing Website (MS11) — pulled forward, build before staging | BUILD NOW |
 | PROHIBITED | Mobile, POS, Marketplace, AWS Scale (Phase 7–9) | DO NOT IMPLEMENT |
+
+**PRE-STAGING items (in order):**
+1. Staff password change + negative stock floor + `customerRef` on orders (MS9 close)
+2. Marketing page (`apps/marketing`) — local first; CTA = "Request a Demo" → Calendly (no self-registration)
+3. Multi-branch v1 — scaffolded, invisible at single-branch
+4. Dashboard / home screen — summary view on login
+5. Staging deployment
+
+**No tenant self-registration.** There is no pricing model and no tiers yet. All tenants are manually provisioned by Super Admin. Prospects book a demo via Calendly; owner onboards them.
 
 If not MVP-CRITICAL → document it, assign to the appropriate future phase, do not build.
 
@@ -378,3 +391,24 @@ LATER (not MVP unless explicitly pulled in):
 - OAuth/OIDC social login (Google, Facebook/Meta).
 - Keep auth design compatible with multiple identity providers.
 - Do not block MVP on social login — email/password only for now.
+
+---
+
+## PR Workflow (Required Steps Before Every Merge)
+
+Every PR must complete these steps **in order** before merging:
+
+| Step | Action | Required |
+|------|--------|----------|
+| 1 | All E2E tests pass (`pnpm --filter api test:e2e`) | ✅ Mandatory |
+| 2 | TypeScript compiles clean (`pnpm typecheck`) | ✅ Mandatory |
+| 3 | Run `/audit` — no 🔴 findings allowed to remain | ✅ Mandatory |
+| 4 | User manual UI test (Claude provides step-by-step checklist) | ✅ Mandatory |
+| 5 | User gives explicit go signal | ✅ Mandatory |
+| 6 | Claude commits + pushes | ✅ Mandatory |
+| 7 | User merges on GitHub | ✅ Mandatory |
+
+**On `/audit` findings:**
+- 🔴 Blocking → fix before merge, no exceptions
+- 🟡 Warning → document in PR description, fix before staging
+- 🟢 Advisory → log in MILESTONES.md backlog, fix when convenient
