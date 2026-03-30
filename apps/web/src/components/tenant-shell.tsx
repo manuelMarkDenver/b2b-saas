@@ -148,8 +148,8 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
           </div>
 
           <div className="flex items-center gap-1">
-            <BranchSwitcher tenantSlug={tenantSlug} />
             <TenantSwitcher currentSlug={tenantSlug} />
+            <BranchSwitcher tenantSlug={tenantSlug} />
             <NotificationBell tenantSlug={tenantSlug} />
             <ModeToggle />
 

@@ -43,6 +43,26 @@
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
+### Single-Branch vs Multi-Branch Visibility Rules
+
+All branch-aware UI is **hidden by default** and only appears when a tenant has more than 1 active branch. This ensures single-branch tenants see a clean, simple interface with no multi-branch concepts surfaced.
+
+| UI Element | Single branch | Multi-branch |
+|-----------|:---:|:---:|
+| Branch switcher in header | Hidden | Visible |
+| "All branches" option in switcher | — | Always shown (resets to tenant-wide scope) |
+| Default branch auto-selected on load | No — starts at "All branches" | No — starts at "All branches" |
+| Branch breakdown table on dashboard | Hidden | Visible |
+| Accordion collapse on breakdown table | — | Shown when >5 branches |
+| Search bar in branch switcher | — | Shown when >7 branches |
+| "Viewing: 1 branch / show all" text on dashboard | Hidden | Visible when a branch is drilled into |
+| Branch column in order/payment tables | Hidden | Future (post-MVP) |
+
+**Scope of branch filter:**
+- Global branch switcher (header) → scopes ALL tabs: Orders, Payments, Inventory
+- Dashboard inline branch selector → scopes only dashboard cards and charts, does not affect other tabs
+- "All branches" = no `x-branch-id` header sent → API returns full tenant-wide data
+
 ### Mobile Strategy — Why PWA, Not Native App
 
 **The problem (valid):** The Philippine SMB market is mobile-first. Most business owners and staff operate from Android phones. A desktop-only app will have friction at every demo and daily use.
