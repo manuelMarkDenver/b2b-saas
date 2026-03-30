@@ -24,7 +24,7 @@ export class ReportsController {
     @Query('from') fromStr?: string,
     @Query('to') toStr?: string,
     @Query('format') format?: string,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res?: Response,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
 
@@ -39,8 +39,6 @@ export class ReportsController {
       branchId,
     });
 
-    const payload = { data: orders, meta: { from: from.toISOString(), to: to.toISOString() } };
-
     if (format === 'csv') {
       const csv = this.reports.generateOrdersCsv(orders);
       const filename = `orders-report-${from.toISOString().split('T')[0]}-${to.toISOString().split('T')[0]}.csv`;
@@ -50,6 +48,6 @@ export class ReportsController {
       return;
     }
 
-    res!.json(payload);
+    return { data: orders, meta: { from: from.toISOString(), to: to.toISOString() } };
   }
 }
