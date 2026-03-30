@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthLayout } from '@/components/auth-layout';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token') ?? '';
@@ -59,6 +59,72 @@ export default function ResetPasswordPage() {
   }
 
   return (
+    <>
+      {done ? (
+        <div className="mt-6 space-y-4">
+          <p className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">
+            Password updated. Redirecting to sign in…
+          </p>
+          <Link href="/login">
+            <Button variant="outline" className="w-full">Sign in now</Button>
+          </Link>
+        </div>
+      ) : (
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">New password</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              placeholder="Min. 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm">Confirm password</Label>
+            <Input
+              id="confirm"
+              type="password"
+              required
+              placeholder="Repeat password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+          </div>
+
+          {!token && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              No reset token found. Please use the link from your email.
+            </p>
+          )}
+
+          {error && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          <Button type="submit" className="w-full" disabled={loading || !token}>
+            {loading ? 'Updating…' : 'Update password'}
+          </Button>
+
+          <div className="text-center text-sm text-muted-foreground">
+            <Link href="/login" className="text-primary hover:underline">
+              Back to sign in
+            </Link>
+          </div>
+        </form>
+      )}
+    </>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <AuthLayout quoteIndex={2}>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Set new password</h1>
@@ -67,65 +133,9 @@ export default function ResetPasswordPage() {
         </p>
       </div>
 
-          {done ? (
-            <div className="mt-6 space-y-4">
-              <p className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-400">
-                Password updated. Redirecting to sign in…
-              </p>
-              <Link href="/login">
-                <Button variant="outline" className="w-full">Sign in now</Button>
-              </Link>
-            </div>
-          ) : (
-            <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">New password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  minLength={8}
-                  placeholder="Min. 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm">Confirm password</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  required
-                  placeholder="Repeat password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                />
-              </div>
-
-              {!token && (
-                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  No reset token found. Please use the link from your email.
-                </p>
-              )}
-
-              {error && (
-                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-
-              <Button type="submit" className="w-full" disabled={loading || !token}>
-                {loading ? 'Updating…' : 'Update password'}
-              </Button>
-
-              <div className="text-center text-sm text-muted-foreground">
-                <Link href="/login" className="text-primary hover:underline">
-                  Back to sign in
-                </Link>
-              </div>
-            </form>
-          )}
+      <React.Suspense fallback={null}>
+        <ResetPasswordForm />
+      </React.Suspense>
     </AuthLayout>
   );
 }

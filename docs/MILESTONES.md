@@ -445,6 +445,22 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 
 ---
 
+### MS14 — PWA + Mobile Responsive 🚧 In Progress
+
+> Make the existing app installable as a PWA and usable on phone screens. Same features, same routes — just mobile-friendly layout.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `manifest.json` + app icons | 🚧 | `name`, `short_name`, `start_url`, 192×192 + 512×512 icons |
+| Service worker via `@ducanh2912/next-pwa` | 🚧 | Auto-generated; offline fallback page |
+| Viewport meta + theme-color | 🚧 | Fixes mobile viewport scaling |
+| App title update | 🚧 | Replace "Create Next App" with proper name |
+| Mobile sidebar drawer | 🚧 | Fixed overlay on mobile, inline collapse on desktop |
+| Responsive tables (horizontal scroll) | 🚧 | `overflow-x-auto` wrapper + `min-w` on all grid rows |
+| Responsive sheets | 🚧 | `w-full sm:w-[680px]` on all SheetContent panels |
+
+---
+
 ## PHASE 7 — Marketplace 🔒
 
 > Do not build yet. Unlocks after Phase 4 is stable and validated demand exists.

@@ -151,6 +151,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </div>
             </div>
 
+            <div className="overflow-x-auto">
+            <div className="min-w-[400px]">
             <div className="grid grid-cols-[1fr_160px_100px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Product</span>
               <span>SKU Code</span>
@@ -189,6 +191,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 })}
               </div>
             )}
+            </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -202,11 +206,13 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </div>
             </div>
 
+            <div className="overflow-x-auto">
+            <div className="min-w-[500px]">
             <div className="grid grid-cols-[1fr_90px_92px_1fr_110px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>SKU</span>
               <span>Type</span>
               <span className="text-right">Qty</span>
-              <span className="hidden sm:block">Note</span>
+              <span>Note</span>
               <span className="text-right">Date</span>
             </div>
 
@@ -248,7 +254,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                         {m.type === 'OUT' ? '-' : '+'}
                         {Math.abs(m.quantity)}
                       </div>
-                      <div className="hidden truncate text-xs text-muted-foreground sm:block">{m.note ?? '—'}</div>
+                      <div className="truncate text-xs text-muted-foreground">{m.note ?? '—'}</div>
                       <div className="text-right text-xs text-muted-foreground">
                         {new Date(m.createdAt).toLocaleDateString()}
                       </div>
@@ -257,6 +263,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 })}
               </div>
             )}
+            </div>
+            </div>
 
             {/* Pagination */}
             {meta.totalPages > 1 && (

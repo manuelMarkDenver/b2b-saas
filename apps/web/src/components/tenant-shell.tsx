@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, User, ChevronDown, Camera } from 'lucide-react';
+import { LogOut, User, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import { ImageUpload } from '@/components/image-upload';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -15,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -61,7 +60,12 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [tenantLogoUrl, setTenantLogoUrl] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Open sidebar by default on desktop after mount
+  useEffect(() => {
+    if (window.innerWidth >= 768) setSidebarOpen(true);
+  }, []);
 
   // Auth guard — redirect if no token
   useEffect(() => {
@@ -118,8 +122,25 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      {/* Sidebar */}
-      <div className={cn('flex shrink-0 transition-all duration-200', sidebarOpen ? 'w-56' : 'w-0 overflow-hidden')}>
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — fixed drawer on mobile, inline collapse on desktop */}
+      <div
+        className={cn(
+          // Mobile: fixed drawer sliding in from left
+          'fixed inset-y-0 left-0 z-30 flex shrink-0 transition-transform duration-200',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          // Desktop: inline sidebar with width transition
+          'md:relative md:inset-auto md:z-auto md:translate-x-0 md:transition-[width] md:duration-200',
+          sidebarOpen ? 'md:w-56' : 'md:w-0 md:overflow-hidden',
+        )}
+      >
         <Sidebar
           tenantSlug={tenantSlug}
           tenantName={tenantName}

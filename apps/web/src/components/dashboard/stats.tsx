@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { ShoppingCart, CreditCard, Boxes, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, CreditCard, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
 import { BranchBreakdown } from './branch-breakdown';

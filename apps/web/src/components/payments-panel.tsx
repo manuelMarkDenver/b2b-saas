@@ -295,6 +295,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         </div>
 
+        <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
         <div className="grid grid-cols-[1fr_60px_120px_120px_160px_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
@@ -340,6 +342,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             </button>
           ))}
         </div>
+        </div>{/* min-w */}
+        </div>{/* overflow-x-auto */}
         {ordersMeta.totalPages > 1 && (
           <Pagination
             page={ordersMeta.page}
@@ -370,7 +374,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         {payments.length === 0 ? (
           <div className="px-4 py-6 text-sm text-muted-foreground">No payments yet.</div>
         ) : (
-          <>
+          <div className="overflow-x-auto">
+          <div className="min-w-[800px]">
             <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Payment</span>
               <span className="text-right">Amount</span>
@@ -455,7 +460,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                 </div>
               ))}
             </div>
-          </>
+          </div>
+          </div>
         )}
       </div>
 
@@ -463,7 +469,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       </Tabs>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-[520px]">
+        <SheetContent side="right" className="w-full sm:w-[520px]">
           <SheetHeader>
             <SheetTitle>Order details</SheetTitle>
             <SheetDescription>Review items, then submit a payment for this order.</SheetDescription>
