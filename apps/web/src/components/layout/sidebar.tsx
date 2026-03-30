@@ -12,6 +12,7 @@ import {
   BookOpen,
   Users,
   GitBranch,
+  FileText,
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Inventory', href: '/inventory', icon: Boxes, featureKey: 'inventory' },
   { label: 'Orders', href: '/orders', icon: ShoppingCart, featureKey: 'orders' },
   { label: 'Payments', href: '/payments', icon: CreditCard, featureKey: 'payments' },
+  { label: 'Reports', href: '/reports', icon: FileText, featureKey: 'reports' },
   { label: 'Catalog', href: '/catalog', icon: BookOpen, featureKey: 'catalog' },
   { label: 'Team', href: '/settings/team', icon: Users, featureKey: 'team' },
   { label: 'Branches', href: '/settings/branches', icon: GitBranch },

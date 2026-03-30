@@ -16,3 +16,4 @@ postgres-data/
 apps/marketing/out
 apps/marketing/.next
 apps/marketing/tsconfig.tsbuildinfo
+apps/api/uploads/

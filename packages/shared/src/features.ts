@@ -90,8 +90,7 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     description:
       'Sales summaries, low stock reports, and payment breakdowns — all in one view. Export to CSV anytime.',
     icon: 'BarChart2',
-    shipped: false,
-    phase: 'Pre-staging',
+    shipped: true,
   },
   {
     key: 'multi_branch',
