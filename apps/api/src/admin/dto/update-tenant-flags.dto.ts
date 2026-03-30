@@ -16,4 +16,8 @@ export class UpdateTenantFlagsDto {
   @IsOptional()
   @IsBoolean()
   marketplace?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  reports?: boolean;
 }
