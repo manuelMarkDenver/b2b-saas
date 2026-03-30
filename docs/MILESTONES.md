@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — Full table restructure. Gaps & Risks analysis added. /audit added to PR workflow. Tenant self-registration removed (Calendly model). Multi-branch + marketing pulled into pre-staging. Username scoping fix added to MS9.
+> Last updated: 2026-03-30 — MS11 marketing site built (apps/marketing, static Next.js, Operix brand, dynamic features grid). Global market goal documented. Sidebar UX improvements queued in Feature Backlog.
 
 ---
 
@@ -15,14 +15,15 @@
 | **Phase 5** | MS9–MS10 | Extensions — CSV Import, Team Mgmt, Multi-Branch | 🚧 MS9 in progress |
 | **Phase 6** | MS11 | Go-to-Market — Marketing Website | 🚧 Pulled forward (before staging) |
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
-| **Phase 8** | — | Mobile + POS | 🚫 Prohibited |
+| **Phase 8** | — | Mobile + POS | 📋 PWA pre-staging; native app after revenue |
 | **Phase 9** | — | AWS Scale + Subdomain Routing | 🔒 Do not build yet |
 
 **Rules:**
 - MVP = Phase 1–4 (MS1–MS8). First shippable product. ✅ Complete.
 - 🔒 = architecturally designed, not yet scheduled.
-- 🚫 = prohibited until explicit product decision.
 - Never pull work from a future phase into a current milestone.
+
+**On mobile:** PWA + responsive web ships **before** staging — this is a pre-staging requirement, not a future phase. React Native native app (Phase 8) ships only after real revenue validates the investment. See "Mobile Strategy" in the Pre-Staging Checklist section for the full rationale.
 
 ---
 
@@ -32,14 +33,35 @@
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | MS9 close — username scoping, password change, negative stock floor, customerRef | 🚧 In progress | |
-| 2 | Marketing page (`apps/marketing`) | 📋 Next | CTA = "Book a Demo" → Calendly. No self-registration. |
-| 3 | Multi-branch v1 | 📋 Planned | Scaffolded, invisible at single-branch. No UI until 2nd branch added. |
-| 4 | Dashboard / home screen | 📋 Planned | Summary of orders, payments, low stock on login. |
-| 5 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
-| 6 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 1 | MS9 close — username scoping, password change, negative stock floor, customerRef | ✅ Done | PR open |
+| 2 | Marketing page (`apps/marketing`) | 🚧 In progress | MS11 branch |
+| 3 | Mobile responsive + PWA | 📋 Planned | **Must ship before staging.** See rationale below. |
+| 4 | Multi-branch v1 | 📋 Planned | Scaffolded, invisible at single-branch. No UI until 2nd branch added. |
+| 5 | Dashboard / home screen | 📋 Planned | Summary of orders, payments, low stock on login. |
+| 6 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
+| 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
+
+### Mobile Strategy — Why PWA, Not Native App
+
+**The problem (valid):** The Philippine SMB market is mobile-first. Most business owners and staff operate from Android phones. A desktop-only app will have friction at every demo and daily use.
+
+**The solution: PWA + responsive web — not React Native.**
+
+| Approach | Timeline | Cost | Ships features instantly | Same codebase |
+|----------|----------|------|------------------------|---------------|
+| React Native app | +3–6 months | High | ❌ | ❌ |
+| PWA + responsive | +2–3 weeks | Near zero | ✅ | ✅ |
+
+A PWA installed on Android/iOS home screen is indistinguishable from a native app for the target use cases (create orders, check stock, log payments at counter). Native app (Phase 8) only makes sense after real revenue and validated demand for it.
+
+**Role → device mapping:**
+| Role | Likely device | Primary actions |
+|------|--------------|----------------|
+| Owner / Admin | Phone or desktop | Reports, settings, team |
+| Staff / Cashier | Phone at counter | Create orders, log payments |
+| Warehouse staff | Phone on floor | Log movements, check stock |
 
 ---
 
@@ -332,19 +354,34 @@
 
 ## PHASE 6 — Go-to-Market 🚧 (Pulled forward — before staging)
 
-### MS11 — Marketing Website
+### MS11 — Marketing Website 🚧 In Progress
+
+> Full spec: `docs/milestones/ms11-marketing.md`
+> Brand: **Operix** (placeholder). Target: Filipino-first, global-ready.
+> Global ambition is intentional — currency + language features in the platform are the scaffold for it.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `apps/marketing` — standalone Next.js static app | 📋 Planned | Fully independent of platform |
-| Hero section: headline, subheadline, CTA | 📋 Planned | CTA = "Book a Demo" → Calendly |
-| Features grid (config-driven via `features.config.ts`) | 📋 Planned | Add/remove cards without code changes |
-| How-it-works walkthrough | 📋 Planned | add products → stock → order → payment |
-| Social proof section | 📋 Planned | Placeholder until real client logos |
-| Footer with links | 📋 Planned | |
-| Fully static (`next export`) — no server runtime | 📋 Planned | |
-| **No pricing page** | ✅ Decided | No tiers yet. "Contact us" only. |
-| **No "Get Started" self-signup** | ✅ Decided | Super Admin provisions manually. |
+| `apps/marketing` — standalone Next.js static app | ✅ Built | `milestone-11/marketing-site` branch |
+| Navbar (sticky, mobile responsive) | ✅ Built | |
+| Hero — headline, subheadline, CTA | ✅ Built | Image slot ready for `/generate-image` |
+| Social proof bar | ✅ Built | Logo placeholders until real clients go live |
+| Features grid — dynamic from `features.config.ts` | ✅ Built | Only enabled features render |
+| How-it-works — 3 steps with images | ✅ Built | Image slots ready |
+| Demo section — animated UI + voice-over audio | ✅ Built | Audio slot ready for `/generate-voiceover` |
+| Testimonial section | ✅ Built | Placeholder; swap in `marketing.config.ts` |
+| Final CTA section | ✅ Built | |
+| Footer | ✅ Built | |
+| All copy in `marketing.config.ts` | ✅ Built | Single source of truth |
+| All assets in `features.config.ts` | ✅ Built | Feature toggle = one boolean |
+| Fully static (`next export`) | ✅ Built | Verified: `next build` passes |
+| **No pricing page** | ✅ Decided | No tiers yet |
+| **No self-signup** | ✅ Decided | Super Admin provisions manually |
+| Hero image generated | ⏳ Pending | Needs `REPLICATE_API_TOKEN` or `OPENAI_API_KEY` |
+| How-it-works images (×3) generated | ⏳ Pending | Needs token |
+| Voice-over MP3 generated | ⏳ Pending | Needs `OPENAI_API_KEY` |
+| Testimonial avatar generated | ⏳ Pending | Needs token |
+| Real Calendly URL configured | ⏳ Pending | Set `urls.calendly` in `marketing.config.ts` |
 
 ---
 
@@ -365,14 +402,15 @@
 
 ---
 
-## PHASE 8 — Mobile + POS 🚫
+## PHASE 8 — Mobile + POS
 
-> Prohibited. Requires dedicated mobile engineers and hardware integrations.
+> **PWA + responsive web** is pre-staging (see checklist above). React Native native app is Phase 8 — only after real revenue and validated demand.
 
-| Item | Status |
-|------|--------|
-| Mobile app (React Native / Expo) | 🚫 Do not implement |
-| POS + barcode scanning | 🚫 Do not implement |
+| Item | Status | Notes |
+|------|--------|-------|
+| **PWA + mobile responsive web** | ⏳ Pre-staging | `manifest.json`, service worker, responsive CSS pass on `apps/web`. Ships before staging. |
+| Mobile app (React Native / Expo) | 🔒 Phase 8 | Only after staging is live, real clients confirmed, and revenue validates the investment. |
+| POS + barcode scanning | 🔒 Phase 8 | Requires hardware integrations and dedicated mobile engineer. |
 
 ---
 
@@ -396,6 +434,7 @@
 
 | Feature | Priority | Phase | Prerequisite | Why Deferred |
 |---------|----------|-------|-------------|--------------|
+| Sidebar UX overhaul — wider, bigger text (18px base), icons on nav items, all values in config | 🟡 Medium | Pre-staging | — | Modern SaaS standard. Current sidebar is functional but compact. Text sizing trend is 17–18px base. Centralize all nav config. |
 | Reports / CSV export (orders, payments) | 🔴 High | Pre-staging | MS9 done | Day-one client ask — "how much did we sell this month?" |
 | `customerRef` + `note` on orders | 🔴 High | MS9 | — | Moved up — B2B dealbreaker |
 | Low Stock Threshold + Alerts | 🟡 Medium | Post-Phase 4 | External notifications | `lowStockThreshold` exists on SKU. Needs notification channel. |

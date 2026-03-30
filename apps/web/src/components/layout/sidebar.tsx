@@ -9,32 +9,38 @@ import {
   CreditCard,
   Boxes,
   Settings,
+  BookOpen,
+  Users,
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/image-upload';
 import { apiFetch } from '@/lib/api';
+import { isFeatureActive } from '@repo/shared';
 
-type TenantFeatures = {
-  inventory?: boolean;
-  orders?: boolean;
-  payments?: boolean;
-  marketplace?: boolean;
-};
+// TenantFeatures shape — matches Tenant.features JSON from the API
+export type TenantFeatures = Record<string, boolean>;
 
 type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
-  featureKey?: keyof TenantFeatures;
+  /** Matches a key in PLATFORM_FEATURES. Undefined = always shown (no feature flag). */
+  featureKey?: string;
 };
 
+/**
+ * Sidebar navigation items.
+ * featureKey must match a key in packages/shared/src/features.ts exactly.
+ * Items without featureKey are always visible (Dashboard, Settings).
+ */
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '', icon: LayoutDashboard },
   { label: 'Inventory', href: '/inventory', icon: Boxes, featureKey: 'inventory' },
   { label: 'Orders', href: '/orders', icon: ShoppingCart, featureKey: 'orders' },
   { label: 'Payments', href: '/payments', icon: CreditCard, featureKey: 'payments' },
-  { label: 'Catalog', href: '/catalog', icon: Package },
+  { label: 'Catalog', href: '/catalog', icon: BookOpen, featureKey: 'catalog' },
+  { label: 'Team', href: '/settings/team', icon: Users, featureKey: 'team' },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -54,7 +60,8 @@ export function Sidebar({ tenantSlug, tenantName, features, logoUrl, userRole, o
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!item.featureKey) return true;
-    return features[item.featureKey] !== false;
+    // isFeatureActive checks BOTH: feature is shipped AND tenant has it enabled
+    return isFeatureActive(item.featureKey, features);
   });
 
   async function handleLogoUploaded(url: string) {

@@ -30,6 +30,7 @@
     "@nestjs/serve-static": "^5.0.4",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^6.16.0",
+    "@repo/shared": "workspace:^",
     "@types/multer": "^2.1.0",
     "@types/multer-s3": "^3.0.3",
     "bcryptjs": "^3.0.3",
