@@ -15,19 +15,38 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
 
+  // Login once before all tests, save state to e2e/.auth/user.json
+  globalSetup: './e2e/global.setup.ts',
+
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:3000',
     trace: 'on-first-retry',
   },
 
   projects: [
+    // Auth tests — test the login form itself, no saved state
+    {
+      name: 'auth',
+      testMatch: '**/auth.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+
+    // All other tests — reuse saved auth state (no re-login per test)
     {
       name: 'desktop-chrome',
-      use: { ...devices['Desktop Chrome'] },
+      testIgnore: '**/auth.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/user.json',
+      },
     },
     {
       name: 'mobile-chrome',
-      use: { ...devices['Pixel 5'] },
+      testIgnore: '**/auth.spec.ts',
+      use: {
+        ...devices['Pixel 5'],
+        storageState: 'e2e/.auth/user.json',
+      },
     },
   ],
 

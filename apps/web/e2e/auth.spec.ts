@@ -30,7 +30,7 @@ test.describe('Auth', () => {
   test('successful login redirects to tenant dashboard', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel(/email/i).fill('owner@peak-hardware.test');
-    await page.getByLabel(/password/i).fill('password123');
+    await page.getByLabel(/password/i).fill('Password123!');
     await page.getByRole('button', { name: /sign in/i }).click();
 
     // Should redirect to a tenant dashboard
@@ -42,7 +42,7 @@ test.describe('Auth', () => {
     // Login first
     await page.goto('/login');
     await page.getByLabel(/email/i).fill('owner@peak-hardware.test');
-    await page.getByLabel(/password/i).fill('password123');
+    await page.getByLabel(/password/i).fill('Password123!');
     await page.getByRole('button', { name: /sign in/i }).click();
     await page.waitForURL(/\/t\/.+/, { timeout: 10_000 });
 

@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { ShoppingCart, CreditCard, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { getActiveBranchId, setActiveBranchId } from '@/lib/branch';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
 import { BranchBreakdown } from './branch-breakdown';
 
@@ -113,25 +114,28 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   const [range, setRange] = useState<DateRange>(presetToRange('7d'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  // null = all branches; string = specific branch scoped in dashboard only
-  const [dashBranchId, setDashBranchId] = useState<string | null>(null);
+  // Read active branch from global sidebar state (localStorage)
+  const activeBranchId = getActiveBranchId(tenantSlug);
 
-  const load = useCallback(async (r: DateRange, branchId: string | null) => {
+  const load = useCallback(async (r: DateRange) => {
     setLoading(true);
     const url = `/dashboard?from=${r.from}&to=${r.to}`;
-    const res = await apiFetch(url, { tenantSlug, branchId });
+    // apiFetch auto-picks activeBranchId from localStorage when branchId not passed
+    const res = await apiFetch(url, { tenantSlug });
     if (res.ok) setData(await res.json());
     setLoading(false);
   }, [tenantSlug]);
 
-  useEffect(() => { load(range, dashBranchId); }, [range, dashBranchId, load]);
+  useEffect(() => { load(range); }, [range, load]);
 
   function handleRangeChange(r: DateRange) {
     setRange(r);
   }
 
+  // Clicking a branch row switches the global branch (same as sidebar switcher)
   function handleBranchSelect(branchId: string | null) {
-    setDashBranchId(branchId);
+    setActiveBranchId(tenantSlug, branchId);
+    window.location.reload();
   }
 
   if (loading && !data) {
@@ -182,27 +186,21 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
       {/* Date range control */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {dashBranchId ? (
-            <>Viewing: <span className="font-medium text-foreground">1 branch</span> —{' '}
-              <button onClick={() => handleBranchSelect(null)} className="text-primary underline-offset-2 hover:underline text-sm">
-                show all
-              </button>
-            </>
-          ) : (
-            <>Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
-            <span className="font-medium text-foreground">{range.to}</span></>
-          )}
+          Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
+          <span className="font-medium text-foreground">{range.to}</span>
         </p>
         <DateRangePicker value={range} onChange={handleRangeChange} />
       </div>
 
-      {/* Branch breakdown table — hidden for single-branch tenants */}
-      <BranchBreakdown
-        tenantSlug={tenantSlug}
-        range={range}
-        activeBranchId={dashBranchId}
-        onSelectBranch={handleBranchSelect}
-      />
+      {/* Branch breakdown — only shown when "All branches" is selected in the sidebar */}
+      {activeBranchId === null && (
+        <BranchBreakdown
+          tenantSlug={tenantSlug}
+          range={range}
+          activeBranchId={null}
+          onSelectBranch={handleBranchSelect}
+        />
+      )}
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

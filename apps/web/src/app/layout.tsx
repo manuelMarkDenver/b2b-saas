@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "B2B Platform",
   },
 };
@@ -30,7 +30,13 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#0f172a",
+  // Matches app background — white in light mode, near-black in dark mode
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#030712" },
+  ],
+  // Allow content to extend under the notch — we handle padding in the shell
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
