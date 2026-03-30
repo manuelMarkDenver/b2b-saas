@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/auth/current-user.decorator';
 import type { AuthUser, RequestWithUser } from '../common/auth/auth.types';
@@ -29,7 +30,7 @@ export class AuthController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(@Body() body: LoginDto) {
-    return this.authService.login(body.email, body.password);
+    return this.authService.login(body.email, body.password, body.tenantSlug);
   }
 
   @Post('forgot-password')
@@ -54,6 +55,14 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return { user };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/password')
+  @HttpCode(200)
+  async changePassword(@Req() req: RequestWithUser, @Body() dto: ChangePasswordDto) {
+    await this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+    return { message: 'Password updated.' };
   }
 
   @UseGuards(JwtAuthGuard)

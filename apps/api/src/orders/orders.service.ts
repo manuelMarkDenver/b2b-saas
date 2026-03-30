@@ -63,6 +63,8 @@ export class OrdersService {
       data: {
         tenantId,
         totalCents,
+        customerRef: dto.customerRef?.trim() || null,
+        note: dto.note?.trim() || null,
         items: { create: itemsData },
       },
       include: {
@@ -165,6 +167,8 @@ export class OrdersService {
         where: { id: orderId },
         data: {
           totalCents,
+          customerRef: dto.customerRef?.trim() || null,
+          note: dto.note?.trim() || null,
           items: { create: itemsData },
         },
         include: {

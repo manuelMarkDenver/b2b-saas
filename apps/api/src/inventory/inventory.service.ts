@@ -41,6 +41,12 @@ export class InventoryService {
       );
     }
 
+    if (data.type === MovementType.ADJUSTMENT && data.quantity < 0 && sku.stockOnHand + data.quantity < 0) {
+      throw new BadRequestException(
+        `Adjustment would result in negative stock: current ${sku.stockOnHand}, delta ${data.quantity}`,
+      );
+    }
+
     const delta =
       data.type === MovementType.IN
         ? data.quantity

@@ -44,10 +44,17 @@ type Member = {
   role: string;
   status: string;
   jobTitle: string | null;
+  username: string | null; // set for direct-add staff (no email)
   isOwner: boolean;
   createdAt: string;
   user: { email: string; avatarUrl?: string | null };
 };
+
+function memberDisplayName(m: Member): string {
+  // Direct-add staff have a placeholder email — show username instead
+  if (m.username) return m.username;
+  return m.user.email;
+}
 
 const SETTINGS_NAV = [
   { label: 'Profile', href: 'profile', icon: Settings },
@@ -171,7 +178,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
   }
 
   async function handleDeactivate(member: Member) {
-    if (!confirm(`Deactivate ${member.user.email}? They will lose access immediately.`)) return;
+    if (!confirm(`Deactivate ${memberDisplayName(member)}? They will lose access immediately.`)) return;
     setActioning(member.id);
     try {
       const res = await apiFetch(`/memberships/${member.id}`, {
@@ -182,7 +189,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
       if (!res.ok) {
         pushToast({ variant: 'error', title: 'Failed to deactivate', message: 'Please try again.' });
       } else {
-        pushToast({ variant: 'success', title: 'Member deactivated', message: `${member.user.email} removed.` });
+        pushToast({ variant: 'success', title: 'Member deactivated', message: `${memberDisplayName(member)} removed.` });
         void loadMembers();
       }
     } finally {
@@ -201,7 +208,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
       if (!res.ok) {
         pushToast({ variant: 'error', title: 'Failed to reactivate', message: 'Please try again.' });
       } else {
-        pushToast({ variant: 'success', title: 'Member reactivated', message: `${member.user.email} now has access.` });
+        pushToast({ variant: 'success', title: 'Member reactivated', message: `${memberDisplayName(member)} now has access.` });
         void loadMembers();
       }
     } finally {
@@ -318,10 +325,10 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
                 <div key={member.id} className="flex items-center justify-between px-4 py-3 gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
-                      {member.user.email[0]}
+                      {memberDisplayName(member)[0]}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{member.user.email}</p>
+                      <p className="text-sm font-medium truncate">{memberDisplayName(member)}</p>
                       <p className="text-xs text-muted-foreground">
                         {member.jobTitle ?? (member.status === 'INVITED' ? 'Invite pending' : member.status === 'DISABLED' ? 'Deactivated' : 'No title set')}
                       </p>
@@ -488,7 +495,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
           {editTarget && (
             <form onSubmit={handleEdit} className="space-y-4">
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                {editTarget.user.email}
+                {memberDisplayName(editTarget)}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit-role">Role</Label>

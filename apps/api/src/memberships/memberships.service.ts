@@ -62,6 +62,7 @@ export class MembershipsService {
         role: true,
         status: true,
         jobTitle: true,
+        username: true,
         isOwner: true,
         createdAt: true,
         user: { select: { email: true, avatarUrl: true } },
@@ -88,43 +89,41 @@ export class MembershipsService {
 
     const normalizedIdentifier = identifier.trim().toLowerCase();
 
-    const existing = await this.prisma.user.findUnique({
-      where: { email: normalizedIdentifier },
-      select: { id: true },
+    // Check username uniqueness within this tenant
+    const usernameConflict = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_username: { tenantId, username: normalizedIdentifier } },
+      select: { id: true, status: true },
     });
-    if (existing) {
-      const alreadyMember = await this.prisma.tenantMembership.findUnique({
-        where: { tenantId_userId: { tenantId, userId: existing.id } },
-        select: { status: true },
-      });
-      if (alreadyMember?.status === 'ACTIVE') {
-        throw new BadRequestException('That identifier is already used by an active member');
-      }
+    if (usernameConflict?.status === 'ACTIVE') {
+      throw new BadRequestException('That username is already taken in this business');
     }
+
+    // Get tenant slug for placeholder email
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
 
     const passwordHash = await hash(password, 12);
-    const user = existing ?? await this.prisma.user.create({
-      data: { email: normalizedIdentifier, passwordHash, status: 'ACTIVE' },
+    const placeholderEmail = `direct-${randomUUID()}@${tenant!.slug}.internal`;
+
+    const user = await this.prisma.user.create({
+      data: { email: placeholderEmail, passwordHash, status: 'ACTIVE' },
       select: { id: true },
     });
-
-    if (existing) {
-      await this.prisma.user.update({
-        where: { id: existing.id },
-        data: { passwordHash, status: 'ACTIVE' },
-      });
-    }
 
     await this.prisma.tenantMembership.upsert({
       where: { tenantId_userId: { tenantId, userId: user.id } },
       create: {
         tenantId,
         userId: user.id,
+        username: normalizedIdentifier,
         role,
         jobTitle: jobTitle?.trim() || null,
         status: 'ACTIVE',
       },
       update: {
+        username: normalizedIdentifier,
         role,
         jobTitle: jobTitle?.trim() || null,
         status: 'ACTIVE',

@@ -1,8 +1,8 @@
 # Data Model
 
-> Last updated: 2026-03-29 — Audit pass: added Tenant.status, Sku.isArchived, Sku.lowStockThreshold, Order.customerRef/note, fixed MembershipStatus enum.
-> Added i18n/currency fields to Tenant + User (post-MVP). Added Integration + TenantRole to Future Models.
-> Bug fixes: negative stock prevention enforced (OUT movements + order confirmation); CONFIRMED→CANCELLED now restores inventory.
+> Last updated: 2026-03-30 — MS9: TenantMembership.username (tenant-scoped, direct-add staff login), ADJUSTMENT negative stock floor, DATA_MODEL brought in sync with schema.
+> 2026-03-29: Audit pass: added Tenant.status, Sku.isArchived, Sku.lowStockThreshold, Order.customerRef/note, fixed MembershipStatus enum.
+> Bug fixes: negative stock prevention enforced (OUT movements + order confirmation + ADJUSTMENT floor); CONFIRMED→CANCELLED now restores inventory.
 > Added quantity cap (max 10,000/line) and totalCents overflow guard (~$21M). Future: migrate totalCents to Decimal/BigInt.
 
 ---
@@ -75,11 +75,18 @@
 | tenantId | UUID | FK → Tenant |
 | userId | UUID | FK → User |
 | role | Enum | `OWNER`, `ADMIN`, `STAFF`, `VIEWER` |
-| status | Enum | `ACTIVE`, `INACTIVE` — deactivated = no access, record preserved |
+| status | Enum | `ACTIVE`, `INVITED`, `DISABLED` — deactivated = no access, record preserved |
+| username | String? | Login identifier for direct-add staff (no email). Scoped per tenant — `@@unique([tenantId, username])`. Null for email-invited members. |
+| jobTitle | String? | Optional display label (e.g. "Cashier", "Manager") |
+| isOwner | Boolean | True only for the tenant creator |
+| inviteToken | String? | Short-lived UUID for email invite flow |
+| inviteExpiresAt | DateTime? | Invite expiry (48h from send) |
 | createdAt | DateTime | |
 
 **Rules:**
-- Memberships are deactivated (`status: INACTIVE`), never deleted. Preserves audit trail of who had access when.
+- Memberships are deactivated (`status: DISABLED`), never deleted. Preserves audit trail of who had access when.
+- Direct-add staff: `User.email` is a placeholder (`direct-{uuid}@{slug}.internal`). Actual login credential is `membership.username` + business code (tenant slug) + password.
+- Invited staff: `membership.username` is null. Login via email + password only.
 
 ---
 
@@ -148,7 +155,7 @@
 - Every stock change MUST create an `InventoryMovement` record.
 - Backend enforces this — no silent stock updates.
 - `OUT` movements are rejected if `quantity > stockOnHand` — negative stock is prevented at the service layer.
-- `ADJUSTMENT` movements may produce negative stock intentionally (e.g. write-offs after a count). No guard on ADJUSTMENT.
+- `ADJUSTMENT` movements with a negative delta that would drop `stockOnHand` below 0 are also rejected.
 
 ---
 

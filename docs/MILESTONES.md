@@ -51,40 +51,45 @@
 
 | # | Issue | Status | Fix |
 |---|-------|--------|-----|
-| 1 | Staff can't change their password | ⏳ MS9 | Add `PATCH /auth/me/password` + settings UI |
-| 2 | Username collision across tenants | ⏳ MS9 | `username` on `TenantMembership`, not `User.email`. Scoped `@@unique([tenantId, username])` |
-| 3 | No customer reference on orders | ⏳ MS9 | Add nullable `customerRef String?` to `Order` |
+| 1 | Staff can't change their password | ✅ MS9 | `PATCH /auth/me/password` + settings UI card |
+| 2 | Username collision across tenants | ✅ MS9 | `username` on `TenantMembership`, scoped `@@unique([tenantId, username])` |
+| 3 | No customer reference on orders | ✅ MS9 | `customerRef String?` + `note String?` on `Order` |
 | 4 | No dashboard / home screen | ⏳ Pre-staging | Summary view: orders today, pending payments, low stock |
-| 5 | No marketing page / demo CTA | ⏳ MS11 | `apps/marketing`, static Next.js, Calendly link |
+| 5 | No marketing page / demo CTA | ⏳ MS10 | `apps/marketing`, static Next.js, Calendly link |
 
 ### 🟡 Warning — fix before staging
 
 | # | Issue | Status | Fix |
 |---|-------|--------|-----|
-| 6 | Stock goes negative on manual OUT movements | ⏳ MS9 | Add stock floor check in `InventoryService` for manual adjustments |
-| 7 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
-| 8 | 7-day JWT — deactivating User (not membership) doesn't revoke access | ❌ Open | Low risk now. TenantGuard checks membership. Revisit at staging. |
-| 9 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
-| 10 | No profile page for non-owner staff | ❌ Open | Minor. Add avatar/name edit to user menu for all roles. |
+| 6 | Stock goes negative on manual ADJUSTMENT | ✅ MS9 | Stock floor check added in `InventoryService` for negative adjustments |
+| 7 | ₱ hardcoded in `payments.service.ts` notification body | ❌ Open | `payments.service.ts:65` — move to shared `formatCents()` util. Breaks for non-PHP tenants. |
+| 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ❌ Open | Extract to `@/lib/format.ts` with currency configurable per tenant |
+| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership` | ❌ Open | Sequential scans at scale. Add before staging deployment. |
+| 10 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
+| 11 | 7-day JWT — deactivating User (not membership) doesn't revoke access immediately | ❌ Open | Low risk now. TenantGuard checks membership status. Revisit at staging. |
+| 12 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
 
 ### 🟢 Advisory — log and revisit
 
 | # | Issue | Status | Notes |
 |---|-------|--------|-------|
-| 11 | Currency hardcoded to ₱ in `formatCents()` | ❌ Open | Fine for PH-only. Becomes a problem for international demos. |
-| 12 | CSV import allows wrong `categorySlug` per tenant type | ❌ Open | UX issue. Pizza shop can import with `fasteners` category. Not a security risk. |
-| 13 | Direct-add staff have no email → can't use Forgot Password | ❌ Open | Resolved by password change endpoint (item 1). |
-| 14 | No pricing / tiers | ✅ Intentional | Calendly model. Revisit post-staging with real client feedback. |
-| 15 | Tenant self-registration | ✅ Intentional | Super Admin provisions manually. By design. |
+| 13 | `UsersService.findById()` is dead code — exported, never called | ❌ Open | `users.service.ts:8`. Not a live leak. Remove to avoid confusion. |
+| 14 | `Notification.tenantId` is nullable — not documented in schema | ❌ Open | Intentional for `PLATFORM_ALERT` type. Add inline comment to schema. |
+| 15 | `OrderItem` has no `createdAt`/`updatedAt` | ❌ Open | Immutable by design (deleted+recreated on order edit). Timestamps would help audit trail. |
+| 16 | Financial FK relations lack explicit `onDelete: Restrict` | ❌ Open | Currently relies on Postgres default. Make explicit before staging to prevent migration mistakes. |
+| 17 | CSV import allows wrong `categorySlug` per business type | ❌ Open | UX issue. Pizza shop can import with `fasteners` category. Not a security risk. |
+| 18 | No pricing / tiers | ✅ Intentional | Calendly model. Revisit post-staging with real client feedback. |
+| 19 | Tenant self-registration | ✅ Intentional | Super Admin provisions manually. By design. |
 
 ### ✅ Fixed This Milestone
 
 | # | Issue | Fixed in |
 |---|-------|----------|
-| 16 | Team list showing 0 members | MS9 — `JwtAuthGuard` missing on `GET /memberships/team` |
-| 17 | Invite link pointed to API port (3001) | MS9 — `APP_FRONTEND_URL` env var |
-| 18 | Login rejected phone/nickname identifiers | MS9 — `@IsEmail()` replaced with `@IsString()` on `LoginDto` |
-| 19 | Invite emails linked to wrong port | MS9 — `appFrontendUrl` used in memberships service |
+| 20 | Team list showing 0 members | MS9 — `JwtAuthGuard` missing on `GET /memberships/team` |
+| 21 | Invite link pointed to API port (3001) | MS9 — `APP_FRONTEND_URL` env var |
+| 22 | Login rejected phone/nickname identifiers | MS9 — `@IsEmail()` replaced with `@IsString()` on `LoginDto` |
+| 23 | Direct-add staff have no email → can't use Forgot Password | MS9 — `PATCH /auth/me/password` endpoint + UI |
+| 24 | Username collision across tenants (two Juans, different businesses) | MS9 — `membership.username` scoped per tenant |
 
 ---
 
