@@ -12,7 +12,7 @@
 | **Phase 2** | MS3 | Catalog — Products, SKUs, Categories | ✅ Done |
 | **Phase 3** | MS4–MS6 | Operations — Inventory, Orders, Payments | ✅ Done |
 | **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | ✅ Done |
-| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Team Mgmt, Multi-Branch | 🚧 MS9 ✅, MS10 next |
+| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Team Mgmt, Multi-Branch | ✅ Done |
 | **Phase 6** | MS11 | Go-to-Market — Marketing Website | ✅ Done |
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
 | **Phase 8** | — | Mobile + POS | 📋 PWA pre-staging; native app after revenue |
@@ -35,8 +35,8 @@
 |---|------|--------|-------|
 | 1 | MS9 — username scoping, password change, negative stock floor, customerRef | ✅ Done | Merged |
 | 2 | Marketing page (`apps/marketing`) | ✅ Done | MS11 merged |
-| 3 | Multi-branch v1 (MS10) | 📋 Next | Invisible at single-branch. No UI until 2nd branch added. |
-| 4 | Dashboard / home screen | 📋 Planned | Summary of orders, payments, low stock on login. |
+| 3 | Multi-branch v1 (MS10) | ✅ Done | Merged |
+| 4 | Dashboard / home screen (MS12) | ✅ Done | Summary cards, date range (presets + custom), 4 Recharts: area revenue, bar orders/day, donut status, horizontal bar low stock. |
 | 5 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
 | 6 | **Mobile responsive + PWA** | 📋 Planned | **Second-to-last.** Done after all features are stabilised — avoids re-doing responsive work as panels change. |
 | 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
@@ -76,8 +76,8 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 1 | Staff can't change their password | ✅ MS9 | `PATCH /auth/me/password` + settings UI card |
 | 2 | Username collision across tenants | ✅ MS9 | `username` on `TenantMembership`, scoped `@@unique([tenantId, username])` |
 | 3 | No customer reference on orders | ✅ MS9 | `customerRef String?` + `note String?` on `Order` |
-| 4 | No dashboard / home screen | ⏳ Pre-staging | Summary view: orders today, pending payments, low stock |
-| 5 | No marketing page / demo CTA | ⏳ MS10 | `apps/marketing`, static Next.js, Calendly link |
+| 4 | No dashboard / home screen | ✅ MS12 | Summary cards, date range (presets + custom), 4 animated Recharts (area, bar, donut, horizontal bar) |
+| 5 | No marketing page / demo CTA | ✅ MS11 | `apps/marketing`, static Next.js, Calendly link |
 
 ### 🟡 Warning — fix before staging
 
@@ -103,7 +103,7 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 18 | No pricing / tiers | ✅ Intentional | Calendly model. Revisit post-staging with real client feedback. |
 | 19 | Tenant self-registration | ✅ Intentional | Super Admin provisions manually. By design. |
 
-### ✅ Fixed This Milestone
+### ✅ Fixed This Milestone (MS10 + MS12)
 
 | # | Issue | Fixed in |
 |---|-------|----------|
@@ -112,6 +112,8 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 22 | Login rejected phone/nickname identifiers | MS9 — `@IsEmail()` replaced with `@IsString()` on `LoginDto` |
 | 23 | Direct-add staff have no email → can't use Forgot Password | MS9 — `PATCH /auth/me/password` endpoint + UI |
 | 24 | Username collision across tenants (two Juans, different businesses) | MS9 — `membership.username` scoped per tenant |
+| 25 | No multi-branch support | MS10 — `Branch` model, `BranchesModule`, `x-branch-id` header filtering, branch switcher UI |
+| 26 | Dashboard was a stub with no real data | MS12 — `GET /dashboard` with date range, 4 animated charts (revenue area, orders bar, status donut, low stock horizontal bar) |
 
 ---
 
