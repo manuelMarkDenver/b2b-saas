@@ -38,7 +38,7 @@
 | 3 | Multi-branch v1 (MS10) | ✅ Done | Merged |
 | 4 | Dashboard / home screen (MS12) | ✅ Done | Summary cards, date range (presets + custom), 4 Recharts: area revenue, bar orders/day, donut status, horizontal bar low stock. |
 | 5 | Basic reports (orders CSV export, date filter) | ✅ Done | MS13 — GET /reports/orders + CSV export, sidebar nav, date picker. |
-| 6 | **Mobile responsive + PWA** | 📋 Planned | **Second-to-last.** Done after all features are stabilised — avoids re-doing responsive work as panels change. |
+| 6 | **Mobile responsive + PWA** | ✅ Done | MS14 — manifest, service worker, mobile drawer, horizontal-scroll tables, responsive sheets. |
 | 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
@@ -445,19 +445,19 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 
 ---
 
-### MS14 — PWA + Mobile Responsive 🚧 In Progress
+### MS14 — PWA + Mobile Responsive ✅ Done
 
 > Make the existing app installable as a PWA and usable on phone screens. Same features, same routes — just mobile-friendly layout.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `manifest.json` + app icons | 🚧 | `name`, `short_name`, `start_url`, 192×192 + 512×512 icons |
-| Service worker via `@ducanh2912/next-pwa` | 🚧 | Auto-generated; offline fallback page |
-| Viewport meta + theme-color | 🚧 | Fixes mobile viewport scaling |
-| App title update | 🚧 | Replace "Create Next App" with proper name |
-| Mobile sidebar drawer | 🚧 | Fixed overlay on mobile, inline collapse on desktop |
-| Responsive tables (horizontal scroll) | 🚧 | `overflow-x-auto` wrapper + `min-w` on all grid rows |
-| Responsive sheets | 🚧 | `w-full sm:w-[680px]` on all SheetContent panels |
+| `manifest.json` + app icons | ✅ Done | `name`, `short_name`, `start_url`, 192×192 + 512×512 icons |
+| Service worker via `@ducanh2912/next-pwa` | ✅ Done | Auto-generated; offline fallback page at `/offline` |
+| Viewport meta + theme-color | ✅ Done | Fixes mobile viewport scaling |
+| App title update | ✅ Done | "B2B Platform" replacing "Create Next App" |
+| Mobile sidebar drawer | ✅ Done | Fixed overlay on mobile, inline collapse on desktop |
+| Responsive tables (horizontal scroll) | ✅ Done | `overflow-x-auto` wrapper on orders, payments, inventory, reports panels |
+| Responsive sheets | ✅ Done | `w-full sm:w-[680px/520px]` on all SheetContent panels |
 
 ---
 
