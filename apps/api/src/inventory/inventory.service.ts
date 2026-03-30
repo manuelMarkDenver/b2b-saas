@@ -21,6 +21,7 @@ export class InventoryService {
       referenceId?: string;
       note?: string;
     },
+    branchId?: string,
   ) {
     const sku = await this.prisma.sku.findFirst({
       where: { id: data.skuId, tenantId },
@@ -64,6 +65,7 @@ export class InventoryService {
           referenceType: data.referenceType,
           referenceId: data.referenceId ?? null,
           note: data.note ?? null,
+          branchId: branchId ?? null,
         },
       });
 
@@ -76,9 +78,13 @@ export class InventoryService {
     });
   }
 
-  async listMovements(tenantId: string, page: number, limit: number, skuId?: string) {
+  async listMovements(tenantId: string, page: number, limit: number, skuId?: string, branchId?: string) {
     const skip = (page - 1) * limit;
-    const where = { tenantId, ...(skuId ? { skuId } : {}) };
+    const where = {
+      tenantId,
+      ...(skuId ? { skuId } : {}),
+      ...(branchId ? { branchId } : {}),
+    };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.inventoryMovement.findMany({
         where,

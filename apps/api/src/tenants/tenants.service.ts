@@ -15,12 +15,21 @@ export class TenantsService {
       throw new ConflictException('Tenant slug already in use');
     }
 
-    return this.prisma.tenant.create({
-      data: {
-        name: name.trim(),
-        slug: normalizedSlug,
-        createdByUserId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          name: name.trim(),
+          slug: normalizedSlug,
+          createdByUserId,
+        },
+      });
+
+      // Auto-create the default branch for every new tenant
+      await tx.branch.create({
+        data: { tenantId: tenant.id, name: 'Main Branch', isDefault: true },
+      });
+
+      return tenant;
     });
   }
 

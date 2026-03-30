@@ -20,7 +20,7 @@ export class OrdersService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async createOrder(tenantId: string, dto: CreateOrderDto) {
+  async createOrder(tenantId: string, dto: CreateOrderDto, branchId?: string) {
     const skuIds = dto.items.map((i) => i.skuId);
 
     const skus = await this.prisma.sku.findMany({
@@ -63,6 +63,7 @@ export class OrdersService {
       data: {
         tenantId,
         totalCents,
+        branchId: branchId ?? null,
         customerRef: dto.customerRef?.trim() || null,
         note: dto.note?.trim() || null,
         items: { create: itemsData },
@@ -85,9 +86,9 @@ export class OrdersService {
     return order;
   }
 
-  async listOrders(tenantId: string, page: number, limit: number) {
+  async listOrders(tenantId: string, page: number, limit: number, branchId?: string) {
     const skip = (page - 1) * limit;
-    const where = { tenantId };
+    const where = { tenantId, ...(branchId ? { branchId } : {}) };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({
         where,

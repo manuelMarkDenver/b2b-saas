@@ -15,7 +15,8 @@ export class InventoryController {
 
   @Post('movements')
   logMovement(@Req() req: RequestWithUser, @Body() body: LogMovementDto) {
-    return this.inventoryService.logMovement(req.tenant!.id, body);
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    return this.inventoryService.logMovement(req.tenant!.id, body, branchId);
   }
 
   @Get('movements')
@@ -24,6 +25,7 @@ export class InventoryController {
     @Query() pagination: PaginationDto,
     @Query('skuId') skuId?: string,
   ) {
-    return this.inventoryService.listMovements(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, skuId);
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    return this.inventoryService.listMovements(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, skuId, branchId);
   }
 }
