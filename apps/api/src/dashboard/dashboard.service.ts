@@ -187,15 +187,41 @@ export class DashboardService {
     const revenueMap = toMap(revenueByBranch, 'amountCents');
     const todayMap = toMap(todayByBranch, 'count');
 
-    return branches.map((b) => ({
-      id: b.id,
-      name: b.name,
-      isDefault: b.isDefault,
-      ordersInRange: (ordersMap.get(b.id) as number) ?? 0,
-      ordersToday: (todayMap.get(b.id) as number) ?? 0,
-      pendingPayments: (pendingMap.get(b.id) as number) ?? 0,
-      revenueRangeCents: (revenueMap.get(b.id) as number) ?? 0,
-    }));
+    // Tenant-wide totals — computed independently so "All branches" row
+    // always matches the summary cards (includes orders with branchId = null)
+    const [totalOrdersInRange, totalOrdersToday, totalPending, totalRevenue] = await Promise.all([
+      this.prisma.order.count({ where: { tenantId, createdAt: { gte: from, lte: to } } }),
+      this.prisma.order.count({ where: { tenantId, createdAt: { gte: todayStart, lte: todayEnd } } }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          status: OrderStatus.CONFIRMED,
+          payments: { none: { status: PaymentStatus.VERIFIED } },
+        },
+      }),
+      this.prisma.payment.aggregate({
+        where: { tenantId, status: PaymentStatus.VERIFIED, createdAt: { gte: from, lte: to } },
+        _sum: { amountCents: true },
+      }),
+    ]);
+
+    return {
+      totals: {
+        ordersInRange: totalOrdersInRange,
+        ordersToday: totalOrdersToday,
+        pendingPayments: totalPending,
+        revenueRangeCents: totalRevenue._sum.amountCents ?? 0,
+      },
+      branches: branches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        isDefault: b.isDefault,
+        ordersInRange: (ordersMap.get(b.id) as number) ?? 0,
+        ordersToday: (todayMap.get(b.id) as number) ?? 0,
+        pendingPayments: (pendingMap.get(b.id) as number) ?? 0,
+        revenueRangeCents: (revenueMap.get(b.id) as number) ?? 0,
+      })),
+    };
   }
 }
 

@@ -107,16 +107,22 @@ describe('Dashboard (e2e)', () => {
   });
 
   describe('GET /dashboard/branches', () => {
-    it('returns per-branch breakdown', async () => {
+    it('returns per-branch breakdown with totals', async () => {
       const res = await request(app.getHttpServer())
         .get('/dashboard/branches')
         .set('Authorization', `Bearer ${ownerToken}`)
         .set('x-tenant-slug', TENANT_SLUG);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body.length).toBeGreaterThanOrEqual(1);
-      for (const row of res.body) {
+      expect(res.body.totals).toMatchObject({
+        ordersInRange: expect.any(Number),
+        ordersToday: expect.any(Number),
+        pendingPayments: expect.any(Number),
+        revenueRangeCents: expect.any(Number),
+      });
+      expect(Array.isArray(res.body.branches)).toBe(true);
+      expect(res.body.branches.length).toBeGreaterThanOrEqual(1);
+      for (const row of res.body.branches) {
         expect(row).toMatchObject({
           id: expect.any(String),
           name: expect.any(String),
@@ -127,6 +133,27 @@ describe('Dashboard (e2e)', () => {
           revenueRangeCents: expect.any(Number),
         });
       }
+    });
+
+    it('totals match tenant-wide summary data', async () => {
+      const [breakdownRes, summaryRes] = await Promise.all([
+        request(app.getHttpServer())
+          .get('/dashboard/branches')
+          .set('Authorization', `Bearer ${ownerToken}`)
+          .set('x-tenant-slug', TENANT_SLUG),
+        request(app.getHttpServer())
+          .get('/dashboard')
+          .set('Authorization', `Bearer ${ownerToken}`)
+          .set('x-tenant-slug', TENANT_SLUG),
+      ]);
+
+      expect(breakdownRes.status).toBe(200);
+      expect(summaryRes.status).toBe(200);
+
+      // Totals row must match summary card values exactly
+      expect(breakdownRes.body.totals.ordersToday).toBe(summaryRes.body.summary.ordersToday);
+      expect(breakdownRes.body.totals.pendingPayments).toBe(summaryRes.body.summary.pendingPayments);
+      expect(breakdownRes.body.totals.revenueRangeCents).toBe(summaryRes.body.summary.revenueRangeCents);
     });
 
     it('tenant isolation — other tenant gets their own branches', async () => {
@@ -141,8 +168,8 @@ describe('Dashboard (e2e)', () => {
           .set('x-tenant-slug', OTHER_SLUG),
       ]);
 
-      const aIds = resA.body.map((r: { id: string }) => r.id);
-      const bIds = resB.body.map((r: { id: string }) => r.id);
+      const aIds = resA.body.branches.map((r: { id: string }) => r.id);
+      const bIds = resB.body.branches.map((r: { id: string }) => r.id);
       expect(aIds.filter((id: string) => bIds.includes(id))).toHaveLength(0);
     });
 

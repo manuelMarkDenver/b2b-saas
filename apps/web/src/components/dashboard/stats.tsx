@@ -241,7 +241,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           {revenueData.length === 0 ? (
             <EmptyChart message="No verified payments in this range" />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={200} style={{ background: 'transparent' }}>
               <AreaChart data={revenueData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
@@ -267,7 +267,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           {ordersData.length === 0 ? (
             <EmptyChart message="No orders in this range" />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={200} style={{ background: 'transparent' }}>
               <BarChart data={ordersData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
@@ -330,7 +330,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           {lowStockData.length === 0 ? (
             <EmptyChart message="All items are above threshold" />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={200} style={{ background: 'transparent' }}>
               <BarChart
                 layout="vertical"
                 data={lowStockData}

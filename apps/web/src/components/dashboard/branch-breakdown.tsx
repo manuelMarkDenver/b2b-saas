@@ -15,6 +15,18 @@ type BranchRow = {
   revenueRangeCents: number;
 };
 
+type Totals = {
+  ordersInRange: number;
+  ordersToday: number;
+  pendingPayments: number;
+  revenueRangeCents: number;
+};
+
+type BranchBreakdownResponse = {
+  totals: Totals;
+  branches: BranchRow[];
+};
+
 function formatCents(cents: number) {
   return `₱${(cents / 100).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
@@ -27,20 +39,23 @@ interface Props {
 }
 
 export function BranchBreakdown({ tenantSlug, range, onSelectBranch, activeBranchId }: Props) {
-  const [rows, setRows] = useState<BranchRow[]>([]);
+  const [data, setData] = useState<BranchBreakdownResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     apiFetch(`/dashboard/branches?from=${range.from}&to=${range.to}`, { tenantSlug, branchId: null })
       .then((r) => r.json())
-      .then((data: BranchRow[]) => setRows(data))
+      .then((res: BranchBreakdownResponse) => setData(res))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [tenantSlug, range]);
 
   // Only show when there are multiple branches
-  if (!loading && rows.length <= 1) return null;
+  if (!loading && (!data || data.branches.length <= 1)) return null;
+
+  const totals = data?.totals;
+  const rows = data?.branches ?? [];
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -77,7 +92,7 @@ export function BranchBreakdown({ tenantSlug, range, onSelectBranch, activeBranc
               </tr>
             </thead>
             <tbody>
-              {/* "All branches" row */}
+              {/* "All branches" row — uses server-computed totals, always matches summary cards */}
               <tr
                 onClick={() => onSelectBranch(null)}
                 className={`border-b border-border cursor-pointer transition-colors hover:bg-muted/40 ${
@@ -92,17 +107,17 @@ export function BranchBreakdown({ tenantSlug, range, onSelectBranch, activeBranc
                     All branches
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right font-semibold">
-                  {rows.reduce((s, r) => s + r.ordersToday, 0)}
-                </td>
-                <td className="px-4 py-3 text-right hidden sm:table-cell">
-                  {rows.reduce((s, r) => s + r.ordersInRange, 0)}
-                </td>
+                <td className="px-4 py-3 text-right font-semibold">{totals?.ordersToday ?? 0}</td>
+                <td className="px-4 py-3 text-right hidden sm:table-cell">{totals?.ordersInRange ?? 0}</td>
                 <td className="px-4 py-3 text-right hidden md:table-cell">
-                  {rows.reduce((s, r) => s + r.pendingPayments, 0)}
+                  {(totals?.pendingPayments ?? 0) > 0 ? (
+                    <span className="text-destructive font-medium">{totals?.pendingPayments}</span>
+                  ) : (
+                    totals?.pendingPayments ?? 0
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right font-semibold">
-                  {formatCents(rows.reduce((s, r) => s + r.revenueRangeCents, 0))}
+                  {formatCents(totals?.revenueRangeCents ?? 0)}
                 </td>
               </tr>
 
