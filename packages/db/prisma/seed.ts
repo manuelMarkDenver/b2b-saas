@@ -206,7 +206,7 @@ async function main() {
     create: { tenantId: adminTenant.id, userId: admin.id, status: "ACTIVE", isOwner: true, role: "OWNER" },
   });
 
-  const defaultFeatures = { inventory: true, orders: true, payments: true, marketplace: false };
+  const defaultFeatures = { inventory: true, orders: true, payments: true, team: true, catalog: true, reports: true, marketplace: false };
 
   const hardwareTenant = await prisma.tenant.upsert({
     where: { slug: "peak-hardware" },

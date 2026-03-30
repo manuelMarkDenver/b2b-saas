@@ -5,6 +5,14 @@ import { TenantGuard } from '../common/auth/tenant.guard';
 import { ReportsService } from './reports.service';
 import type { RequestWithUser } from '../common/auth/auth.types';
 
+function startOfDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+}
+
+function endOfDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
+}
+
 @Controller('reports')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class ReportsController {
@@ -16,13 +24,13 @@ export class ReportsController {
     @Query('from') fromStr?: string,
     @Query('to') toStr?: string,
     @Query('format') format?: string,
-    @Res() res?: Response,
+    @Res() res: Response,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
 
     const now = new Date();
-    const to = toStr ? new Date(toStr) : now;
-    const from = fromStr ? new Date(fromStr) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = toStr ? endOfDay(new Date(toStr)) : endOfDay(now);
+    const from = fromStr ? startOfDay(new Date(fromStr)) : startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
 
     const orders = await this.reports.getOrdersReport({
       tenantId: req.tenant!.id,
@@ -31,16 +39,17 @@ export class ReportsController {
       branchId,
     });
 
+    const payload = { data: orders, meta: { from: from.toISOString(), to: to.toISOString() } };
+
     if (format === 'csv') {
       const csv = this.reports.generateOrdersCsv(orders);
       const filename = `orders-report-${from.toISOString().split('T')[0]}-${to.toISOString().split('T')[0]}.csv`;
-
-      res?.setHeader('Content-Type', 'text/csv');
-      res?.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res?.send(csv);
+      res!.setHeader('Content-Type', 'text/csv');
+      res!.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res!.send(csv);
       return;
     }
 
-    return { data: orders, meta: { from: from.toISOString(), to: to.toISOString() } };
+    res!.json(payload);
   }
 }

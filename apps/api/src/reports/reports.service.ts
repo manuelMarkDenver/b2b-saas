@@ -33,6 +33,10 @@ export class ReportsService {
       },
       orderBy: { createdAt: 'desc' },
       take: 1000,
+      include: {
+        items: { select: { quantity: true } },
+        branch: { select: { name: true } },
+      },
     });
 
     return orders.map((order): OrderReportRow => ({
@@ -41,8 +45,8 @@ export class ReportsService {
       customerRef: order.customerRef,
       totalCents: order.totalCents,
       status: order.status,
-      itemCount: 0,
-      branchName: null,
+      itemCount: order.items.reduce((sum, i) => sum + i.quantity, 0),
+      branchName: order.branch?.name ?? null,
     }));
   }
 
