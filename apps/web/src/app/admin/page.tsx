@@ -12,6 +12,7 @@ type TenantFeatures = {
   orders: boolean;
   payments: boolean;
   marketplace: boolean;
+  reports: boolean;
 };
 
 type Tenant = {
@@ -24,7 +25,7 @@ type Tenant = {
   _count: { memberships: number };
 };
 
-const FLAG_KEYS: (keyof TenantFeatures)[] = ["inventory", "orders", "payments", "marketplace"];
+const FLAG_KEYS: (keyof TenantFeatures)[] = ["inventory", "orders", "payments", "reports", "marketplace"];
 
 async function readApiError(res: Response): Promise<string> {
   try {

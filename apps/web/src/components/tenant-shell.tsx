@@ -28,6 +28,7 @@ type TenantFeatures = {
   orders: boolean;
   payments: boolean;
   marketplace: boolean;
+  reports: boolean;
 };
 
 type Membership = {
@@ -54,6 +55,7 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
     orders: true,
     payments: true,
     marketplace: false,
+    reports: false,
   });
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);

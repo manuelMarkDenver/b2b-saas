@@ -37,7 +37,7 @@
 | 2 | Marketing page (`apps/marketing`) | ✅ Done | MS11 merged |
 | 3 | Multi-branch v1 (MS10) | ✅ Done | Merged |
 | 4 | Dashboard / home screen (MS12) | ✅ Done | Summary cards, date range (presets + custom), 4 Recharts: area revenue, bar orders/day, donut status, horizontal bar low stock. |
-| 5 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
+| 5 | Basic reports (orders CSV export, date filter) | ✅ Done | MS13 — GET /reports/orders + CSV export, sidebar nav, date picker. |
 | 6 | **Mobile responsive + PWA** | 📋 Planned | **Second-to-last.** Done after all features are stabilised — avoids re-doing responsive work as panels change. |
 | 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
@@ -410,6 +410,38 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | Voice-over MP3 generated | ⏳ Pending | Needs `OPENAI_API_KEY` |
 | Testimonial avatar generated | ⏳ Pending | Needs token |
 | Real Calendly URL configured | ⏳ Pending | Set `urls.calendly` in `marketing.config.ts` |
+
+---
+
+### MS13 — Basic Reports ✅ Done
+
+> Day-one client ask: "How much did we sell this month?"
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `GET /reports/orders` — date range filter | ✅ Done | Query params: `from`, `to` (ISO dates). |
+| `GET /reports/orders?format=csv` | ✅ Done | Returns CSV with headers. |
+| Branch filtering support | ✅ Done | Respects `x-branch-id` header. |
+| Reports sidebar nav item | ✅ Done | Feature-gated, added to sidebar. |
+| Reports page: date picker + table | ✅ Done | Reuse dashboard date presets. Default: This Month. |
+| Export CSV button | ✅ Done | Browser blob download. |
+
+**CSV columns:**
+- Order ID
+- Date
+- Customer Ref
+- Total (₱)
+- Status
+- Item Count
+- Branch (if multi-branch)
+
+**Date presets (reused from dashboard):**
+- Today
+- Yesterday
+- Last 7 days
+- This Month
+- Last Month
+- Custom range
 
 ---
 
