@@ -130,7 +130,7 @@ export function BranchSwitcher({ tenantSlug }: BranchSwitcherProps) {
         {/* Search — only when >7 branches */}
         {expanded && showSearch && (
           <div className="px-2 pb-1">
-            <div className="flex items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1">
+            <div className="flex items-center gap-1.5 rounded-md border border-input bg-muted px-2 py-1">
               <Search className="h-3 w-3 text-muted-foreground shrink-0" />
               <input
                 ref={searchRef}
