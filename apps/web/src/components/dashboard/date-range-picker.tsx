@@ -96,7 +96,7 @@ export function DateRangePicker({ value, onChange }: Props) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-background shadow-lg">
+          <div className="absolute left-0 z-20 mt-1 w-56 rounded-lg border border-border bg-background shadow-lg">
             <div className="py-1">
               {PRESETS.map((preset) => (
                 <button
