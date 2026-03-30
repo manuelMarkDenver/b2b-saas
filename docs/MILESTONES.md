@@ -458,6 +458,31 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | Mobile sidebar drawer | ✅ Done | Fixed overlay on mobile, inline collapse on desktop |
 | Responsive tables (horizontal scroll) | ✅ Done | `overflow-x-auto` wrapper on orders, payments, inventory, reports panels |
 | Responsive sheets | ✅ Done | `w-full sm:w-[680px/520px]` on all SheetContent panels |
+| Settings layout responsive | ✅ Done | `flex-col md:flex-row` on settings sub-nav; horizontal pills on mobile |
+| Header overflow fixed | ✅ Done | TenantSwitcher/BranchSwitcher/NotificationBell hidden on mobile; breadcrumb truncated |
+
+---
+
+### MS15 — Browser Tests (Playwright) ✅ Done
+
+> Automated browser tests for key flows. No more manual UI testing.
+
+| Suite | Status | File | What it covers |
+|-------|--------|------|----------------|
+| PWA smoke tests | ✅ Done | `e2e/pwa.spec.ts` | manifest.json, icons, offline page, viewport meta, title |
+| Auth flow | ✅ Done | `e2e/auth.spec.ts` | Login renders, invalid creds show error, success redirects, already-authed redirect |
+| Mobile responsive | ✅ Done | `e2e/mobile-responsive.spec.ts` | Sidebar hidden on mobile, hamburger toggles drawer, backdrop closes, table overflow, header height |
+| Desktop layout | ✅ Done | `e2e/mobile-responsive.spec.ts` | Sidebar visible by default, toggle inline (no backdrop on desktop) |
+
+**Run:**
+```bash
+# Start API + web dev servers first, then:
+pnpm --filter web test:e2e            # headless (all suites)
+pnpm --filter web test:e2e:ui         # interactive Playwright UI
+pnpm --filter web test:e2e:report     # view last run HTML report
+```
+
+**Browsers:** Desktop Chrome + Pixel 5 (mobile Chrome)
 
 ---
 
