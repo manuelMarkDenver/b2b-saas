@@ -106,10 +106,12 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 6 | Stock goes negative on manual ADJUSTMENT | ✅ MS9 | Stock floor check added in `InventoryService` for negative adjustments |
 | 7 | ₱ hardcoded in `payments.service.ts` notification body | ❌ Open | `payments.service.ts:65` — move to shared `formatCents()` util. Breaks for non-PHP tenants. |
 | 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ❌ Open | Extract to `@/lib/format.ts` with currency configurable per tenant |
-| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership` | ❌ Open | Sequential scans at scale. Add before staging deployment. |
+| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership`; missing `@@index([createdAt])` on `Order` | ❌ Open | Sequential scans at scale. Add before staging deployment. |
 | 10 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
 | 11 | 7-day JWT — deactivating User (not membership) doesn't revoke access immediately | ❌ Open | Low risk now. TenantGuard checks membership status. Revisit at staging. |
 | 12 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
+| 27 | `uploads` controller missing `TenantGuard` | ❌ Open | `uploads.controller.ts:23` — any authenticated user can upload regardless of tenant. Add `TenantGuard` and scope files under `tenantId/`. |
+| 28 | Hardcoded tenant slugs in `tenant-theme.ts` | ❌ Open | `tenant-theme.ts:46,62` — `peak-hardware` and `corner-general` baked into frontend theming. Move to a `theme` JSON column on `Tenant` before real clients onboard. |
 
 ### 🟢 Advisory — log and revisit
 
@@ -122,8 +124,12 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 17 | CSV import allows wrong `categorySlug` per business type | ❌ Open | UX issue. Pizza shop can import with `fasteners` category. Not a security risk. |
 | 18 | No pricing / tiers | ✅ Intentional | Calendly model. Revisit post-staging with real client feedback. |
 | 19 | Tenant self-registration | ✅ Intentional | Super Admin provisions manually. By design. |
+| 29 | `GET /categories` has no auth guard | ❌ Open | `catalog.controller.ts:25` — categories are platform-owned public data, no tenant scope. Not sensitive, but inconsistent with rest of API. |
+| 30 | `console.error` in bootstrap code | ❌ Open | `main.ts:59`, `env.validation.ts:39` — pino not available at startup so `console.error` is acceptable, but worth noting. |
+| 31 | `localhost` fallback in `uploads.service.ts` | ❌ Open | `uploads.service.ts:43` — `?? 'http://localhost:3001'` safety net. `APP_BASE_URL` must be set in prod; env validation already enforces it. |
+| 32 | `tenant.controller.ts` has no E2E spec | ❌ Open | `GET /tenant/context`, `PATCH /tenant/logo`, `GET /tenant/memberships` untested end-to-end. |
 
-### ✅ Fixed This Milestone (MS10 + MS12)
+### ✅ Fixed This Milestone (MS9–MS12)
 
 | # | Issue | Fixed in |
 |---|-------|----------|
