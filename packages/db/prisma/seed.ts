@@ -37,6 +37,7 @@ async function logMovement(
   referenceType: ReferenceType,
   noteOrReferenceId?: string,
   note?: string,
+  branchId?: string,
 ) {
   const delta =
     type === MovementType.IN
@@ -50,7 +51,7 @@ async function logMovement(
 
   await prisma.$transaction(async (tx) => {
     await tx.inventoryMovement.create({
-      data: { tenantId, skuId, type, quantity, referenceType, referenceId: referenceId ?? null, note: resolvedNote ?? null },
+      data: { tenantId, skuId, type, quantity, referenceType, referenceId: referenceId ?? null, note: resolvedNote ?? null, branchId: branchId ?? null },
     });
     await tx.sku.update({
       where: { id: skuId },
@@ -124,6 +125,8 @@ async function createOrder(opts: {
   items: Array<{ skuId: string; quantity: number; priceCents: number }>;
   status: OrderStatus;
   deductStock?: boolean;
+  branchId?: string;
+  customerRef?: string;
 }) {
   const totalCents = opts.items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);
 
@@ -132,6 +135,8 @@ async function createOrder(opts: {
       tenantId: opts.tenantId,
       status: opts.status,
       totalCents,
+      branchId: opts.branchId ?? null,
+      customerRef: opts.customerRef ?? null,
       items: {
         create: opts.items.map((i) => ({
           skuId: i.skuId,
@@ -144,7 +149,7 @@ async function createOrder(opts: {
 
   if (opts.deductStock) {
     for (const item of opts.items) {
-      await logMovement(opts.tenantId, item.skuId, MovementType.OUT, item.quantity, ReferenceType.ORDER, order.id);
+      await logMovement(opts.tenantId, item.skuId, MovementType.OUT, item.quantity, ReferenceType.ORDER, order.id, undefined, opts.branchId);
     }
   }
 
@@ -254,6 +259,21 @@ async function main() {
     });
   }
 
+  // --- Branches ---
+
+  async function upsertBranch(tenantId: string, name: string, isDefault: boolean) {
+    const existing = await prisma.branch.findFirst({ where: { tenantId, name }, select: { id: true } });
+    if (existing) return existing;
+    return prisma.branch.create({ data: { tenantId, name, isDefault, status: "ACTIVE" } });
+  }
+
+  const hwMainBranch    = await upsertBranch(hardwareTenant.id, "Main Warehouse", true);
+  const hwRetailBranch  = await upsertBranch(hardwareTenant.id, "Retail Counter", false);
+  const mpsCentralBranch  = await upsertBranch(foodTenant.id, "Central Kitchen", true);
+  const mpsKatiBranch     = await upsertBranch(foodTenant.id, "Katipunan Outlet", false);
+  const cgsMainBranch   = await upsertBranch(retailTenant.id, "Main Store", true);
+  const cgsAnnexBranch  = await upsertBranch(retailTenant.id, "Annex Branch", false);
+
   // --- Categories ---
 
   const categoryData = [
@@ -348,36 +368,40 @@ async function main() {
   if (hwOrderCount < 20) {
     const hw = hardwareTenant.id;
     const b = boltSku, w = washerSku, n = nutSku, c = cableSku, e = extCordSku, g = glovesSku, h = hardhatSku;
+    const wh = hwMainBranch.id, rc = hwRetailBranch.id;
 
     const orders = [
-      // PENDING orders (current payables)
-      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: b.id, quantity: 100, priceCents: b.priceCents! }, { skuId: w.id, quantity: 200, priceCents: w.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: c.id, quantity: 5, priceCents: c.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: g.id, quantity: 10, priceCents: g.priceCents! }, { skuId: h.id, quantity: 3, priceCents: h.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: e.id, quantity: 6, priceCents: e.priceCents! }, { skuId: b.id, quantity: 50, priceCents: b.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: n.id, quantity: 500, priceCents: n.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.PENDING, items: [{ skuId: w.id, quantity: 300, priceCents: w.priceCents! }, { skuId: n.id, quantity: 300, priceCents: n.priceCents! }] }),
-      // CONFIRMED orders (stock deducted)
-      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: c.id, quantity: 10, priceCents: c.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: b.id, quantity: 200, priceCents: b.priceCents! }, { skuId: w.id, quantity: 200, priceCents: w.priceCents! }, { skuId: n.id, quantity: 200, priceCents: n.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: g.id, quantity: 8, priceCents: g.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: h.id, quantity: 5, priceCents: h.priceCents! }, { skuId: g.id, quantity: 5, priceCents: g.priceCents! }] }),
-      // COMPLETED orders
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 300, priceCents: b.priceCents! }, { skuId: w.id, quantity: 300, priceCents: w.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: e.id, quantity: 12, priceCents: e.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: c.id, quantity: 20, priceCents: c.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: g.id, quantity: 15, priceCents: g.priceCents! }, { skuId: h.id, quantity: 8, priceCents: h.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 400, priceCents: b.priceCents! }, { skuId: n.id, quantity: 400, priceCents: n.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: w.id, quantity: 150, priceCents: w.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: e.id, quantity: 8, priceCents: e.priceCents! }, { skuId: c.id, quantity: 15, priceCents: c.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: h.id, quantity: 10, priceCents: h.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 250, priceCents: b.priceCents! }, { skuId: w.id, quantity: 250, priceCents: w.priceCents! }, { skuId: n.id, quantity: 250, priceCents: n.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: g.id, quantity: 20, priceCents: g.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: c.id, quantity: 30, priceCents: c.priceCents! }] }),
-      // CANCELLED orders
-      await createOrder({ tenantId: hw, status: OrderStatus.CANCELLED, items: [{ skuId: e.id, quantity: 4, priceCents: e.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.CANCELLED, items: [{ skuId: h.id, quantity: 2, priceCents: h.priceCents! }, { skuId: g.id, quantity: 4, priceCents: g.priceCents! }] }),
-      await createOrder({ tenantId: hw, status: OrderStatus.CANCELLED, items: [{ skuId: c.id, quantity: 8, priceCents: c.priceCents! }] }),
+      // PENDING — Main Warehouse
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "BGC Construction PO #2241", status: OrderStatus.PENDING, items: [{ skuId: b.id, quantity: 100, priceCents: b.priceCents! }, { skuId: w.id, quantity: 200, priceCents: w.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Makati Contractor PO #517", status: OrderStatus.PENDING, items: [{ skuId: c.id, quantity: 5, priceCents: c.priceCents! }, { skuId: e.id, quantity: 3, priceCents: e.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "SM North Site", status: OrderStatus.PENDING, items: [{ skuId: g.id, quantity: 10, priceCents: g.priceCents! }, { skuId: h.id, quantity: 3, priceCents: h.priceCents! }] }),
+      // PENDING — Retail Counter
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Walk-in Customer", status: OrderStatus.PENDING, items: [{ skuId: e.id, quantity: 6, priceCents: e.priceCents! }, { skuId: b.id, quantity: 50, priceCents: b.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Pacific Mall Stall", status: OrderStatus.PENDING, items: [{ skuId: n.id, quantity: 500, priceCents: n.priceCents! }, { skuId: b.id, quantity: 300, priceCents: b.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Robinsons Hardware Buyer", status: OrderStatus.PENDING, items: [{ skuId: w.id, quantity: 300, priceCents: w.priceCents! }, { skuId: n.id, quantity: 300, priceCents: n.priceCents! }] }),
+      // CONFIRMED — Main Warehouse
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Jollibee Katipunan PO #88", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: c.id, quantity: 10, priceCents: c.priceCents! }, { skuId: e.id, quantity: 4, priceCents: e.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Ayala Land Project", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: b.id, quantity: 200, priceCents: b.priceCents! }, { skuId: w.id, quantity: 200, priceCents: w.priceCents! }, { skuId: n.id, quantity: 200, priceCents: n.priceCents! }] }),
+      // CONFIRMED — Retail Counter
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Walk-in Contractor", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: g.id, quantity: 8, priceCents: g.priceCents! }, { skuId: b.id, quantity: 100, priceCents: b.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Valenzuela Site PO #31", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: h.id, quantity: 5, priceCents: h.priceCents! }, { skuId: g.id, quantity: 5, priceCents: g.priceCents! }] }),
+      // COMPLETED — Main Warehouse
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "BGC Tower 3 Phase 2", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 300, priceCents: b.priceCents! }, { skuId: w.id, quantity: 300, priceCents: w.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "SM Skyway Project", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: e.id, quantity: 12, priceCents: e.priceCents! }, { skuId: c.id, quantity: 8, priceCents: c.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "DMCI Homes PO #441", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: c.id, quantity: 20, priceCents: c.priceCents! }, { skuId: n.id, quantity: 150, priceCents: n.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Megaworld Site A", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: g.id, quantity: 15, priceCents: g.priceCents! }, { skuId: h.id, quantity: 8, priceCents: h.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Sta. Lucia Realty PO #89", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 400, priceCents: b.priceCents! }, { skuId: n.id, quantity: 400, priceCents: n.priceCents! }] }),
+      // COMPLETED — Retail Counter
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Cainta Hardware Walk-in", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: w.id, quantity: 150, priceCents: w.priceCents! }, { skuId: b.id, quantity: 100, priceCents: b.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Rodriguez Builder", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: e.id, quantity: 8, priceCents: e.priceCents! }, { skuId: c.id, quantity: 15, priceCents: c.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "PO #2298 Quick Supply", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: h.id, quantity: 10, priceCents: h.priceCents! }, { skuId: g.id, quantity: 12, priceCents: g.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Antipolo Construction", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: b.id, quantity: 250, priceCents: b.priceCents! }, { skuId: w.id, quantity: 250, priceCents: w.priceCents! }, { skuId: n.id, quantity: 250, priceCents: n.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "QC Safety Supplies", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: g.id, quantity: 20, priceCents: g.priceCents! }, { skuId: h.id, quantity: 5, priceCents: h.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Pasig River Dev PO #14", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: c.id, quantity: 30, priceCents: c.priceCents! }, { skuId: e.id, quantity: 6, priceCents: e.priceCents! }] }),
+      // CANCELLED
+      await createOrder({ tenantId: hw, branchId: rc, customerRef: "Walk-in (cancelled)", status: OrderStatus.CANCELLED, items: [{ skuId: e.id, quantity: 4, priceCents: e.priceCents! }, { skuId: b.id, quantity: 20, priceCents: b.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "PO #190 Cancelled", status: OrderStatus.CANCELLED, items: [{ skuId: h.id, quantity: 2, priceCents: h.priceCents! }, { skuId: g.id, quantity: 4, priceCents: g.priceCents! }] }),
+      await createOrder({ tenantId: hw, branchId: wh, customerRef: "Taguig Site Cancelled", status: OrderStatus.CANCELLED, items: [{ skuId: c.id, quantity: 8, priceCents: c.priceCents! }, { skuId: n.id, quantity: 50, priceCents: n.priceCents! }] }),
     ];
 
     // Payments for CONFIRMED and COMPLETED orders
@@ -457,33 +481,37 @@ async function main() {
   if (mpsOrderCount < 18) {
     const tid = foodTenant.id;
     const f = flourSku, m = mozzaSku, s = sauceSku, y = yeastSku, o = oliveOilSku, p = pepperoniSku, t = tomatoesSku;
+    const ck = mpsCentralBranch.id, ko = mpsKatiBranch.id;
 
     const orders = [
-      // PENDING
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: f.id, quantity: 5, priceCents: f.priceCents! }, { skuId: s.id, quantity: 6, priceCents: s.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: m.id, quantity: 8, priceCents: m.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: p.id, quantity: 20, priceCents: p.priceCents! }, { skuId: t.id, quantity: 30, priceCents: t.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: o.id, quantity: 4, priceCents: o.priceCents! }, { skuId: y.id, quantity: 10, priceCents: y.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: f.id, quantity: 10, priceCents: f.priceCents! }, { skuId: m.id, quantity: 5, priceCents: m.priceCents! }] }),
-      // CONFIRMED
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: f.id, quantity: 10, priceCents: f.priceCents! }, { skuId: m.id, quantity: 15, priceCents: m.priceCents! }, { skuId: s.id, quantity: 12, priceCents: s.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: p.id, quantity: 30, priceCents: p.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: y.id, quantity: 15, priceCents: y.priceCents! }, { skuId: o.id, quantity: 3, priceCents: o.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: t.id, quantity: 48, priceCents: t.priceCents! }] }),
-      // COMPLETED
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: m.id, quantity: 8, priceCents: m.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: f.id, quantity: 15, priceCents: f.priceCents! }, { skuId: s.id, quantity: 10, priceCents: s.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: p.id, quantity: 24, priceCents: p.priceCents! }, { skuId: t.id, quantity: 36, priceCents: t.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: o.id, quantity: 5, priceCents: o.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: y.id, quantity: 20, priceCents: y.priceCents! }, { skuId: f.id, quantity: 8, priceCents: f.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: m.id, quantity: 12, priceCents: m.priceCents! }, { skuId: s.id, quantity: 15, priceCents: s.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: t.id, quantity: 60, priceCents: t.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: f.id, quantity: 20, priceCents: f.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: p.id, quantity: 40, priceCents: p.priceCents! }, { skuId: m.id, quantity: 10, priceCents: m.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: s.id, quantity: 18, priceCents: s.priceCents! }, { skuId: o.id, quantity: 2, priceCents: o.priceCents! }] }),
+      // PENDING — Central Kitchen
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Pizza Palace Cubao Franchise #08", status: OrderStatus.PENDING, items: [{ skuId: f.id, quantity: 5, priceCents: f.priceCents! }, { skuId: s.id, quantity: 6, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Bella Pizza QC PO #33", status: OrderStatus.PENDING, items: [{ skuId: m.id, quantity: 8, priceCents: m.priceCents! }, { skuId: y.id, quantity: 5, priceCents: y.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Star Pizza Makati", status: OrderStatus.PENDING, items: [{ skuId: p.id, quantity: 20, priceCents: p.priceCents! }, { skuId: t.id, quantity: 30, priceCents: t.priceCents! }] }),
+      // PENDING — Katipunan Outlet
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Marco's Katipunan", status: OrderStatus.PENDING, items: [{ skuId: o.id, quantity: 4, priceCents: o.priceCents! }, { skuId: y.id, quantity: 10, priceCents: y.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Baguio Franchise #014", status: OrderStatus.PENDING, items: [{ skuId: f.id, quantity: 10, priceCents: f.priceCents! }, { skuId: m.id, quantity: 5, priceCents: m.priceCents! }] }),
+      // CONFIRMED — Central Kitchen
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Pizza Palace Cubao Monthly", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: f.id, quantity: 10, priceCents: f.priceCents! }, { skuId: m.id, quantity: 15, priceCents: m.priceCents! }, { skuId: s.id, quantity: 12, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Bella Pizza Reorder", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: p.id, quantity: 30, priceCents: p.priceCents! }, { skuId: t.id, quantity: 24, priceCents: t.priceCents! }] }),
+      // CONFIRMED — Katipunan Outlet
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Katipunan Walk-in Bulk", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: y.id, quantity: 15, priceCents: y.priceCents! }, { skuId: o.id, quantity: 3, priceCents: o.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "UP Village Restaurant", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: t.id, quantity: 48, priceCents: t.priceCents! }, { skuId: s.id, quantity: 10, priceCents: s.priceCents! }] }),
+      // COMPLETED — Central Kitchen
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Franchise #008 Monthly", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: m.id, quantity: 8, priceCents: m.priceCents! }, { skuId: f.id, quantity: 6, priceCents: f.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Star Pizza Bulk Order", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: f.id, quantity: 15, priceCents: f.priceCents! }, { skuId: s.id, quantity: 10, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Manila Grand Hotel", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: p.id, quantity: 24, priceCents: p.priceCents! }, { skuId: t.id, quantity: 36, priceCents: t.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Franchise #014 Reorder", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: o.id, quantity: 5, priceCents: o.priceCents! }, { skuId: y.id, quantity: 8, priceCents: y.priceCents! }] }),
+      // COMPLETED — Katipunan Outlet
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Quezon Ave Pizza Co.", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: y.id, quantity: 20, priceCents: y.priceCents! }, { skuId: f.id, quantity: 8, priceCents: f.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Katipunan Franchise #02", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: m.id, quantity: 12, priceCents: m.priceCents! }, { skuId: s.id, quantity: 15, priceCents: s.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "UP Diliman Canteen", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: t.id, quantity: 60, priceCents: t.priceCents! }, { skuId: p.id, quantity: 18, priceCents: p.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Cubao Express PO #77", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: f.id, quantity: 20, priceCents: f.priceCents! }, { skuId: m.id, quantity: 6, priceCents: m.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Anonas St. Kitchen", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: p.id, quantity: 40, priceCents: p.priceCents! }, { skuId: m.id, quantity: 10, priceCents: m.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "Franchise Central Restock", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: s.id, quantity: 18, priceCents: s.priceCents! }, { skuId: o.id, quantity: 2, priceCents: o.priceCents! }] }),
       // CANCELLED
-      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: o.id, quantity: 6, priceCents: o.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: f.id, quantity: 8, priceCents: f.priceCents! }, { skuId: y.id, quantity: 5, priceCents: y.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ko, customerRef: "Kalayaan Ave (cancelled)", status: OrderStatus.CANCELLED, items: [{ skuId: o.id, quantity: 6, priceCents: o.priceCents! }, { skuId: y.id, quantity: 3, priceCents: y.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ck, customerRef: "PO #201 Cancelled", status: OrderStatus.CANCELLED, items: [{ skuId: f.id, quantity: 8, priceCents: f.priceCents! }, { skuId: y.id, quantity: 5, priceCents: y.priceCents! }] }),
     ];
 
     for (const order of orders) {
@@ -562,34 +590,38 @@ async function main() {
   if (cgsOrderCount < 18) {
     const tid = retailTenant.id;
     const co = colaSku, ch = chipsSku, cl = cleanerSku, wa = waterSku, no = noodlesSku, de = detergentSku, ti = tissueSku;
+    const ms = cgsMainBranch.id, ax = cgsAnnexBranch.id;
 
     const orders = [
-      // PENDING
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: co.id, quantity: 24, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 12, priceCents: ch.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: wa.id, quantity: 48, priceCents: wa.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: no.id, quantity: 24, priceCents: no.priceCents! }, { skuId: ti.id, quantity: 6, priceCents: ti.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: de.id, quantity: 8, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 6, priceCents: cl.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.PENDING, items: [{ skuId: co.id, quantity: 48, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 96, priceCents: wa.priceCents! }] }),
-      // CONFIRMED
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: co.id, quantity: 72, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 36, priceCents: ch.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: de.id, quantity: 12, priceCents: de.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: wa.id, quantity: 120, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 48, priceCents: no.priceCents! }] }),
-      // COMPLETED
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 48, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 24, priceCents: ch.priceCents! }, { skuId: cl.id, quantity: 12, priceCents: cl.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: wa.id, quantity: 96, priceCents: wa.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: no.id, quantity: 60, priceCents: no.priceCents! }, { skuId: ti.id, quantity: 12, priceCents: ti.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: de.id, quantity: 15, priceCents: de.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 96, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 144, priceCents: wa.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: ch.id, quantity: 48, priceCents: ch.priceCents! }, { skuId: ti.id, quantity: 18, priceCents: ti.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: cl.id, quantity: 24, priceCents: cl.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: no.id, quantity: 72, priceCents: no.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: de.id, quantity: 10, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 10, priceCents: cl.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 120, priceCents: co.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: wa.id, quantity: 200, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 100, priceCents: no.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: ch.id, quantity: 60, priceCents: ch.priceCents! }, { skuId: ti.id, quantity: 24, priceCents: ti.priceCents! }] }),
+      // PENDING — Main Store
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Sari-sari Store Aling Nena", status: OrderStatus.PENDING, items: [{ skuId: co.id, quantity: 24, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 12, priceCents: ch.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Canteen Block B", status: OrderStatus.PENDING, items: [{ skuId: wa.id, quantity: 48, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 12, priceCents: no.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Talipapa Corner Buyer", status: OrderStatus.PENDING, items: [{ skuId: no.id, quantity: 24, priceCents: no.priceCents! }, { skuId: ti.id, quantity: 6, priceCents: ti.priceCents! }] }),
+      // PENDING — Annex Branch
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Kiosk 7 Buyer", status: OrderStatus.PENDING, items: [{ skuId: de.id, quantity: 8, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 6, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Tindahan ni Ate Lucy", status: OrderStatus.PENDING, items: [{ skuId: co.id, quantity: 48, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 96, priceCents: wa.priceCents! }] }),
+      // CONFIRMED — Main Store
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Barangay Hall Canteen", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: co.id, quantity: 72, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 36, priceCents: ch.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "School Canteen Restock", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: de.id, quantity: 12, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 8, priceCents: cl.priceCents! }] }),
+      // CONFIRMED — Annex Branch
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Market Vendor Bulk Order", status: OrderStatus.CONFIRMED, deductStock: true, items: [{ skuId: wa.id, quantity: 120, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 48, priceCents: no.priceCents! }] }),
+      // COMPLETED — Main Store
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "SM Hypermarket Buyer", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 48, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 24, priceCents: ch.priceCents! }, { skuId: cl.id, quantity: 12, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Puregold Partner", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: wa.id, quantity: 96, priceCents: wa.priceCents! }, { skuId: co.id, quantity: 36, priceCents: co.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Tindahan ni Ate PO #12", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: no.id, quantity: 60, priceCents: no.priceCents! }, { skuId: ti.id, quantity: 12, priceCents: ti.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Villamor Canteen", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: de.id, quantity: 15, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 10, priceCents: cl.priceCents! }] }),
+      // COMPLETED — Annex Branch
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Annex Bulk Buyer #01", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 96, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 144, priceCents: wa.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Corner Sari-sari Restock", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: ch.id, quantity: 48, priceCents: ch.priceCents! }, { skuId: ti.id, quantity: 18, priceCents: ti.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Blk 4 Canteen", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: cl.id, quantity: 24, priceCents: cl.priceCents! }, { skuId: de.id, quantity: 8, priceCents: de.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Annex Walk-in Wholesale", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: no.id, quantity: 72, priceCents: no.priceCents! }, { skuId: ch.id, quantity: 30, priceCents: ch.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Main Store Weekly Bulk", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: de.id, quantity: 10, priceCents: de.priceCents! }, { skuId: cl.id, quantity: 10, priceCents: cl.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Catering Service Order", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: co.id, quantity: 120, priceCents: co.priceCents! }, { skuId: wa.id, quantity: 60, priceCents: wa.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Annex Saturday Rush", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: wa.id, quantity: 200, priceCents: wa.priceCents! }, { skuId: no.id, quantity: 100, priceCents: no.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Dampa Wet Market Buyer", status: OrderStatus.COMPLETED, deductStock: true, items: [{ skuId: ch.id, quantity: 60, priceCents: ch.priceCents! }, { skuId: ti.id, quantity: 24, priceCents: ti.priceCents! }] }),
       // CANCELLED
-      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: cl.id, quantity: 6, priceCents: cl.priceCents! }] }),
-      await createOrder({ tenantId: tid, status: OrderStatus.CANCELLED, items: [{ skuId: co.id, quantity: 12, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 6, priceCents: ch.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ax, customerRef: "Annex (cancelled)", status: OrderStatus.CANCELLED, items: [{ skuId: cl.id, quantity: 6, priceCents: cl.priceCents! }, { skuId: de.id, quantity: 4, priceCents: de.priceCents! }] }),
+      await createOrder({ tenantId: tid, branchId: ms, customerRef: "Walk-in Cancelled", status: OrderStatus.CANCELLED, items: [{ skuId: co.id, quantity: 12, priceCents: co.priceCents! }, { skuId: ch.id, quantity: 6, priceCents: ch.priceCents! }] }),
     ];
 
     for (const order of orders) {
@@ -602,15 +634,17 @@ async function main() {
   }
 
   // Summary
-  const [orderTotal, paymentTotal, skuTotal, movementTotal] = await Promise.all([
+  const [orderTotal, paymentTotal, skuTotal, movementTotal, branchTotal] = await Promise.all([
     prisma.order.count(),
     prisma.payment.count(),
     prisma.sku.count(),
     prisma.inventoryMovement.count(),
+    prisma.branch.count(),
   ]);
 
   console.log("✓ Admin:", admin.email);
   console.log("✓ Tenants:", hardwareTenant.slug, "|", foodTenant.slug, "|", retailTenant.slug);
+  console.log("✓ Branches:", branchTotal, "(2 per tenant — default + second branch)");
   console.log("✓ SKUs:", skuTotal, "| Orders:", orderTotal, "| Payments:", paymentTotal, "| Movements:", movementTotal);
   console.log("✓ Default password:", DEFAULT_PASSWORD);
 }

@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — MS11 marketing site built (apps/marketing, static Next.js, Operix brand, dynamic features grid). Global market goal documented. Sidebar UX improvements queued in Feature Backlog.
+> Last updated: 2026-03-30 — MS9 + MS11 merged. Pre-staging order revised: functionality first, PWA second-to-last (after all features stabilised).
 
 ---
 
@@ -12,8 +12,8 @@
 | **Phase 2** | MS3 | Catalog — Products, SKUs, Categories | ✅ Done |
 | **Phase 3** | MS4–MS6 | Operations — Inventory, Orders, Payments | ✅ Done |
 | **Phase 4** | MS7–MS8 | Hardening — Admin, UI Overhaul, Prod Prep | ✅ Done |
-| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Team Mgmt, Multi-Branch | 🚧 MS9 in progress |
-| **Phase 6** | MS11 | Go-to-Market — Marketing Website | 🚧 Pulled forward (before staging) |
+| **Phase 5** | MS9–MS10 | Extensions — CSV Import, Team Mgmt, Multi-Branch | 🚧 MS9 ✅, MS10 next |
+| **Phase 6** | MS11 | Go-to-Market — Marketing Website | ✅ Done |
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
 | **Phase 8** | — | Mobile + POS | 📋 PWA pre-staging; native app after revenue |
 | **Phase 9** | — | AWS Scale + Subdomain Routing | 🔒 Do not build yet |
@@ -23,7 +23,7 @@
 - 🔒 = architecturally designed, not yet scheduled.
 - Never pull work from a future phase into a current milestone.
 
-**On mobile:** PWA + responsive web ships **before** staging — this is a pre-staging requirement, not a future phase. React Native native app (Phase 8) ships only after real revenue validates the investment. See "Mobile Strategy" in the Pre-Staging Checklist section for the full rationale.
+**On mobile:** PWA + responsive web ships **second-to-last before staging** — after all functionality is stabilised and MVP market-fit is confirmed. Doing it earlier means re-doing responsive work every time a panel changes. React Native native app (Phase 8) ships only after real revenue validates the investment. See "Mobile Strategy" in the Pre-Staging Checklist section for the full rationale.
 
 ---
 
@@ -33,12 +33,12 @@
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| 1 | MS9 close — username scoping, password change, negative stock floor, customerRef | ✅ Done | PR open |
-| 2 | Marketing page (`apps/marketing`) | 🚧 In progress | MS11 branch |
-| 3 | Mobile responsive + PWA | 📋 Planned | **Must ship before staging.** See rationale below. |
-| 4 | Multi-branch v1 | 📋 Planned | Scaffolded, invisible at single-branch. No UI until 2nd branch added. |
-| 5 | Dashboard / home screen | 📋 Planned | Summary of orders, payments, low stock on login. |
-| 6 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
+| 1 | MS9 — username scoping, password change, negative stock floor, customerRef | ✅ Done | Merged |
+| 2 | Marketing page (`apps/marketing`) | ✅ Done | MS11 merged |
+| 3 | Multi-branch v1 (MS10) | 📋 Next | Invisible at single-branch. No UI until 2nd branch added. |
+| 4 | Dashboard / home screen | 📋 Planned | Summary of orders, payments, low stock on login. |
+| 5 | Basic reports (orders CSV export, date filter) | 📋 Planned | Day-one client ask. |
+| 6 | **Mobile responsive + PWA** | 📋 Planned | **Second-to-last.** Done after all features are stabilised — avoids re-doing responsive work as panels change. |
 | 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.

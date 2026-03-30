@@ -43,7 +43,9 @@ mobile-responsive web — not native apps — at their early stage.
 
 ## The Decision
 
-**Stage 1 (Pre-staging, now):** PWA + fully mobile-responsive `apps/web`
+**Sequencing:** PWA + responsive web is done **second-to-last before staging** — after all functionality is stabilised and MVP market-fit is confirmed. Rationale: responsive CSS is tightly coupled to layout. Adding a new panel (dashboard, reports, branch switcher) means re-doing responsive work. Do it once, when the UI is stable.
+
+**Stage 1 (Pre-staging, second-to-last):** PWA + fully mobile-responsive `apps/web`
 - `manifest.json` with Operix branding → installable on Android and iOS
 - Service worker → basic offline capability (load last-viewed data)
 - Full responsive CSS pass on all panels: sidebar, orders, inventory, payments, team

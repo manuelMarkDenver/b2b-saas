@@ -18,6 +18,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { BranchesModule } from './branches/branches.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -50,6 +51,7 @@ import { AppService } from './app.service';
     AdminModule,
     NotificationsModule,
     UploadsModule,
+    BranchesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -50,6 +50,11 @@ model User {
   notifications        Notification[]
 }
 
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum BusinessType {
   general_retail
   hardware
@@ -76,11 +81,29 @@ model Tenant {
 
   createdByUser      User                @relation("TenantCreatedBy", fields: [createdByUserId], references: [id])
   memberships        TenantMembership[]
+  branches           Branch[]
   products           Product[]
   skus               Sku[]
   inventoryMovements InventoryMovement[]
   orders             Order[]
   payments           Payment[]
+}
+
+model Branch {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @db.Uuid
+  name      String
+  address   String?
+  isDefault Boolean      @default(false)
+  status    BranchStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  orders    Order[]
+  movements InventoryMovement[]
+
+  @@index([tenantId])
 }
 
 model Category {
@@ -147,6 +170,7 @@ model TenantMembership {
   role              TenantRole       @default(STAFF)
   jobTitle          String?
   username          String?          // Login identifier for direct-add staff (no email). Scoped to tenant.
+  branchIds         Json             @default("[]") // Array of Branch IDs. Empty = access to all branches.
   isOwner           Boolean          @default(false)
   inviteToken       String?          @unique
   inviteExpiresAt   DateTime?
@@ -185,16 +209,19 @@ model Order {
   tenantId      String      @db.Uuid
   status        OrderStatus @default(PENDING)
   totalCents    Int         @default(0)
+  branchId      String?     @db.Uuid
   customerRef   String?     // B2B customer reference: "Jollibee Branch 3", "PO #1234", etc.
   note          String?     // Internal note for staff
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  branch     Branch?     @relation(fields: [branchId], references: [id])
   items      OrderItem[]
   payments   Payment[]
 
   @@index([tenantId])
+  @@index([branchId])
 }
 
 model OrderItem {
@@ -243,13 +270,16 @@ model InventoryMovement {
   referenceType ReferenceType
   referenceId   String?
   note          String?
+  branchId      String?       @db.Uuid
   createdAt     DateTime      @default(now())
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
   sku           Sku           @relation(fields: [skuId], references: [id])
+  branch        Branch?       @relation(fields: [branchId], references: [id])
 
   @@index([tenantId])
   @@index([skuId])
+  @@index([branchId])
 }
 
 enum NotificationType {

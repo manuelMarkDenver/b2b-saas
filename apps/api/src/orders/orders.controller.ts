@@ -28,12 +28,14 @@ export class OrdersController {
 
   @Post()
   createOrder(@Req() req: RequestWithUser, @Body() body: CreateOrderDto) {
-    return this.ordersService.createOrder(req.tenant!.id, body);
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    return this.ordersService.createOrder(req.tenant!.id, body, branchId);
   }
 
   @Get()
   listOrders(@Req() req: RequestWithUser, @Query() pagination: PaginationDto) {
-    return this.ordersService.listOrders(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20);
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    return this.ordersService.listOrders(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, branchId);
   }
 
   @Get(':id')

@@ -10,6 +10,7 @@ import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { NotificationBell } from '@/components/notifications/bell';
 import { ModeToggle } from '@/components/mode-toggle';
 import { TenantSwitcher } from '@/components/tenant-switcher';
+import { BranchSwitcher } from '@/components/branch-switcher';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,6 +148,7 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
           </div>
 
           <div className="flex items-center gap-1">
+            <BranchSwitcher tenantSlug={tenantSlug} />
             <TenantSwitcher currentSlug={tenantSlug} />
             <NotificationBell tenantSlug={tenantSlug} />
             <ModeToggle />
