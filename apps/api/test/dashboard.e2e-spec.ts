@@ -156,6 +156,28 @@ describe('Dashboard (e2e)', () => {
       expect(breakdownRes.body.totals.revenueRangeCents).toBe(summaryRes.body.summary.revenueRangeCents);
     });
 
+    it('per-branch revenue sums do not exceed tenant total (unassigned orders go to default)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/dashboard/branches')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('x-tenant-slug', TENANT_SLUG);
+
+      expect(res.status).toBe(200);
+      const { totals, branches } = res.body;
+
+      const branchOrderSum = branches.reduce((s: number, b: { ordersInRange: number }) => s + b.ordersInRange, 0);
+      const branchRevenueSum = branches.reduce((s: number, b: { revenueRangeCents: number }) => s + b.revenueRangeCents, 0);
+
+      // Branch sums must not exceed tenant totals (null-branchId orders fold into default branch)
+      expect(branchOrderSum).toBeLessThanOrEqual(totals.ordersInRange + totals.ordersInRange); // at most 2x if all go to default
+      expect(branchRevenueSum).toBeLessThanOrEqual(totals.revenueRangeCents + totals.revenueRangeCents);
+
+      // Stronger: with proper data, branch sums equal totals exactly
+      // (all orders have a branchId after re-seeding)
+      expect(branchOrderSum).toBe(totals.ordersInRange);
+      expect(branchRevenueSum).toBe(totals.revenueRangeCents);
+    });
+
     it('tenant isolation — other tenant gets their own branches', async () => {
       const [resA, resB] = await Promise.all([
         request(app.getHttpServer())

@@ -36,7 +36,8 @@ export class PaymentsController {
     @Query() pagination: PaginationDto,
     @Query('orderId') orderId?: string,
   ) {
-    return this.paymentsService.listPayments(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, orderId);
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    return this.paymentsService.listPayments(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, orderId, branchId);
   }
 
   @Get(':id')

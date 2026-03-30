@@ -15,8 +15,8 @@ export class DashboardController {
     @Query('from') fromStr?: string,
     @Query('to') toStr?: string,
   ) {
-    const to = toStr ? new Date(toStr) : endOfDay(new Date());
-    const from = fromStr ? new Date(fromStr) : subDays(to, 6);
+    const to = toStr ? endOfDay(new Date(toStr)) : endOfDay(new Date());
+    const from = fromStr ? startOfDay(new Date(fromStr)) : subDays(to, 6);
     return this.dashboard.getBranchBreakdown({ tenantId: req.tenant!.id, from, to });
   }
 
@@ -28,9 +28,9 @@ export class DashboardController {
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
 
-    // Default: last 7 days
-    const to = toStr ? new Date(toStr) : endOfDay(new Date());
-    const from = fromStr ? new Date(fromStr) : subDays(to, 6);
+    // Always apply day boundaries so date-only strings like "2026-03-30" cover the full day
+    const to = toStr ? endOfDay(new Date(toStr)) : endOfDay(new Date());
+    const from = fromStr ? startOfDay(new Date(fromStr)) : subDays(to, 6);
 
     return this.dashboard.getSummary({
       tenantId: req.tenant!.id,
@@ -39,6 +39,10 @@ export class DashboardController {
       branchId,
     });
   }
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
 }
 
 function endOfDay(d: Date): Date {
