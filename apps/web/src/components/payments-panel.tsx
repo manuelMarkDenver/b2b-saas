@@ -249,7 +249,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium">Payments (Milestone 6)</div>
+          <div className="text-sm font-medium">Payments</div>
           <div className="mt-1 text-xs text-muted-foreground">
             Submit payments for orders. Staff verifies or rejects manually.
           </div>

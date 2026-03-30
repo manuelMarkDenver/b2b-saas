@@ -68,9 +68,13 @@ export class PaymentsService {
     return payment;
   }
 
-  async listPayments(tenantId: string, page: number, limit: number, orderId?: string) {
+  async listPayments(tenantId: string, page: number, limit: number, orderId?: string, branchId?: string) {
     const skip = (page - 1) * limit;
-    const where = { tenantId, ...(orderId ? { orderId } : {}) };
+    const where = {
+      tenantId,
+      ...(orderId ? { orderId } : {}),
+      ...(branchId ? { order: { branchId } } : {}),
+    };
     const [data, total] = await this.prisma.$transaction([
       this.prisma.payment.findMany({
         where,

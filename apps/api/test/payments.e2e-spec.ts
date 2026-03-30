@@ -219,4 +219,41 @@ describe('Payments (e2e)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('x-branch-id filtering', () => {
+    it('filters payments to the specified branch via order join', async () => {
+      const branchRes = await request(app.getHttpServer())
+        .get('/branches')
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware');
+      expect(branchRes.body.length).toBeGreaterThanOrEqual(2);
+
+      const [branchA, branchB] = branchRes.body as Array<{ id: string }>;
+
+      const [resA, resB, resAll] = await Promise.all([
+        request(app.getHttpServer())
+          .get('/payments')
+          .set('Authorization', `Bearer ${peakToken}`)
+          .set('x-tenant-slug', 'peak-hardware')
+          .set('x-branch-id', branchA.id),
+        request(app.getHttpServer())
+          .get('/payments')
+          .set('Authorization', `Bearer ${peakToken}`)
+          .set('x-tenant-slug', 'peak-hardware')
+          .set('x-branch-id', branchB.id),
+        request(app.getHttpServer())
+          .get('/payments')
+          .set('Authorization', `Bearer ${peakToken}`)
+          .set('x-tenant-slug', 'peak-hardware'),
+      ]);
+
+      expect(resA.status).toBe(200);
+      expect(resB.status).toBe(200);
+      expect(resAll.status).toBe(200);
+
+      expect(resA.body.meta.total).toBeLessThanOrEqual(resAll.body.meta.total);
+      expect(resB.body.meta.total).toBeLessThanOrEqual(resAll.body.meta.total);
+      expect(resA.body.meta.total + resB.body.meta.total).toBeLessThanOrEqual(resAll.body.meta.total);
+    });
+  });
 });

@@ -19,6 +19,7 @@ import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { BranchesModule } from './branches/branches.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -52,6 +53,7 @@ import { AppService } from './app.service';
     NotificationsModule,
     UploadsModule,
     BranchesModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

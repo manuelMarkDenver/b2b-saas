@@ -285,7 +285,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium">Catalog (Milestone 4)</div>
+          <div className="text-sm font-medium">Catalog</div>
           <div className="mt-1 text-xs text-muted-foreground">
             Categories are platform-managed. Products/SKUs are tenant-scoped.
           </div>

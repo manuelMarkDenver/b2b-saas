@@ -320,7 +320,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       {/* ── Panel header ── */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium">Orders (Milestone 5)</div>
+          <div className="text-sm font-medium">Orders</div>
           <div className="mt-1 text-xs text-muted-foreground">
             Create and manage orders. Confirming deducts stock automatically.
           </div>
