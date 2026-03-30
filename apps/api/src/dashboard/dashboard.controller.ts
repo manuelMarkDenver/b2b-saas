@@ -9,6 +9,17 @@ import type { RequestWithUser } from '../common/auth/auth.types';
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
 
+  @Get('branches')
+  getBranchBreakdown(
+    @Req() req: RequestWithUser,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    const to = toStr ? new Date(toStr) : endOfDay(new Date());
+    const from = fromStr ? new Date(fromStr) : subDays(to, 6);
+    return this.dashboard.getBranchBreakdown({ tenantId: req.tenant!.id, from, to });
+  }
+
   @Get()
   getSummary(
     @Req() req: RequestWithUser,

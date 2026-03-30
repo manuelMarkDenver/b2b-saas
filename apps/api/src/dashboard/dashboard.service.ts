@@ -120,6 +120,83 @@ export class DashboardService {
       },
     };
   }
+
+  async getBranchBreakdown({ tenantId, from, to }: Omit<DashboardQuery, 'branchId'>) {
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+
+    const [branches, ordersByBranch, pendingByBranch, revenueByBranch, todayByBranch] =
+      await Promise.all([
+        this.prisma.branch.findMany({
+          where: { tenantId, status: 'ACTIVE' },
+          select: { id: true, name: true, isDefault: true },
+          orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+        }),
+
+        // Orders in range grouped by branch
+        this.prisma.$queryRaw<Array<{ branchId: string | null; count: number }>>`
+          SELECT "branchId"::text, COUNT(*)::int AS count
+          FROM "Order"
+          WHERE "tenantId" = ${tenantId}::uuid
+            AND "createdAt" >= ${from}
+            AND "createdAt" <= ${to}
+          GROUP BY "branchId"
+        `,
+
+        // Confirmed orders with no verified payment, grouped by branch
+        this.prisma.$queryRaw<Array<{ branchId: string | null; count: number }>>`
+          SELECT o."branchId"::text, COUNT(*)::int AS count
+          FROM "Order" o
+          WHERE o."tenantId" = ${tenantId}::uuid
+            AND o."status" = 'CONFIRMED'
+            AND NOT EXISTS (
+              SELECT 1 FROM "Payment" p
+              WHERE p."orderId" = o.id AND p."status" = 'VERIFIED'
+            )
+          GROUP BY o."branchId"
+        `,
+
+        // Revenue in range grouped by branch (via order join)
+        this.prisma.$queryRaw<Array<{ branchId: string | null; amountCents: number }>>`
+          SELECT o."branchId"::text, SUM(p."amountCents")::int AS "amountCents"
+          FROM "Payment" p
+          JOIN "Order" o ON o.id = p."orderId"
+          WHERE p."tenantId" = ${tenantId}::uuid
+            AND p."status" = 'VERIFIED'
+            AND p."createdAt" >= ${from}
+            AND p."createdAt" <= ${to}
+          GROUP BY o."branchId"
+        `,
+
+        // Orders today grouped by branch
+        this.prisma.$queryRaw<Array<{ branchId: string | null; count: number }>>`
+          SELECT "branchId"::text, COUNT(*)::int AS count
+          FROM "Order"
+          WHERE "tenantId" = ${tenantId}::uuid
+            AND "createdAt" >= ${todayStart}
+            AND "createdAt" <= ${todayEnd}
+          GROUP BY "branchId"
+        `,
+      ]);
+
+    const toMap = <T extends { branchId: string | null }>(rows: T[], key: keyof T) =>
+      new Map(rows.map((r) => [r.branchId ?? '__null__', r[key]]));
+
+    const ordersMap = toMap(ordersByBranch, 'count');
+    const pendingMap = toMap(pendingByBranch, 'count');
+    const revenueMap = toMap(revenueByBranch, 'amountCents');
+    const todayMap = toMap(todayByBranch, 'count');
+
+    return branches.map((b) => ({
+      id: b.id,
+      name: b.name,
+      isDefault: b.isDefault,
+      ordersInRange: (ordersMap.get(b.id) as number) ?? 0,
+      ordersToday: (todayMap.get(b.id) as number) ?? 0,
+      pendingPayments: (pendingMap.get(b.id) as number) ?? 0,
+      revenueRangeCents: (revenueMap.get(b.id) as number) ?? 0,
+    }));
+  }
 }
 
 function startOfDay(d: Date): Date {

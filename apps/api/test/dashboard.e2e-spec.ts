@@ -104,6 +104,57 @@ describe('Dashboard (e2e)', () => {
       expect(res.body.summary).toBeDefined();
     });
 
+  });
+
+  describe('GET /dashboard/branches', () => {
+    it('returns per-branch breakdown', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/dashboard/branches')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('x-tenant-slug', TENANT_SLUG);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      for (const row of res.body) {
+        expect(row).toMatchObject({
+          id: expect.any(String),
+          name: expect.any(String),
+          isDefault: expect.any(Boolean),
+          ordersInRange: expect.any(Number),
+          ordersToday: expect.any(Number),
+          pendingPayments: expect.any(Number),
+          revenueRangeCents: expect.any(Number),
+        });
+      }
+    });
+
+    it('tenant isolation — other tenant gets their own branches', async () => {
+      const [resA, resB] = await Promise.all([
+        request(app.getHttpServer())
+          .get('/dashboard/branches')
+          .set('Authorization', `Bearer ${ownerToken}`)
+          .set('x-tenant-slug', TENANT_SLUG),
+        request(app.getHttpServer())
+          .get('/dashboard/branches')
+          .set('Authorization', `Bearer ${otherOwnerToken}`)
+          .set('x-tenant-slug', OTHER_SLUG),
+      ]);
+
+      const aIds = resA.body.map((r: { id: string }) => r.id);
+      const bIds = resB.body.map((r: { id: string }) => r.id);
+      expect(aIds.filter((id: string) => bIds.includes(id))).toHaveLength(0);
+    });
+
+    it('returns 401 without token', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/dashboard/branches')
+        .set('x-tenant-slug', TENANT_SLUG);
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /dashboard', () => {
     it('topLowStock items have required fields', async () => {
       const res = await request(app.getHttpServer())
         .get('/dashboard')

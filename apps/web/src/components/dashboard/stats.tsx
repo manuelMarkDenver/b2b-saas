@@ -8,6 +8,7 @@ import {
 import { ShoppingCart, CreditCard, Boxes, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
+import { BranchBreakdown } from './branch-breakdown';
 
 // ── types ──────────────────────────────────────────────────────────────────
 
@@ -112,18 +113,25 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   const [range, setRange] = useState<DateRange>(presetToRange('7d'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  // null = all branches; string = specific branch scoped in dashboard only
+  const [dashBranchId, setDashBranchId] = useState<string | null>(null);
 
-  const load = useCallback(async (r: DateRange) => {
+  const load = useCallback(async (r: DateRange, branchId: string | null) => {
     setLoading(true);
-    const res = await apiFetch(`/dashboard?from=${r.from}&to=${r.to}`, { tenantSlug });
+    const url = `/dashboard?from=${r.from}&to=${r.to}`;
+    const res = await apiFetch(url, { tenantSlug, branchId });
     if (res.ok) setData(await res.json());
     setLoading(false);
   }, [tenantSlug]);
 
-  useEffect(() => { load(range); }, [range, load]);
+  useEffect(() => { load(range, dashBranchId); }, [range, dashBranchId, load]);
 
   function handleRangeChange(r: DateRange) {
     setRange(r);
+  }
+
+  function handleBranchSelect(branchId: string | null) {
+    setDashBranchId(branchId);
   }
 
   if (loading && !data) {
@@ -174,11 +182,27 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
       {/* Date range control */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
-          <span className="font-medium text-foreground">{range.to}</span>
+          {dashBranchId ? (
+            <>Viewing: <span className="font-medium text-foreground">1 branch</span> —{' '}
+              <button onClick={() => handleBranchSelect(null)} className="text-primary underline-offset-2 hover:underline text-sm">
+                show all
+              </button>
+            </>
+          ) : (
+            <>Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
+            <span className="font-medium text-foreground">{range.to}</span></>
+          )}
         </p>
         <DateRangePicker value={range} onChange={handleRangeChange} />
       </div>
+
+      {/* Branch breakdown table — hidden for single-branch tenants */}
+      <BranchBreakdown
+        tenantSlug={tenantSlug}
+        range={range}
+        activeBranchId={dashBranchId}
+        onSelectBranch={handleBranchSelect}
+      />
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
