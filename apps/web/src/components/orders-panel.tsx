@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Minus, Plus, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
@@ -69,9 +70,6 @@ const ACTION_LABEL: Record<Order["status"], string> = {
   CANCELLED: "Cancelled",
 };
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toFixed(2)}`;
-}
 
 async function readApiError(res: Response): Promise<string> {
   try {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { GitBranch, TrendingUp, ShoppingCart, CreditCard, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { formatCents } from '@/lib/format';
 import type { DateRange } from './date-range-picker';
 
 type BranchRow = {
@@ -27,9 +28,6 @@ type BranchBreakdownResponse = {
   branches: BranchRow[];
 };
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 
 interface Props {
   tenantSlug: string;

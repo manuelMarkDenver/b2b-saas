@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { apiFetch } from "@/lib/api";
+import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
@@ -65,9 +66,6 @@ const ORDER_STATUS_VARIANT: Record<string, "pending" | "confirmed" | "completed"
   CANCELLED: "cancelled",
 };
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toFixed(2)}`;
-}
 
 async function readApiError(res: Response): Promise<string> {
   try {

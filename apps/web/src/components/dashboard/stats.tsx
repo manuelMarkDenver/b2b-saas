@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { ShoppingCart, CreditCard, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { formatCents } from '@/lib/format';
 import { getActiveBranchId, setActiveBranchId } from '@/lib/branch';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
 import { BranchBreakdown } from './branch-breakdown';
@@ -64,9 +65,6 @@ const TOOLTIP_STYLE = {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function formatCents(cents: number) {
-  return `₱${(cents / 100).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'UTC' });
