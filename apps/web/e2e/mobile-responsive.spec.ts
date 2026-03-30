@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Mobile responsive tests — verifies layout behaviour on narrow viewports.
  * Uses the Pixel 5 device profile (393×851) by default.
  */
 
-async function loginAs(page: Parameters<typeof test>[1] extends (args: { page: infer P }) => unknown ? P : never, email: string, password: string) {
+async function loginAs(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
