@@ -26,6 +26,12 @@ const DEFAULT_TENANT: TenantThemeTokens = {
   radius: "0.75rem",
 };
 
+/**
+ * Per-tenant brand overrides for demo/seed tenants.
+ * Real tenants that are not listed here fall through to DEFAULT_TENANT automatically.
+ * Post-staging: replace this static map with a `theme` JSON column on the Tenant model
+ * so each client can self-configure their brand without a code deploy.
+ */
 const TENANT_THEMES: Record<string, TenantThemeTokens> = {
   acme: {
     brandName: "Acme Supply",

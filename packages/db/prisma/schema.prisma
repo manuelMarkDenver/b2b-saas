@@ -184,6 +184,7 @@ model TenantMembership {
   @@unique([tenantId, username])
   @@index([userId])
   @@index([tenantId])
+  @@index([status])
 }
 
 enum MovementType {
@@ -222,6 +223,8 @@ model Order {
 
   @@index([tenantId])
   @@index([branchId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -259,6 +262,7 @@ model Payment {
 
   @@index([tenantId])
   @@index([orderId])
+  @@index([status])
 }
 
 model InventoryMovement {

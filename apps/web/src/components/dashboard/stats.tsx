@@ -54,6 +54,14 @@ const CHART_COLORS = {
   threshold: '#d1d5db',
 };
 
+const TOOLTIP_STYLE = {
+  fontSize: 12,
+  borderRadius: 8,
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-background)',
+  color: 'var(--color-foreground)',
+};
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function formatCents(cents: number) {
@@ -251,7 +259,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `₱${(v as number).toLocaleString()}`} width={70} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                  contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [`₱${(v as number).toLocaleString()}`, 'Revenue']}
                 />
                 <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.revenue} strokeWidth={2} fill="url(#revenueGrad)" dot={false} activeDot={{ r: 4 }} isAnimationActive />
@@ -271,7 +279,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} allowDecimals={false} width={30} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                  contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v, 'Orders']}
                 />
                 <Bar dataKey="orders" fill={CHART_COLORS.orders} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive />
@@ -306,7 +314,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                    contentStyle={TOOLTIP_STYLE}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -333,12 +341,14 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 layout="vertical"
                 data={lowStockData}
                 margin={{ top: 4, right: 20, left: 0, bottom: 0 }}
+                barCategoryGap="30%"
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={110} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)' }}
+                  contentStyle={TOOLTIP_STYLE}
+                  cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="threshold" fill={CHART_COLORS.threshold} radius={[0, 4, 4, 0]} maxBarSize={14} name="Threshold" isAnimationActive />

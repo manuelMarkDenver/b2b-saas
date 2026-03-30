@@ -13,6 +13,7 @@ import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../common/auth/tenant.guard';
 import { UploadsService } from './uploads.service';
 
 // Ensure uploads dir exists at startup
@@ -20,7 +21,7 @@ const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 @Controller('uploads')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
