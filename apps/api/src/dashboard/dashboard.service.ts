@@ -187,6 +187,22 @@ export class DashboardService {
     const revenueMap = toMap(revenueByBranch, 'amountCents');
     const todayMap = toMap(todayByBranch, 'count');
 
+    // Orders with branchId = null (pre-multi-branch data) are attributed to the
+    // default branch — standard ERP behaviour when multi-branch is introduced retroactively.
+    const defaultBranch = branches.find((b) => b.isDefault);
+    if (defaultBranch) {
+      const merge = (map: Map<string, unknown>, valueKey: string) => {
+        const nullVal = (map.get('__null__') as number) ?? 0;
+        const defVal = (map.get(defaultBranch.id) as number) ?? 0;
+        if (nullVal > 0) map.set(defaultBranch.id, nullVal + defVal);
+        map.delete('__null__');
+      };
+      merge(ordersMap, 'count');
+      merge(pendingMap, 'count');
+      merge(revenueMap, 'amountCents');
+      merge(todayMap, 'count');
+    }
+
     // Tenant-wide totals — computed independently so "All branches" row
     // always matches the summary cards (includes orders with branchId = null)
     const [totalOrdersInRange, totalOrdersToday, totalPending, totalRevenue] = await Promise.all([
