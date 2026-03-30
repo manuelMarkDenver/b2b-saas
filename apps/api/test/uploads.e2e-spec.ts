@@ -39,6 +39,7 @@ describe('Uploads (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/uploads')
         .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
         .attach('file', tmpFile);
 
       fs.unlinkSync(tmpFile);
@@ -61,6 +62,7 @@ describe('Uploads (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/uploads')
         .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware')
         .attach('file', Buffer.from('not an image'), {
           filename: 'test-doc.txt',
           contentType: 'text/plain',
@@ -72,7 +74,8 @@ describe('Uploads (e2e)', () => {
     it('returns 400 when no file is attached', async () => {
       const res = await request(app.getHttpServer())
         .post('/uploads')
-        .set('Authorization', `Bearer ${peakToken}`);
+        .set('Authorization', `Bearer ${peakToken}`)
+        .set('x-tenant-slug', 'peak-hardware');
 
       expect(res.status).toBe(400);
     });
