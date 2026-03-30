@@ -13,3 +13,6 @@ coverage/
 postgres-data/
 
 .vscode/
+apps/marketing/out
+apps/marketing/.next
+apps/marketing/tsconfig.tsbuildinfo

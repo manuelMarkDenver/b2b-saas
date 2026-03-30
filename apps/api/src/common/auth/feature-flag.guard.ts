@@ -7,8 +7,9 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { RequestWithUser } from './auth.types';
+import { type FeatureFlag } from '@repo/shared';
 
-export type FeatureFlag = 'inventory' | 'orders' | 'payments' | 'marketplace';
+export type { FeatureFlag };
 
 export const FEATURE_FLAG_KEY = 'featureFlag';
 export const RequireFeature = (flag: FeatureFlag) =>
