@@ -350,8 +350,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       ) : null}
 
       {/* ── Orders table ── */}
-      <div className="mt-5 overflow-hidden rounded-md border border-border/60">
-        <div className="overflow-x-auto">
+      <div className="mt-5 overflow-x-auto rounded-md border border-border/60">
         <div className="min-w-[640px]">
         <div className="grid grid-cols-[1fr_60px_120px_120px_160px_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
@@ -414,7 +413,6 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
             ))}
           </div>
         )}
-        </div>
         </div>
         {meta.totalPages > 1 && (
           <Pagination

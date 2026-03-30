@@ -41,16 +41,16 @@ export function Breadcrumbs({ tenantSlug, tenantName }: BreadcrumbsProps) {
   if (crumbs.length <= 1) return null;
 
   return (
-    <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+    <nav className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1;
         return (
-          <span key={crumb.href} className="flex items-center gap-1">
-            {i > 0 && <ChevronRight className="h-3.5 w-3.5" />}
+          <span key={crumb.href} className={cn('flex shrink-0 items-center gap-1', isLast && 'min-w-0')}>
+            {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
             {isLast ? (
-              <span className={cn('font-medium text-foreground')}>{crumb.label}</span>
+              <span className="truncate font-medium text-foreground">{crumb.label}</span>
             ) : (
-              <Link href={crumb.href} className="hover:text-foreground transition-colors">
+              <Link href={crumb.href} className="hidden truncate transition-colors hover:text-foreground sm:block">
                 {crumb.label}
               </Link>
             )}

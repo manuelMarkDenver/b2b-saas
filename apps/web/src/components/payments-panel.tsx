@@ -282,7 +282,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         <TabsContent value="payables" className="mt-4">
 
-      <div className="overflow-hidden rounded-md border border-border/60">
+      <div className="overflow-x-auto rounded-md border border-border/60">
+        <div className="min-w-[640px]">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
           <div>
             <div className="text-sm font-medium">Orders</div>
@@ -295,8 +296,6 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
         <div className="grid grid-cols-[1fr_60px_120px_120px_160px_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
@@ -342,8 +341,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             </button>
           ))}
         </div>
-        </div>{/* min-w */}
-        </div>{/* overflow-x-auto */}
+        </div>
         {ordersMeta.totalPages > 1 && (
           <Pagination
             page={ordersMeta.page}
@@ -360,7 +358,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         <TabsContent value="history" className="mt-4">
 
-      <div className="overflow-hidden rounded-md border border-border/60">
+      <div className="overflow-x-auto rounded-md border border-border/60">
+        <div className="min-w-[800px]">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-background px-4 py-3">
           <div>
             <div className="text-sm font-medium">Payments</div>
@@ -374,8 +373,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         {payments.length === 0 ? (
           <div className="px-4 py-6 text-sm text-muted-foreground">No payments yet.</div>
         ) : (
-          <div className="overflow-x-auto">
-          <div className="min-w-[800px]">
+          <>
             <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Payment</span>
               <span className="text-right">Amount</span>
@@ -460,9 +458,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                 </div>
               ))}
             </div>
-          </div>
-          </div>
+          </>
         )}
+        </div>
       </div>
 
         </TabsContent>

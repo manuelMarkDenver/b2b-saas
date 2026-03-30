@@ -155,10 +155,10 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setSidebarOpen((v) => !v)}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="Toggle sidebar"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -167,13 +167,17 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
-            <Breadcrumbs tenantSlug={tenantSlug} tenantName={tenantName} />
+            <div className="min-w-0 overflow-hidden">
+              <Breadcrumbs tenantSlug={tenantSlug} tenantName={tenantName} />
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <TenantSwitcher currentSlug={tenantSlug} />
-            <BranchSwitcher tenantSlug={tenantSlug} />
-            <NotificationBell tenantSlug={tenantSlug} />
+          <div className="flex shrink-0 items-center gap-1">
+            <div className="hidden md:flex md:items-center md:gap-1">
+              <TenantSwitcher currentSlug={tenantSlug} />
+              <BranchSwitcher tenantSlug={tenantSlug} />
+              <NotificationBell tenantSlug={tenantSlug} />
+            </div>
             <ModeToggle />
 
             {/* User menu */}

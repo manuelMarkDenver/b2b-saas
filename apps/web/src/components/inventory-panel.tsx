@@ -143,7 +143,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
         {/* ── Stock Levels tab ── */}
         <TabsContent value="stock" className="mt-4">
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="min-w-[400px]">
             <div className="border-b border-border/60 px-4 py-3">
               <div className="text-sm font-medium">Current stock</div>
               <div className="mt-0.5 text-xs text-muted-foreground">
@@ -151,8 +152,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-            <div className="min-w-[400px]">
             <div className="grid grid-cols-[1fr_160px_100px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Product</span>
               <span>SKU Code</span>
@@ -192,13 +191,13 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </div>
             )}
             </div>
-            </div>
           </div>
         </TabsContent>
 
         {/* ── Movements tab ── */}
         <TabsContent value="movements" className="mt-4">
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="min-w-[550px]">
             <div className="border-b border-border/60 px-4 py-3">
               <div className="text-sm font-medium">Movement log</div>
               <div className="mt-0.5 text-xs text-muted-foreground">
@@ -206,8 +205,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-            <div className="min-w-[500px]">
             <div className="grid grid-cols-[1fr_90px_92px_1fr_110px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>SKU</span>
               <span>Type</span>
@@ -263,8 +260,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 })}
               </div>
             )}
-            </div>
-            </div>
 
             {/* Pagination */}
             {meta.totalPages > 1 && (
@@ -279,6 +274,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </TabsContent>
       </Tabs>
