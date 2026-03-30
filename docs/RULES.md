@@ -391,3 +391,24 @@ LATER (not MVP unless explicitly pulled in):
 - OAuth/OIDC social login (Google, Facebook/Meta).
 - Keep auth design compatible with multiple identity providers.
 - Do not block MVP on social login — email/password only for now.
+
+---
+
+## PR Workflow (Required Steps Before Every Merge)
+
+Every PR must complete these steps **in order** before merging:
+
+| Step | Action | Required |
+|------|--------|----------|
+| 1 | All E2E tests pass (`pnpm --filter api test:e2e`) | ✅ Mandatory |
+| 2 | TypeScript compiles clean (`pnpm typecheck`) | ✅ Mandatory |
+| 3 | Run `/audit` — no 🔴 findings allowed to remain | ✅ Mandatory |
+| 4 | User manual UI test (Claude provides step-by-step checklist) | ✅ Mandatory |
+| 5 | User gives explicit go signal | ✅ Mandatory |
+| 6 | Claude commits + pushes | ✅ Mandatory |
+| 7 | User merges on GitHub | ✅ Mandatory |
+
+**On `/audit` findings:**
+- 🔴 Blocking → fix before merge, no exceptions
+- 🟡 Warning → document in PR description, fix before staging
+- 🟢 Advisory → log in MILESTONES.md backlog, fix when convenient
