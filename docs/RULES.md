@@ -208,12 +208,11 @@ This is the standard workflow for every change:
 
 1. **Claude implements** the change.
 2. **Claude runs API tests** — reports results with expected vs actual.
-3. **Claude runs browser tests** — run `pnpm --filter web test:e2e` and report pass/fail for any affected spec files.
-4. **User tests UI** (if applicable) — Claude provides exact steps and expected outcomes.
-5. **User gives go signal** — explicit confirmation before any commit.
-6. **Claude commits and pushes** — with a clear commit message, no co-author line.
-7. **User merges** on GitHub via PR.
-8. **User confirms merge** — Claude uses this as the signal to proceed to the next task.
+3. **User tests UI** (if applicable) — Claude provides exact steps and expected outcomes.
+4. **User gives go signal** — explicit confirmation before any commit.
+5. **Claude commits and pushes** — with a clear commit message, no co-author line.
+6. **User merges** on GitHub via PR.
+7. **User confirms merge** — Claude uses this as the signal to proceed to the next task.
 
 MUST:
 
@@ -263,9 +262,7 @@ MUST:
 - **API tests are Claude's responsibility.** Write and run E2E tests (Jest + Supertest) — do NOT use curl for API testing. Curl wastes tokens and is not reusable. Run `pnpm --filter api test:e2e` and report pass/fail before asking the user to commit.
 - Every new API endpoint requires an E2E test covering: happy path, validation error, tenant isolation (cross-tenant 403), and invalid transitions where applicable.
 - Shared test helpers live in `apps/api/test/helpers/`. Use `createTestApp()` and `loginAs()` for all E2E tests.
-- **Browser tests are Claude's responsibility.** Run `pnpm --filter web test:e2e` for any UI change. Use `/playwright` skill to run and interpret results. Spec files live in `apps/web/e2e/`.
-- Every new page or UI feature requires a Playwright spec covering: page renders, key interactions, and mobile responsiveness.
-- **UI spot-check is the user's responsibility.** Claude provides exact browser steps + expected outcome for any flows not covered by Playwright.
+- **UI spot-check is the user's responsibility.** Claude provides exact browser steps + expected outcome for every UI change.
 - Every test must include its **expected result** — never list a test step without saying what success looks like.
 - If any test fails, diagnose and fix before surfacing to user. Do not commit broken code.
 - **Run the seeder automatically** (`pnpm db:seed`) whenever a migration or seed change is made — do not ask the user to run it.
@@ -285,23 +282,6 @@ MUST:
 - Complex business logic (e.g., delta calculation, status transitions) gets unit tests in addition to E2E.
 - Do NOT write E2E tests that mock the service layer — they must go through the full HTTP stack.
 - Do NOT use curl for API verification — always use E2E tests instead.
-
----
-
-## Browser Test Rules (Playwright)
-
-MUST:
-
-- Every new page requires a Playwright spec in `apps/web/e2e/` — desktop + mobile viewport sections.
-- Run with: `pnpm --filter web test:e2e`
-- Use `/playwright` to run and interpret results.
-- Shared helpers live in `apps/web/e2e/helpers.ts` — use `gotoTenantPage()` for authenticated navigation, `login()` for explicit auth flows.
-- Desktop tests use `{ width: 1280, height: 800 }`, mobile tests use `{ width: 393, height: 851 }`.
-- Mobile tests must include a horizontal scroll check for any table using `expectHorizontallyScrollable()`.
-- Do NOT assert on exact pixel dimensions unless testing a specific layout constraint.
-- Tests run against a live dev server — ensure `pnpm dev` (web) is running or set `CI=true`.
-
-See `docs/DEVELOPMENT.md` for how to run tests locally.
 
 ---
 

@@ -104,9 +104,9 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | # | Issue | Status | Fix |
 |---|-------|--------|-----|
 | 6 | Stock goes negative on manual ADJUSTMENT | ✅ MS9 | Stock floor check added in `InventoryService` for negative adjustments |
-| 7 | ₱ hardcoded in `payments.service.ts` notification body | ❌ Open | `payments.service.ts:65` — move to shared `formatCents()` util. Breaks for non-PHP tenants. |
-| 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ❌ Open | Extract to `@/lib/format.ts` with currency configurable per tenant |
-| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership`; missing `@@index([createdAt])` on `Order` | ❌ Open | Sequential scans at scale. Add before staging deployment. |
+| 7 | ₱ hardcoded in `payments.service.ts` notification body | ✅ Done | `payments.service.ts` — uses `toLocaleString('en-PH', { style: 'currency' })` |
+| 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ✅ Done | Extracted to `apps/web/src/lib/format.ts`; 4 local copies removed |
+| 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership`; missing `@@index([createdAt])` on `Order` | ✅ Done | Migration `20260330135249_add_status_createdat_indexes` |
 | 10 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
 | 11 | 7-day JWT — deactivating User (not membership) doesn't revoke access immediately | ❌ Open | Low risk now. TenantGuard checks membership status. Revisit at staging. |
 | 12 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
