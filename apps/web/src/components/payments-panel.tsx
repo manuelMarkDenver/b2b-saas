@@ -114,6 +114,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [ordersMeta, setOrdersMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [ordersPage, setOrdersPage] = React.useState(1);
+  const [payablesFilters, setPayablesFilters] = React.useState<FilterValues>({});
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
@@ -123,15 +124,18 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters) {
+  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters) {
     setStatus({ kind: "info", text: "Loading payments..." });
     try {
       const paymentParams = new URLSearchParams({ page: String(pPage), limit: '20' });
       if (pFilters.status) paymentParams.set('status', pFilters.status as string);
 
+      const ordersParams = new URLSearchParams({ page: String(oPage), limit: '20' });
+      if (oFilters.status) ordersParams.set('status', oFilters.status as string);
+
       const [paymentsRes, ordersRes] = await Promise.all([
         apiFetch(`/payments?${paymentParams}`, { tenantSlug }),
-        apiFetch(`/orders?page=${oPage}&limit=20`, { tenantSlug }),
+        apiFetch(`/orders?${ordersParams}`, { tenantSlug }),
       ]);
 
       if (!paymentsRes.ok) throw new Error(`Payments failed: ${paymentsRes.status}`);
@@ -166,9 +170,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    void loadData(ordersPage, paymentsPage, paymentFilters);
+    void loadData(ordersPage, paymentsPage, paymentFilters, payablesFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters]);
+  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters, payablesFilters]);
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
@@ -253,6 +257,25 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     await loadData();
   }
 
+  function handleExportPayables() {
+    const rows: string[][] = [['Order ID', 'Status', 'Items', 'Total', 'Date']];
+    orders.forEach((o) => {
+      rows.push([
+        o.id,
+        o.status,
+        String(o.items?.length ?? 0),
+        formatCents(o.totalCents),
+        new Date(o.createdAt).toLocaleDateString(),
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'payables.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleExportPayments() {
     const rows: string[][] = [['Payment ID', 'Order ID', 'Amount', 'Status', 'Date']];
     payments.forEach((p) => {
@@ -307,7 +330,23 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         </div>
 
-        <TabsContent value="payables" className="mt-4">
+        <TabsContent value="payables" className="mt-4 space-y-3">
+
+          <FilterBar
+            filters={[
+              {
+                type: 'select', key: 'status', label: 'All statuses',
+                options: [
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'CONFIRMED', label: 'Confirmed' },
+                  { value: 'COMPLETED', label: 'Completed' },
+                ],
+              },
+            ]}
+            values={payablesFilters}
+            onChange={(v) => { setPayablesFilters(v); setOrdersPage(1); }}
+            onExport={handleExportPayables}
+          />
 
       <div className="overflow-x-auto rounded-md border border-border/60">
         <div className="min-w-[640px]">
