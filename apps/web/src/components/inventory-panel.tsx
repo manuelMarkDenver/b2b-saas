@@ -23,9 +23,12 @@ type Movement = {
   type: string;
   quantity: number;
   note?: string;
+  reason?: string;
+  approvalStatus: string;
   referenceType: string;
   createdAt: string;
   sku: { code: string; name: string };
+  actor?: { id: string; email: string } | null;
 };
 
 type Sku = {
@@ -82,6 +85,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [movMeta, setMovMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [movPage, setMovPage] = useState(1);
+  const [movFilter, setMovFilter] = useState(''); // '' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Add movement dialog
   const [addOpen, setAddOpen] = useState(false);
@@ -131,19 +136,46 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   }, [tenantSlug, skuPage, filters]);
 
   const loadMovements = useCallback(async () => {
-    const res = await apiFetch(`/inventory/movements?page=${movPage}&limit=20`, { tenantSlug });
+    const params = new URLSearchParams({ page: String(movPage), limit: '20' });
+    if (movFilter) params.set('approvalStatus', movFilter);
+    const res = await apiFetch(`/inventory/movements?${params}`, { tenantSlug });
     if (res.ok) {
       const data = await res.json() as { data: Movement[]; meta: Meta };
       setMovements(data.data);
       setMovMeta(data.meta);
     }
-  }, [tenantSlug, movPage]);
+    // Load pending count (always, regardless of filter)
+    if (!staffMode) {
+      const r2 = await apiFetch('/inventory/movements?approvalStatus=PENDING&limit=1', { tenantSlug });
+      if (r2.ok) {
+        const d2 = await r2.json() as { meta: Meta };
+        setPendingCount(d2.meta.total);
+      }
+    }
+  }, [tenantSlug, movPage, movFilter, staffMode]);
 
   useEffect(() => { loadSkus(); }, [loadSkus]);
   useEffect(() => { loadMovements(); }, [loadMovements]);
 
   // Reset page to 1 when filters change
   useEffect(() => { setSkuPage(1); }, [filters]);
+
+  async function handleApprove(movementId: string) {
+    const res = await apiFetch(`/inventory/movements/${movementId}/approve`, { method: 'PATCH', tenantSlug });
+    if (res.ok) {
+      pushToast({ variant: 'success', title: 'Approved', message: 'Stock has been updated.' });
+      loadSkus();
+      loadMovements();
+    }
+  }
+
+  async function handleReject(movementId: string) {
+    const res = await apiFetch(`/inventory/movements/${movementId}/reject`, { method: 'PATCH', tenantSlug });
+    if (res.ok) {
+      pushToast({ variant: 'info', title: 'Rejected', message: 'Movement has been rejected.' });
+      loadMovements();
+    }
+  }
 
   async function handleQuickAdjust(e: React.FormEvent) {
     e.preventDefault();
@@ -263,6 +295,31 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
     }
   }
 
+  function handleExportMovements() {
+    const rows: string[][] = [['Product', 'SKU', 'Type', 'Qty', 'Status', 'Note', 'Reason', 'Actor', 'Date']];
+    movements.forEach((m) => {
+      rows.push([
+        m.sku.name,
+        m.sku.code,
+        m.type,
+        String(m.quantity),
+        m.approvalStatus,
+        m.note ?? '',
+        m.reason ?? '',
+        m.actor?.email ?? '',
+        new Date(m.createdAt).toLocaleDateString(),
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'movements.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleExport() {
     const rows: string[][] = [['Product', 'Category', 'SKU Code', 'In Stock', 'Cost', 'Price']];
     skus.forEach((s) => {
@@ -323,7 +380,14 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       <Tabs defaultValue="stock">
         <TabsList>
           <TabsTrigger value="stock">Stock Levels</TabsTrigger>
-          <TabsTrigger value="movements">Movements</TabsTrigger>
+          <TabsTrigger value="movements" className="relative">
+            Movements
+            {!staffMode && pendingCount > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Stock Levels tab ── */}
@@ -426,19 +490,31 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         <TabsContent value="movements" className="mt-4">
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="min-w-[550px]">
-            <div className="border-b border-border/60 px-4 py-3">
-              <div className="text-sm font-medium">Movement log</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                IN increases stock · OUT decreases stock · ADJUSTMENT corrects counts.
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
+              <div className="flex gap-1">
+                {(['', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => { setMovFilter(s); setMovPage(1); }}
+                    className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${movFilter === s ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                  >
+                    {s === '' ? 'All' : s === 'PENDING' ? `Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}` : s.charAt(0) + s.slice(1).toLowerCase()}
+                  </button>
+                ))}
               </div>
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleExportMovements}>
+                Export CSV
+              </Button>
             </div>
 
-            <div className="grid grid-cols-[1fr_90px_92px_1fr_110px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <span>SKU</span>
+            <div className={`grid gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${!staffMode ? 'grid-cols-[1fr_90px_80px_1fr_100px_100px]' : 'grid-cols-[1fr_90px_80px_1fr_110px]'}`}>
+              <span>Product</span>
               <span>Type</span>
               <span className="text-right">Qty</span>
-              <span>Note</span>
+              <span>Note / Reason</span>
               <span className="text-right">Date</span>
+              {!staffMode && <span className="text-right">Actions</span>}
             </div>
 
             {movements.length === 0 ? (
@@ -459,16 +535,19 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 {movements.map((m) => {
                   const Icon = MOVEMENT_ICON[m.type] ?? ArrowLeftRight;
                   const color = MOVEMENT_COLOR[m.type] ?? '';
+                  const isPending = m.approvalStatus === 'PENDING';
                   return (
                     <div
                       key={m.id}
-                      className="grid grid-cols-[1fr_90px_92px_1fr_110px] items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30"
+                      className={`grid items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30 ${!staffMode ? 'grid-cols-[1fr_90px_80px_1fr_100px_100px]' : 'grid-cols-[1fr_90px_80px_1fr_110px]'} ${isPending ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <ProductThumb label={`${m.sku.code} ${m.sku.name}`} size={36} className="rounded-lg shrink-0" />
+                        <ProductThumb label={`${m.sku.code} ${m.sku.name}`} size={32} className="rounded-lg shrink-0" />
                         <div className="min-w-0">
-                          <span className="block truncate font-medium">{m.sku.code}</span>
-                          <span className="block truncate text-xs text-muted-foreground">{m.sku.name}</span>
+                          <span className="block truncate text-xs font-medium">{m.sku.name}</span>
+                          {isPending && (
+                            <span className="text-[10px] font-semibold text-amber-600">Pending approval</span>
+                          )}
                         </div>
                       </div>
                       <div className={`flex items-center gap-1.5 ${color}`}>
@@ -479,10 +558,39 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                         {m.type === 'OUT' ? '-' : '+'}
                         {Math.abs(m.quantity)}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">{m.note ?? '—'}</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs text-muted-foreground">{m.note ?? m.reason ?? '—'}</div>
+                        {m.actor && <div className="truncate text-[10px] text-muted-foreground/70">{m.actor.email}</div>}
+                      </div>
                       <div className="text-right text-xs text-muted-foreground">
                         {new Date(m.createdAt).toLocaleDateString()}
                       </div>
+                      {!staffMode && (
+                        <div className="flex justify-end gap-1">
+                          {isPending ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleApprove(m.id)}
+                                className="rounded px-2 py-0.5 text-[11px] font-medium text-green-700 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleReject(m.id)}
+                                className="rounded px-2 py-0.5 text-[11px] font-medium text-red-700 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className={`text-[10px] font-medium ${m.approvalStatus === 'APPROVED' ? 'text-green-600' : 'text-red-500'}`}>
+                              {m.approvalStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
