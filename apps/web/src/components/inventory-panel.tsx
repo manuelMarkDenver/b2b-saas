@@ -315,7 +315,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'movements.csv';
+    a.download = 'stock-history.csv';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -363,13 +363,15 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           <span>products</span>
           <span>·</span>
           <span className="font-medium text-foreground">{movMeta.total}</span>
-          <span>movements</span>
+          <span>history entries</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setAddOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Log movement
-          </Button>
+          {!staffMode && (
+            <Button variant="outline" onClick={() => setAddOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Adjust Stock
+            </Button>
+          )}
           <Button onClick={() => setProductOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
             New Product
@@ -380,8 +382,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       <Tabs defaultValue="stock">
         <TabsList>
           <TabsTrigger value="stock">Stock Levels</TabsTrigger>
-          <TabsTrigger value="movements" className="relative">
-            Movements
+          <TabsTrigger value="history" className="relative">
+            History
             {!staffMode && pendingCount > 0 && (
               <span className="ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
                 {pendingCount}
@@ -449,19 +451,19 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => { setAdjustSku({ id: sku.id, name: sku.name, direction: 'OUT' }); setAdjustQty('1'); setAdjustReason(''); }}
-                          className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
-                          title="Decrease stock"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => { setAdjustSku({ id: sku.id, name: sku.name, direction: 'IN' }); setAdjustQty('1'); setAdjustReason(''); }}
                           className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
                           title="Increase stock"
                         >
                           <Plus className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAdjustSku({ id: sku.id, name: sku.name, direction: 'OUT' }); setAdjustQty('1'); setAdjustReason(''); }}
+                          className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                          title="Decrease stock"
+                        >
+                          <Minus className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -486,8 +488,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           </div>
         </TabsContent>
 
-        {/* ── Movements tab ── */}
-        <TabsContent value="movements" className="mt-4">
+        {/* ── History tab ── */}
+        <TabsContent value="history" className="mt-4">
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="min-w-[550px]">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
@@ -519,16 +521,18 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
             {movements.length === 0 ? (
               <div className="px-4 py-10 text-center">
-                <div className="text-sm font-medium">No movements yet</div>
+                <div className="text-sm font-medium">No history yet</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  Log your first stock movement to start tracking inventory.
+                  Use the +/- buttons on each product to log your first stock adjustment.
                 </div>
-                <div className="mt-4">
-                  <Button onClick={() => setAddOpen(true)}>
-                    <Plus className="mr-1.5 h-4 w-4" />
-                    Log movement
-                  </Button>
-                </div>
+                {!staffMode && (
+                  <div className="mt-4">
+                    <Button onClick={() => setAddOpen(true)}>
+                      <Plus className="mr-1.5 h-4 w-4" />
+                      Adjust Stock
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-border/60">
@@ -762,7 +766,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Log inventory movement</DialogTitle>
+            <DialogTitle>Adjust Stock</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="space-y-1.5">
@@ -811,7 +815,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={saving || !form.skuId}>
-                {saving ? 'Saving…' : 'Log movement'}
+                {saving ? 'Saving…' : 'Save adjustment'}
               </Button>
             </DialogFooter>
           </form>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Settings, Users, Plus, Mail, UserX, UserCheck, Pencil } from 'lucide-react';
+import { Settings, Users, Palette, Plus, Mail, UserX, UserCheck, Pencil } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,6 +59,7 @@ function memberDisplayName(m: Member): string {
 const SETTINGS_NAV = [
   { label: 'Profile', href: 'profile', icon: Settings },
   { label: 'Team & Permissions', href: 'team', icon: Users },
+  { label: 'Appearance', href: 'appearance', icon: Palette },
 ];
 
 type StatusFilter = 'all' | 'active' | 'pending' | 'deactivated';

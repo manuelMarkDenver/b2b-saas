@@ -341,6 +341,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v, 'Orders']}
+                  cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
                 />
                 <Bar dataKey="orders" fill={CHART_COLORS.orders} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive />
               </BarChart>

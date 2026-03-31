@@ -16,7 +16,7 @@ const BRANCH_COLORS = [
 ];
 
 const ALL_BRANCHES_COLOR =
-  'bg-muted text-muted-foreground';
+  'bg-muted text-foreground';
 
 interface PageHeaderProps {
   tenantSlug: string;

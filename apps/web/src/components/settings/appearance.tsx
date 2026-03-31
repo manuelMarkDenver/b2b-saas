@@ -49,13 +49,15 @@ export function AppearanceSettings({ tenantSlug }: { tenantSlug: string }) {
 
       {/* Appearance content */}
       <div className="flex-1 space-y-4">
-        <div className="rounded-lg border border-border bg-card p-6">
+        <div>
           <h2 className="text-base font-semibold">Appearance</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Customize how the app looks on your device.
           </p>
+        </div>
 
-          <div className="mt-6 space-y-3">
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="space-y-3">
             <p className="text-sm font-medium">Theme</p>
             <div className="flex gap-3">
               {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
