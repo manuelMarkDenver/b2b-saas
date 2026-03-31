@@ -68,18 +68,25 @@ export class PaymentsService {
     return payment;
   }
 
-  async listPayments(tenantId: string, page: number, limit: number, orderId?: string, branchId?: string) {
+  async listPayments(
+    tenantId: string,
+    page: number,
+    limit: number,
+    orderId?: string,
+    branchId?: string,
+    status?: string,
+  ) {
     const skip = (page - 1) * limit;
-    const where = {
-      tenantId,
-      ...(orderId ? { orderId } : {}),
-      ...(branchId ? { order: { branchId } } : {}),
-    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = { tenantId };
+    if (orderId) where.orderId = orderId;
+    if (branchId) where.order = { branchId };
+    if (status) where.status = status;
     const [data, total] = await this.prisma.$transaction([
       this.prisma.payment.findMany({
         where,
         include: {
-          order: { select: { id: true, status: true, totalCents: true } },
+          order: { select: { id: true, status: true, totalCents: true, createdAt: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
