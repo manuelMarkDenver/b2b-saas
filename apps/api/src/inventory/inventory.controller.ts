@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
@@ -16,7 +16,12 @@ export class InventoryController {
   @Post('movements')
   logMovement(@Req() req: RequestWithUser, @Body() body: LogMovementDto) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
-    return this.inventoryService.logMovement(req.tenant!.id, body, branchId);
+    return this.inventoryService.logMovement(
+      req.tenant!.id,
+      { ...body, actorId: req.user!.id },
+      branchId,
+      req.membership?.role,
+    );
   }
 
   @Get('movements')
@@ -24,8 +29,26 @@ export class InventoryController {
     @Req() req: RequestWithUser,
     @Query() pagination: PaginationDto,
     @Query('skuId') skuId?: string,
+    @Query('approvalStatus') approvalStatus?: string,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
-    return this.inventoryService.listMovements(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, skuId, branchId);
+    return this.inventoryService.listMovements(
+      req.tenant!.id,
+      pagination.page ?? 1,
+      pagination.limit ?? 20,
+      skuId,
+      branchId,
+      approvalStatus,
+    );
+  }
+
+  @Patch('movements/:id/approve')
+  approveMovement(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.inventoryService.approveMovement(req.tenant!.id, id, req.membership!.role);
+  }
+
+  @Patch('movements/:id/reject')
+  rejectMovement(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.inventoryService.rejectMovement(req.tenant!.id, id, req.membership!.role);
   }
 }

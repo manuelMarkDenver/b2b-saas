@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus } from 'lucide-react';
+import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -87,6 +88,13 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [form, setForm] = useState({ skuId: '', type: 'IN', quantity: '', note: '' });
   const [saving, setSaving] = useState(false);
 
+  // Quick adjust dialog
+  const [adjustSku, setAdjustSku] = useState<{ id: string; name: string; direction: 'IN' | 'OUT' } | null>(null);
+  const [adjustQty, setAdjustQty] = useState('1');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjustSaving, setAdjustSaving] = useState(false);
+  const staffMode = isStaff(tenantSlug);
+
   // New product dialog
   const [productOpen, setProductOpen] = useState(false);
   const [productForm, setProductForm] = useState({
@@ -136,6 +144,46 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
   // Reset page to 1 when filters change
   useEffect(() => { setSkuPage(1); }, [filters]);
+
+  async function handleQuickAdjust(e: React.FormEvent) {
+    e.preventDefault();
+    if (!adjustSku) return;
+    setAdjustSaving(true);
+    try {
+      const res = await apiFetch('/inventory/movements', {
+        method: 'POST',
+        tenantSlug,
+        body: JSON.stringify({
+          skuId: adjustSku.id,
+          type: adjustSku.direction,
+          quantity: parseInt(adjustQty, 10),
+          referenceType: 'MANUAL',
+          reason: adjustReason || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Failed', message: err.message ?? 'Unknown error' });
+      } else {
+        const d = await res.json() as { approvalStatus: string };
+        const isPending = d.approvalStatus === 'PENDING';
+        pushToast({
+          variant: isPending ? 'info' : 'success',
+          title: isPending ? 'Sent for approval' : 'Stock updated',
+          message: isPending
+            ? 'Your adjustment is pending admin approval.'
+            : `${adjustSku.direction === 'IN' ? '+' : '-'}${adjustQty} units applied.`,
+        });
+        setAdjustSku(null);
+        setAdjustQty('1');
+        setAdjustReason('');
+        loadSkus();
+        loadMovements();
+      }
+    } finally {
+      setAdjustSaving(false);
+    }
+  }
 
   function onProductCategoryChange(categoryId: string) {
     setProductForm((f) => ({ ...f, categoryId }));
@@ -295,13 +343,14 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="min-w-[440px]">
               <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <div className={`grid items-center gap-3 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px]' : 'grid-cols-[2fr_1fr_80px_80px_80px]'}`}>
+                <div className={`grid items-center gap-3 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}>
                   <span>Product</span>
                   <span>Category</span>
                   {showSkuCol && <span>SKU Code</span>}
                   <span className="text-right">In Stock</span>
                   <span className="text-right">Cost</span>
                   <span className="text-right">Price</span>
+                  <span />
                 </div>
               </div>
 
@@ -314,7 +363,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   {skus.map((sku) => (
                     <div
                       key={sku.id}
-                      className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px]' : 'grid-cols-[2fr_1fr_80px_80px_80px]'}`}
+                      className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <ProductThumb label={`${sku.code} ${sku.name}`} size={36} className="rounded-lg shrink-0" />
@@ -332,6 +381,24 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       </div>
                       <div className="text-right text-xs text-muted-foreground tabular-nums">
                         {sku.priceCents != null ? formatCents(sku.priceCents) : '—'}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => { setAdjustSku({ id: sku.id, name: sku.name, direction: 'OUT' }); setAdjustQty('1'); setAdjustReason(''); }}
+                          className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                          title="Decrease stock"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setAdjustSku({ id: sku.id, name: sku.name, direction: 'IN' }); setAdjustQty('1'); setAdjustReason(''); }}
+                          className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                          title="Increase stock"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -439,6 +506,56 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Quick adjust dialog */}
+      <Dialog open={!!adjustSku} onOpenChange={(open) => { if (!open) setAdjustSku(null); }}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>
+              {adjustSku?.direction === 'IN' ? 'Add stock' : 'Remove stock'}
+              {adjustSku && <span className="ml-1 text-muted-foreground font-normal text-sm">— {adjustSku.name}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          {adjustSku && (
+            <form onSubmit={handleQuickAdjust} className="space-y-4">
+              {staffMode && (
+                <p className="text-xs text-muted-foreground rounded-md bg-muted/60 px-3 py-2">
+                  As a staff member your adjustment will be sent for admin approval.
+                </p>
+              )}
+              <div className="space-y-1.5">
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={adjustQty}
+                  onChange={(e) => setAdjustQty(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Reason (optional)</Label>
+                <Input
+                  placeholder={adjustSku.direction === 'IN' ? 'e.g. Restocked from supplier' : 'e.g. Sold offline'}
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAdjustSku(null)}>Cancel</Button>
+                <Button
+                  type="submit"
+                  disabled={adjustSaving || !adjustQty || parseInt(adjustQty, 10) < 1}
+                  variant={adjustSku.direction === 'OUT' ? 'destructive' : 'default'}
+                >
+                  {adjustSaving ? 'Saving…' : staffMode ? 'Submit for approval' : (adjustSku.direction === 'IN' ? 'Add stock' : 'Remove stock')}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* New Product dialog */}
       <Dialog open={productOpen} onOpenChange={setProductOpen}>
