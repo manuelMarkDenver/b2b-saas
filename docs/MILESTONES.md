@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-31 — MS16 started: UI/UX overhaul — inventory restructure, sitewide filters, stock approvals, role-based dashboard.
+> Last updated: 2026-03-31 — MS16 complete: UI/UX overhaul — inventory restructure, sitewide filters, stock approvals, role-based dashboard, reports tabs, dashboard customization.
 
 ---
 
@@ -39,7 +39,8 @@
 | 4 | Dashboard / home screen (MS12) | ✅ Done | Summary cards, date range (presets + custom), 4 Recharts: area revenue, bar orders/day, donut status, horizontal bar low stock. |
 | 5 | Basic reports (orders CSV export, date filter) | ✅ Done | MS13 — GET /reports/orders + CSV export, sidebar nav, date picker. |
 | 6 | **Mobile responsive + PWA** | ✅ Done | MS14 — manifest, service worker, mobile drawer, horizontal-scroll tables, responsive sheets. |
-| 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 7 | MS16 — UI/UX overhaul (inventory, filters, stock approvals, reports, dashboard widgets) | ✅ Done | Branch `milestone-16/ui-ux-overhaul` — 11 phases |
+| 8 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
@@ -486,23 +487,23 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 
 ---
 
-### MS16 — UI/UX Overhaul 🚧 In Progress
+### MS16 — UI/UX Overhaul ✅ Complete
 
 > Full UX redesign based on real client feedback. Inventory restructure, sitewide filter+export pattern, stock approval workflow, role-based dashboard, and settings improvements.
 
 | Phase | Items | Status |
 |-------|-------|--------|
-| 1 — Quick wins + sitewide filter bar | Labels, nav cleanup, branch badge, role-based dashboard, FilterBar component | 🚧 |
-| 2 — DB migration | `approvalStatus`, `reason`, `actorId` on InventoryMovement; auto-SKU logic | ⏳ |
-| 3 — Inventory page rebuild | Products table, column toggle, filter+export, + New Product CTA | ⏳ |
-| 4 — New Product modal | Name, category, photo, cost, price, initial qty, auto-SKU | ⏳ |
-| 5 — Inline stock adjustment | +/− per row, owner/admin immediate, staff → pending | ⏳ |
-| 6 — Stock History + Approvals | Log, filters, pending badge, approve/reject, in-app notifications | ⏳ |
-| 7 — Orders filter + export | Filter bar + CSV export on orders table | ⏳ |
-| 8 — Payments filter + export | Filter bar + CSV export on payments table | ⏳ |
-| 9 — Reports page | Analytics only, filter bar, CSV export of underlying data | ⏳ |
-| 10 — Dashboard Settings | Widget show/hide toggles per user in Settings | ⏳ |
-| 11 — Docs | MILESTONES + DATA_MODEL updates | ⏳ |
+| 1 — Quick wins + sitewide filter bar | Labels, nav cleanup, branch badge, role-based dashboard, FilterBar component, Appearance settings | ✅ |
+| 2 — DB migration | `approvalStatus`, `reason`, `actorId` on InventoryMovement; `ApprovalStatus` enum; indexes | ✅ |
+| 3 — Inventory page rebuild | Products table with category/cost/price, SKU toggle, filter+export, FilterBar | ✅ |
+| 4 — New Product modal | Name, category, photo, cost, price, initial qty, auto-SKU (category prefix + counter) | ✅ |
+| 5 — Inline stock adjustment | +/− per row, owner/admin immediate APPROVED, staff → PENDING + notification | ✅ |
+| 6 — Stock History + Approvals | Movement log tabs (All/Pending/Approved/Rejected), pending badge, approve/reject inline, CSV export | ✅ |
+| 7 — Orders filter + export | FilterBar (search + status) + CSV export on orders table | ✅ |
+| 8 — Payments filter + export | FilterBar (status) + CSV export on payments history tab | ✅ |
+| 9 — Reports page | Three tabs: Orders / Payments / Inventory movements; date range picker; CSV export per tab | ✅ |
+| 10 — Dashboard Settings | Widget show/hide toggles (Customize button), localStorage persistence per user per tenant | ✅ |
+| 11 — Docs | MILESTONES updated | ✅ |
 
 ---
 
