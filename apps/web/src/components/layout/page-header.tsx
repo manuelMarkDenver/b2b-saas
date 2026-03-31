@@ -8,15 +8,15 @@ type Branch = { id: string; name: string };
 
 // Stable color palette — assigned by branch index (consistent across sessions)
 const BRANCH_COLORS = [
-  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
-  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+  'bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700/40',
+  'bg-violet-100 text-violet-800 border border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700/40',
+  'bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700/40',
+  'bg-orange-100 text-orange-800 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700/40',
+  'bg-pink-100 text-pink-800 border border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700/40',
 ];
 
 const ALL_BRANCHES_COLOR =
-  'bg-muted text-foreground';
+  'bg-secondary text-secondary-foreground border border-border';
 
 interface PageHeaderProps {
   tenantSlug: string;

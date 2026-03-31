@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FilterBar, FilterValues } from '@/components/ui/filter-bar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/toast';
 import { ProductThumb } from '@/components/product-thumb';
 import { ImageUpload } from '@/components/image-upload';
@@ -92,6 +93,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ skuId: '', type: 'IN', quantity: '', note: '' });
   const [saving, setSaving] = useState(false);
+  const [skuPickerOpen, setSkuPickerOpen] = useState(false);
+  const [skuSearch, setSkuSearch] = useState('');
 
   // Quick adjust dialog
   const [adjustSku, setAdjustSku] = useState<{ id: string; name: string; direction: 'IN' | 'OUT' } | null>(null);
@@ -306,6 +309,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         pushToast({ variant: 'success', title: 'Movement logged', message: 'Inventory updated.' });
         setAddOpen(false);
         setForm({ skuId: '', type: 'IN', quantity: '', note: '' });
+        setSkuSearch('');
         loadSkus();
         loadMovements();
       }
@@ -518,6 +522,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         {/* ── History tab ── */}
         <TabsContent value="history" className="mt-4 space-y-3">
           <FilterBar
+            collapsible
             filters={[
               {
                 type: 'select', key: 'approvalStatus', label: 'All statuses',
@@ -792,7 +797,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       </Dialog>
 
       {/* Add movement dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) { setSkuSearch(''); setSkuPickerOpen(false); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Adjust Stock</DialogTitle>
@@ -800,16 +805,60 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="space-y-1.5">
               <Label>SKU</Label>
-              <Select value={form.skuId} onValueChange={(v) => setForm((f) => ({ ...f, skuId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select SKU" /></SelectTrigger>
-                <SelectContent>
-                  {skus.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.code} — {s.name} (stock: {s.stockOnHand})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={skuPickerOpen} onOpenChange={setSkuPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm shadow-sm hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <span className={form.skuId ? 'text-foreground' : 'text-muted-foreground'}>
+                      {form.skuId
+                        ? (() => { const s = skus.find((x) => x.id === form.skuId); return s ? `${s.code} — ${s.name}` : 'Select SKU'; })()
+                        : 'Select SKU'}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <div className="p-2 border-b border-border">
+                    <Input
+                      autoFocus
+                      placeholder="Search SKU…"
+                      value={skuSearch}
+                      onChange={(e) => setSkuSearch(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="max-h-52 overflow-y-auto py-1">
+                    {skus
+                      .filter((s) => {
+                        const q = skuSearch.toLowerCase();
+                        return !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+                      })
+                      .map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => { setForm((f) => ({ ...f, skuId: s.id })); setSkuPickerOpen(false); setSkuSearch(''); }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-foreground text-left"
+                        >
+                          <Check className={`h-3.5 w-3.5 shrink-0 ${form.skuId === s.id ? 'text-primary' : 'invisible'}`} />
+                          <span className="flex-1 min-w-0">
+                            <span className="font-medium">{s.code}</span>
+                            <span className="text-muted-foreground"> — {s.name}</span>
+                          </span>
+                          <span className="shrink-0 text-xs text-muted-foreground">stock: {s.stockOnHand}</span>
+                        </button>
+                      ))}
+                    {skus.filter((s) => {
+                      const q = skuSearch.toLowerCase();
+                      return !q || s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No SKUs found.</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
@@ -834,16 +883,20 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Note (optional)</Label>
+              <Label>
+                Reason <span className="text-destructive">*</span>
+              </Label>
               <Input
-                placeholder="e.g. Received from supplier"
+                placeholder="e.g. Received from supplier, stock count correction…"
                 value={form.note}
                 onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                required
               />
+              <p className="text-xs text-muted-foreground">Required — this adjustment will be logged for audit.</p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={saving || !form.skuId}>
+              <Button type="submit" disabled={saving || !form.skuId || !form.note.trim()}>
                 {saving ? 'Saving…' : 'Save adjustment'}
               </Button>
             </DialogFooter>

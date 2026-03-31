@@ -118,6 +118,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [ordersPage, setOrdersPage] = React.useState(1);
   const [payablesFilters, setPayablesFilters] = React.useState<FilterValues>({});
   const [paymentsDateRange, setPaymentsDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
+  const [payablesDateRange, setPayablesDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
   const [sortKey, setSortKey] = React.useState<'createdAt' | 'amountCents' | 'status'>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
@@ -144,7 +145,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     });
   }, [payments, sortKey, sortDir]);
 
-  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters, pdr = paymentsDateRange) {
+  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters, pdr = paymentsDateRange, odr = payablesDateRange) {
     setStatus({ kind: "info", text: "Loading payments..." });
     try {
       const paymentParams = new URLSearchParams({ page: String(pPage), limit: '20' });
@@ -154,6 +155,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
       const ordersParams = new URLSearchParams({ page: String(oPage), limit: '20' });
       if (oFilters.status) ordersParams.set('status', oFilters.status as string);
+      ordersParams.set('from', odr.from);
+      ordersParams.set('to', odr.to);
 
       const [paymentsRes, ordersRes] = await Promise.all([
         apiFetch(`/payments?${paymentParams}`, { tenantSlug }),
@@ -192,9 +195,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    void loadData(ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange);
+    void loadData(ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange, payablesDateRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange]);
+  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange, payablesDateRange]);
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
@@ -354,7 +357,12 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         <TabsContent value="payables" className="mt-4 space-y-3">
 
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker value={payablesDateRange} onChange={(r) => { setPayablesDateRange(r); setOrdersPage(1); }} />
+          </div>
+
           <FilterBar
+            collapsible
             filters={[
               {
                 type: 'select', key: 'status', label: 'All statuses',
@@ -450,6 +458,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             <DateRangePicker value={paymentsDateRange} onChange={(r) => { setPaymentsDateRange(r); setPaymentsPage(1); }} />
           </div>
           <FilterBar
+            collapsible
             filters={[
               {
                 type: 'select', key: 'status', label: 'All statuses',
