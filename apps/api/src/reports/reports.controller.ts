@@ -50,4 +50,31 @@ export class ReportsController {
 
     return { data: orders, meta: { from: from.toISOString(), to: to.toISOString() } };
   }
+
+  @Get('payments')
+  async getPaymentsReport(
+    @Req() req: RequestWithUser,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    const now = new Date();
+    const to = toStr ? endOfDay(new Date(toStr)) : endOfDay(now);
+    const from = fromStr ? startOfDay(new Date(fromStr)) : startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
+    const data = await this.reports.getPaymentsReport({ tenantId: req.tenant!.id, from, to, branchId });
+    return { data, meta: { from: from.toISOString(), to: to.toISOString() } };
+  }
+
+  @Get('inventory')
+  async getInventoryReport(
+    @Req() req: RequestWithUser,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    const now = new Date();
+    const to = toStr ? endOfDay(new Date(toStr)) : endOfDay(now);
+    const from = fromStr ? startOfDay(new Date(fromStr)) : startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
+    const data = await this.reports.getInventoryReport({ tenantId: req.tenant!.id, from, to });
+    return { data, meta: { from: from.toISOString(), to: to.toISOString() } };
+  }
 }
