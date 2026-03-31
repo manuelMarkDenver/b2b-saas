@@ -80,7 +80,7 @@ function StatusBadge({ status }: { status: string }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
-  const [dateRange, setDateRange] = useState<DateRange>(() => presetToRange('month'));
+  const [dateRange, setDateRange] = useState<DateRange>(() => presetToRange('30d'));
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -95,9 +95,9 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
     try {
       const params = `from=${dateRange.from}&to=${dateRange.to}`;
       const [oRes, pRes, iRes] = await Promise.all([
-        apiFetch(`/reports/orders?${params}`, { tenantSlug }),
-        apiFetch(`/reports/payments?${params}`, { tenantSlug }),
-        apiFetch(`/reports/inventory?${params}`, { tenantSlug }),
+        apiFetch(`/reports/orders?${params}`, { tenantSlug, branchId: null }),
+        apiFetch(`/reports/payments?${params}`, { tenantSlug, branchId: null }),
+        apiFetch(`/reports/inventory?${params}`, { tenantSlug, branchId: null }),
       ]);
       if (!oRes.ok || !pRes.ok || !iRes.ok) throw new Error('Failed to fetch report data');
       const [oData, pData, iData] = await Promise.all([oRes.json(), pRes.json(), iRes.json()]);
