@@ -148,14 +148,14 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             <div className="border-b border-border/60 px-4 py-3">
               <div className="text-sm font-medium">Current stock</div>
               <div className="mt-0.5 text-xs text-muted-foreground">
-                Live stock on hand for all SKUs. Log a movement to adjust.
+                Live stock levels for all products.
               </div>
             </div>
 
             <div className="grid grid-cols-[1fr_160px_100px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Product</span>
               <span>SKU Code</span>
-              <span className="text-right">On Hand</span>
+              <span className="text-right">In Stock</span>
             </div>
 
             {skus.length === 0 ? (

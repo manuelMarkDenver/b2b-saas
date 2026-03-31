@@ -8,8 +8,6 @@ import {
   CreditCard,
   Boxes,
   Settings,
-  BookOpen,
-  Users,
   GitBranch,
   FileText,
   LogOut,
@@ -54,16 +52,14 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'Catalog & Reports',
+    label: 'Reports',
     items: [
-      { label: 'Catalog', href: '/catalog', icon: BookOpen, featureKey: 'catalog' },
       { label: 'Reports', href: '/reports', icon: FileText, featureKey: 'reports' },
     ],
   },
   {
     label: 'Manage',
     items: [
-      { label: 'Team', href: '/settings/team', icon: Users, featureKey: 'team' },
       { label: 'Branches', href: '/settings/branches', icon: GitBranch },
       { label: 'Settings', href: '/settings', icon: Settings },
     ],

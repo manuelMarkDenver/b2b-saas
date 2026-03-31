@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — MS9 + MS11 merged. Pre-staging order revised: functionality first, PWA second-to-last (after all features stabilised).
+> Last updated: 2026-03-31 — MS16 started: UI/UX overhaul — inventory restructure, sitewide filters, stock approvals, role-based dashboard.
 
 ---
 
@@ -483,6 +483,26 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 ```
 
 **Browsers:** Desktop Chrome + Pixel 5 (mobile Chrome)
+
+---
+
+### MS16 — UI/UX Overhaul 🚧 In Progress
+
+> Full UX redesign based on real client feedback. Inventory restructure, sitewide filter+export pattern, stock approval workflow, role-based dashboard, and settings improvements.
+
+| Phase | Items | Status |
+|-------|-------|--------|
+| 1 — Quick wins + sitewide filter bar | Labels, nav cleanup, branch badge, role-based dashboard, FilterBar component | 🚧 |
+| 2 — DB migration | `approvalStatus`, `reason`, `actorId` on InventoryMovement; auto-SKU logic | ⏳ |
+| 3 — Inventory page rebuild | Products table, column toggle, filter+export, + New Product CTA | ⏳ |
+| 4 — New Product modal | Name, category, photo, cost, price, initial qty, auto-SKU | ⏳ |
+| 5 — Inline stock adjustment | +/− per row, owner/admin immediate, staff → pending | ⏳ |
+| 6 — Stock History + Approvals | Log, filters, pending badge, approve/reject, in-app notifications | ⏳ |
+| 7 — Orders filter + export | Filter bar + CSV export on orders table | ⏳ |
+| 8 — Payments filter + export | Filter bar + CSV export on payments table | ⏳ |
+| 9 — Reports page | Analytics only, filter bar, CSV export of underlying data | ⏳ |
+| 10 — Dashboard Settings | Widget show/hide toggles per user in Settings | ⏳ |
+| 11 — Docs | MILESTONES + DATA_MODEL updates | ⏳ |
 
 ---
 

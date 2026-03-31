@@ -435,7 +435,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
                     <SelectContent>
                       <SelectItem value="ADMIN">Admin</SelectItem>
                       <SelectItem value="STAFF">Staff</SelectItem>
-                      <SelectItem value="VIEWER">Viewer</SelectItem>
+                      {/* VIEWER role reserved for future marketplace customers */}
                     </SelectContent>
                   </Select>
                 </div>
@@ -462,7 +462,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
                     <SelectContent>
                       <SelectItem value="ADMIN">Admin</SelectItem>
                       <SelectItem value="STAFF">Staff</SelectItem>
-                      <SelectItem value="VIEWER">Viewer</SelectItem>
+                      {/* VIEWER role reserved for future marketplace customers */}
                     </SelectContent>
                   </Select>
                 </div>

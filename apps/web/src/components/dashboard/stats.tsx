@@ -9,6 +9,7 @@ import { ShoppingCart, CreditCard, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
 import { getActiveBranchId, setActiveBranchId } from '@/lib/branch';
+import { isStaff } from '@/lib/user-role';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
 import { BranchBreakdown } from './branch-breakdown';
 
@@ -122,6 +123,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   const [loading, setLoading] = useState(true);
   // Read active branch from global sidebar state (localStorage)
   const activeBranchId = getActiveBranchId(tenantSlug);
+  const staffOnly = isStaff(tenantSlug);
 
   const load = useCallback(async (r: DateRange) => {
     setLoading(true);
@@ -209,7 +211,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
       )}
 
       {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid gap-4 sm:grid-cols-2 ${staffOnly ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
         <StatCard
           label="Orders Today"
           value={s?.ordersToday ?? 0}
@@ -223,25 +225,37 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           icon={CreditCard}
           highlight={(s?.pendingPayments ?? 0) > 0}
         />
-        <StatCard
-          label="Low Stock Items"
-          value={s?.lowStockSkus ?? 0}
-          description="SKUs at or below threshold"
-          icon={AlertTriangle}
-          highlight={(s?.lowStockSkus ?? 0) > 0}
-        />
-        <StatCard
-          label="Revenue (range)"
-          value={formatCents(s?.revenueRangeCents ?? 0)}
-          description="Verified payments in selected range"
-          icon={CreditCard}
-        />
+        {!staffOnly && (
+          <>
+            <StatCard
+              label="Low Stock Items"
+              value={s?.lowStockSkus ?? 0}
+              description="Products at or below threshold"
+              icon={AlertTriangle}
+              highlight={(s?.lowStockSkus ?? 0) > 0}
+            />
+            <StatCard
+              label="Revenue (range)"
+              value={formatCents(s?.revenueRangeCents ?? 0)}
+              description="Verified payments in selected range"
+              icon={CreditCard}
+            />
+          </>
+        )}
       </div>
 
-      {/* Charts — row 1 */}
+      {/* Low stock alert badge for staff */}
+      {staffOnly && (s?.lowStockSkus ?? 0) > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-2.5 text-sm text-yellow-800 dark:border-yellow-800/40 dark:bg-yellow-900/20 dark:text-yellow-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span><span className="font-semibold">{s?.lowStockSkus}</span> product{(s?.lowStockSkus ?? 0) !== 1 ? 's' : ''} low on stock — check inventory.</span>
+        </div>
+      )}
+
+      {/* Charts — row 1 (revenue hidden from staff) */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Revenue area chart */}
-        <ChartCard title="Revenue over time">
+        {/* Revenue area chart — owner/admin only */}
+        {!staffOnly && <ChartCard title="Revenue over time">
           {revenueData.length === 0 ? (
             <EmptyChart message="No verified payments in this range" />
           ) : (
@@ -264,7 +278,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
               </AreaChart>
             </ResponsiveContainer>
           )}
-        </ChartCard>
+        </ChartCard>}
 
         {/* Orders per day bar chart */}
         <ChartCard title="Orders per day">
@@ -329,8 +343,8 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           )}
         </ChartCard>
 
-        {/* Low stock horizontal bar */}
-        <ChartCard title="Low stock SKUs">
+        {/* Low stock horizontal bar — owner/admin only */}
+        {!staffOnly && <ChartCard title="Low stock products">
           {lowStockData.length === 0 ? (
             <EmptyChart message="All items are above threshold" />
           ) : (
@@ -350,11 +364,11 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="threshold" fill={CHART_COLORS.threshold} radius={[0, 4, 4, 0]} maxBarSize={14} name="Threshold" isAnimationActive />
-                <Bar dataKey="stock" fill={CHART_COLORS.lowStock} radius={[0, 4, 4, 0]} maxBarSize={14} name="On hand" isAnimationActive />
+                <Bar dataKey="stock" fill={CHART_COLORS.lowStock} radius={[0, 4, 4, 0]} maxBarSize={14} name="In stock" isAnimationActive />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </ChartCard>
+        </ChartCard>}
       </div>
     </div>
   );
