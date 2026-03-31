@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
+import { FilterBar, FilterValues } from "@/components/ui/filter-bar";
 import {
   Sheet,
   SheetContent,
@@ -109,6 +110,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [meta, setMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [page, setPage] = React.useState(1);
+  const [filters, setFilters] = React.useState<FilterValues>({});
   const [skus, setSkus] = React.useState<Sku[]>([]);
   const [pageStatus, setPageStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
@@ -130,11 +132,14 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData(p = page) {
+  async function loadData(p = page, f = filters) {
     setPageStatus({ kind: "info", text: "Loading orders..." });
     try {
+      const params = new URLSearchParams({ page: String(p), limit: '20' });
+      if (f.search) params.set('search', f.search as string);
+      if (f.status) params.set('status', f.status as string);
       const [ordersRes, skusRes] = await Promise.all([
-        apiFetch(`/orders?page=${p}&limit=20`, { tenantSlug }),
+        apiFetch(`/orders?${params}`, { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
       ]);
       if (!ordersRes.ok) throw new Error(`Orders failed: ${ordersRes.status}`);
@@ -154,9 +159,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    void loadData(page);
+    void loadData(page, filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug, page]);
+  }, [tenantSlug, page, filters]);
 
   // ── Cart helpers ─────────────────────────────────────────────────────────────
 
@@ -311,6 +316,25 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     await loadData();
   }
 
+  function handleExport() {
+    const rows: string[][] = [['Order ID', 'Status', 'Total', 'Items', 'Created']];
+    orders.forEach((o) => {
+      rows.push([
+        o.id,
+        o.status,
+        formatCents(o.totalCents),
+        String(o.items.reduce((n, i) => n + i.quantity, 0)),
+        new Date(o.createdAt).toLocaleDateString(),
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'orders.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -339,6 +363,27 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
             + New Order
           </button>
         </div>
+      </div>
+
+      {/* ── Filter bar ── */}
+      <div className="mt-4">
+        <FilterBar
+          filters={[
+            { type: 'search', key: 'search', placeholder: 'Search order ID or customer ref…' },
+            {
+              type: 'select', key: 'status', label: 'All statuses',
+              options: [
+                { value: 'PENDING', label: 'Pending' },
+                { value: 'CONFIRMED', label: 'Confirmed' },
+                { value: 'COMPLETED', label: 'Completed' },
+                { value: 'CANCELLED', label: 'Cancelled' },
+              ],
+            },
+          ]}
+          values={filters}
+          onChange={(v) => { setFilters(v); setPage(1); }}
+          onExport={handleExport}
+        />
       </div>
 
       {pageStatus ? (

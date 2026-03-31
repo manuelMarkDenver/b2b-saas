@@ -86,9 +86,24 @@ export class OrdersService {
     return order;
   }
 
-  async listOrders(tenantId: string, page: number, limit: number, branchId?: string) {
+  async listOrders(
+    tenantId: string,
+    page: number,
+    limit: number,
+    branchId?: string,
+    filters: { status?: string; search?: string } = {},
+  ) {
     const skip = (page - 1) * limit;
-    const where = { tenantId, ...(branchId ? { branchId } : {}) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = { tenantId };
+    if (branchId) where.branchId = branchId;
+    if (filters.status) where.status = filters.status as OrderStatus;
+    if (filters.search) {
+      where.OR = [
+        { id: { contains: filters.search, mode: 'insensitive' } },
+        { customerRef: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
     const [data, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({
         where,

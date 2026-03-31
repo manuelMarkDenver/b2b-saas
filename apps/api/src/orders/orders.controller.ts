@@ -33,9 +33,20 @@ export class OrdersController {
   }
 
   @Get()
-  listOrders(@Req() req: RequestWithUser, @Query() pagination: PaginationDto) {
+  listOrders(
+    @Req() req: RequestWithUser,
+    @Query() pagination: PaginationDto,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
-    return this.ordersService.listOrders(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, branchId);
+    return this.ordersService.listOrders(
+      req.tenant!.id,
+      pagination.page ?? 1,
+      pagination.limit ?? 20,
+      branchId,
+      { status, search },
+    );
   }
 
   @Get(':id')
