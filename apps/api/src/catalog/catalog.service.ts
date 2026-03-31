@@ -89,14 +89,47 @@ export class CatalogService {
     });
   }
 
-  async listSkus(tenantId: string, page: number, limit: number) {
+  async listSkus(
+    tenantId: string,
+    page: number,
+    limit: number,
+    filters: { search?: string; categoryId?: string; lowStock?: boolean } = {},
+  ) {
     const skip = (page - 1) * limit;
-    const where = { tenantId, isArchived: false };
+
+    const andClauses: object[] = [{ tenantId }, { isArchived: false }];
+
+    if (filters.search) {
+      andClauses.push({
+        OR: [
+          { name: { contains: filters.search, mode: 'insensitive' } },
+          { code: { contains: filters.search, mode: 'insensitive' } },
+          { product: { name: { contains: filters.search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    if (filters.categoryId) {
+      andClauses.push({ product: { categoryId: filters.categoryId } });
+    }
+    if (filters.lowStock) {
+      // Items with stock at or below their low-stock threshold (minimum 1 to exclude zero-threshold SKUs)
+      andClauses.push({ lowStockThreshold: { gt: 0 }, stockOnHand: { lte: 10 } });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where = { AND: andClauses } as any;
+
     const [data, total] = await this.prisma.$transaction([
       this.prisma.sku.findMany({
         where,
         include: {
-          product: { select: { id: true, name: true } },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              category: { select: { id: true, name: true, slug: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip,

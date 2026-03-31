@@ -68,8 +68,19 @@ export class CatalogController {
   // SKUs (tenant-scoped)
   @Get('skus')
   @UseGuards(TenantGuard)
-  listSkus(@Req() req: RequestWithUser, @Query() pagination: PaginationDto) {
-    return this.catalogService.listSkus(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20);
+  listSkus(
+    @Req() req: RequestWithUser,
+    @Query() pagination: PaginationDto,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('lowStock') lowStock?: string,
+  ) {
+    return this.catalogService.listSkus(
+      req.tenant!.id,
+      pagination.page ?? 1,
+      pagination.limit ?? 20,
+      { search, categoryId, lowStock: lowStock === 'true' },
+    );
   }
 
   @Post('skus')

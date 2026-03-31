@@ -3,14 +3,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { formatCents } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FilterBar, FilterValues } from '@/components/ui/filter-bar';
 import { useToast } from '@/components/ui/toast';
 import { ProductThumb } from '@/components/product-thumb';
+
+type Category = { id: string; name: string; slug: string };
 
 type Movement = {
   id: string;
@@ -22,7 +26,17 @@ type Movement = {
   sku: { code: string; name: string };
 };
 
-type Sku = { id: string; code: string; name: string; stockOnHand: number };
+type Sku = {
+  id: string;
+  code: string;
+  name: string;
+  stockOnHand: number;
+  lowStockThreshold: number;
+  priceCents?: number | null;
+  costCents?: number | null;
+  imageUrl?: string | null;
+  product: { id: string; name: string; category: { id: string; name: string; slug: string } };
+};
 
 type Meta = { total: number; page: number; limit: number; totalPages: number };
 
@@ -38,11 +52,12 @@ const MOVEMENT_COLOR: Record<string, string> = {
   ADJUSTMENT: 'text-yellow-600',
 };
 
-const STOCK_LEVEL_VARIANT = (stock: number): 'completed' | 'pending' | 'cancelled' => {
-  if (stock > 50) return 'completed';
-  if (stock > 10) return 'pending';
-  return 'cancelled';
-};
+function stockColor(sku: Sku): string {
+  if (sku.lowStockThreshold > 0 && sku.stockOnHand <= sku.lowStockThreshold)
+    return 'text-red-500 dark:text-red-400';
+  if (sku.stockOnHand <= 10) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-green-600 dark:text-green-400';
+}
 
 interface InventoryPanelProps {
   tenantSlug: string;
@@ -50,32 +65,61 @@ interface InventoryPanelProps {
 
 export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const { pushToast } = useToast();
-  const [movements, setMovements] = useState<Movement[]>([]);
+
+  // Filter state
+  const [filters, setFilters] = useState<FilterValues>({});
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showSkuCol, setShowSkuCol] = useState(false);
+
+  // SKU list state
   const [skus, setSkus] = useState<Sku[]>([]);
-  const [meta, setMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
-  const [page, setPage] = useState(1);
+  const [skuMeta, setSkuMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [skuPage, setSkuPage] = useState(1);
+
+  // Movement list state
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [movMeta, setMovMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [movPage, setMovPage] = useState(1);
+
+  // Add movement dialog
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ skuId: '', type: 'IN', quantity: '', note: '' });
   const [saving, setSaving] = useState(false);
 
+  // Load categories once
+  useEffect(() => {
+    apiFetch('/categories', { tenantSlug }).then(async (r) => {
+      if (r.ok) setCategories(await r.json() as Category[]);
+    });
+  }, [tenantSlug]);
+
+  const loadSkus = useCallback(async () => {
+    const params = new URLSearchParams({ page: String(skuPage), limit: '20' });
+    if (filters.search) params.set('search', filters.search as string);
+    if (filters.categoryId) params.set('categoryId', filters.categoryId as string);
+    if (filters.lowStock === true) params.set('lowStock', 'true');
+    const res = await apiFetch(`/skus?${params}`, { tenantSlug });
+    if (res.ok) {
+      const d = await res.json() as { data: Sku[]; meta: Meta };
+      setSkus(d.data);
+      setSkuMeta(d.meta);
+    }
+  }, [tenantSlug, skuPage, filters]);
+
   const loadMovements = useCallback(async () => {
-    const res = await apiFetch(`/inventory/movements?page=${page}&limit=20`, { tenantSlug });
+    const res = await apiFetch(`/inventory/movements?page=${movPage}&limit=20`, { tenantSlug });
     if (res.ok) {
       const data = await res.json() as { data: Movement[]; meta: Meta };
       setMovements(data.data);
-      setMeta(data.meta);
+      setMovMeta(data.meta);
     }
-  }, [tenantSlug, page]);
+  }, [tenantSlug, movPage]);
 
-  useEffect(() => {
-    loadMovements();
-    apiFetch('/skus?limit=100', { tenantSlug }).then(async (r) => {
-      if (r.ok) {
-        const d = await r.json() as { data: Sku[] };
-        setSkus(d.data);
-      }
-    });
-  }, [tenantSlug, loadMovements]);
+  useEffect(() => { loadSkus(); }, [loadSkus]);
+  useEffect(() => { loadMovements(); }, [loadMovements]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => { setSkuPage(1); }, [filters]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -99,40 +143,63 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         pushToast({ variant: 'success', title: 'Movement logged', message: 'Inventory updated.' });
         setAddOpen(false);
         setForm({ skuId: '', type: 'IN', quantity: '', note: '' });
+        loadSkus();
         loadMovements();
-        // Refresh SKUs for updated stockOnHand
-        apiFetch('/skus?limit=100', { tenantSlug }).then(async (r) => {
-          if (r.ok) { const d = await r.json() as { data: Sku[] }; setSkus(d.data); }
-        });
       }
     } finally {
       setSaving(false);
     }
   }
 
+  function handleExport() {
+    const rows: string[][] = [['Product', 'Category', 'SKU Code', 'In Stock', 'Cost', 'Price']];
+    skus.forEach((s) => {
+      rows.push([
+        s.name,
+        s.product.category.name,
+        s.code,
+        String(s.stockOnHand),
+        s.costCents != null ? formatCents(s.costCents) : '',
+        s.priceCents != null ? formatCents(s.priceCents) : '',
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'inventory.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const filterFields = [
+    { type: 'search' as const, key: 'search', placeholder: 'Search products…' },
+    {
+      type: 'select' as const,
+      key: 'categoryId',
+      label: 'All categories',
+      options: categories.map((c) => ({ value: c.id, label: c.name })),
+    },
+    { type: 'toggle' as const, key: 'lowStock', label: 'Low stock' },
+    { type: 'toggle' as const, key: 'showSku', label: 'Show SKU' },
+  ];
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-lg font-semibold tracking-tight">Inventory</div>
-          <div className="mt-0.5 text-sm text-muted-foreground">
-            Track stock levels and movement history. Movements are immutable logs.
-          </div>
+      {/* Top bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 rounded-md border border-border/60 bg-card px-3 py-1.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{skuMeta.total}</span>
+          <span>products</span>
+          <span>·</span>
+          <span className="font-medium text-foreground">{movMeta.total}</span>
+          <span>movements</span>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-card px-3 py-1.5 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{skus.length}</span>
-            <span>SKUs</span>
-            <span>·</span>
-            <span className="font-medium text-foreground">{meta.total}</span>
-            <span>movements</span>
-          </div>
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Log movement
-          </Button>
-        </div>
+        <Button onClick={() => setAddOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          Log movement
+        </Button>
       </div>
 
       <Tabs defaultValue="stock">
@@ -142,54 +209,78 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         </TabsList>
 
         {/* ── Stock Levels tab ── */}
-        <TabsContent value="stock" className="mt-4">
+        <TabsContent value="stock" className="mt-4 space-y-3">
+          <FilterBar
+            filters={filterFields}
+            values={{ ...filters, showSku: showSkuCol }}
+            onChange={(v) => {
+              setShowSkuCol(v.showSku === true);
+              const { showSku: _, ...rest } = v;
+              setFilters(rest);
+            }}
+            onExport={handleExport}
+            exportLabel="Export CSV"
+          />
+
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <div className="min-w-[400px]">
-            <div className="border-b border-border/60 px-4 py-3">
-              <div className="text-sm font-medium">Current stock</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                Live stock levels for all products.
+            <div className="min-w-[440px]">
+              <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className={`grid items-center gap-3 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px]' : 'grid-cols-[2fr_1fr_80px_80px_80px]'}`}>
+                  <span>Product</span>
+                  <span>Category</span>
+                  {showSkuCol && <span>SKU Code</span>}
+                  <span className="text-right">In Stock</span>
+                  <span className="text-right">Cost</span>
+                  <span className="text-right">Price</span>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-[1fr_160px_100px] gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <span>Product</span>
-              <span>SKU Code</span>
-              <span className="text-right">In Stock</span>
-            </div>
-
-            {skus.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                No products found.
-              </div>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {skus.map((sku) => {
-                  const level = STOCK_LEVEL_VARIANT(sku.stockOnHand);
-                  const levelColor =
-                    level === 'completed' ? 'text-green-600 dark:text-green-400' :
-                    level === 'pending'   ? 'text-yellow-600 dark:text-yellow-400' :
-                                           'text-red-500 dark:text-red-400';
-                  return (
+              {skus.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  No products found.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/60">
+                  {skus.map((sku) => (
                     <div
                       key={sku.id}
-                      className="grid grid-cols-[1fr_160px_100px] items-center gap-0 px-4 py-3 transition-colors hover:bg-muted/30"
+                      className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px]' : 'grid-cols-[2fr_1fr_80px_80px_80px]'}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <ProductThumb label={`${sku.code} ${sku.name}`} size={40} className="rounded-lg" />
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium">{sku.name}</div>
-                        </div>
+                        <ProductThumb label={`${sku.code} ${sku.name}`} size={36} className="rounded-lg shrink-0" />
+                        <span className="truncate text-sm font-medium">{sku.name}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground font-mono">{sku.code}</div>
-                      <div className={`text-right text-base font-bold tabular-nums ${levelColor}`}>
+                      <span className="truncate text-xs text-muted-foreground">{sku.product.category.name}</span>
+                      {showSkuCol && (
+                        <span className="font-mono text-xs text-muted-foreground">{sku.code}</span>
+                      )}
+                      <div className={`text-right text-sm font-bold tabular-nums ${stockColor(sku)}`}>
                         {sku.stockOnHand}
                       </div>
+                      <div className="text-right text-xs text-muted-foreground tabular-nums">
+                        {sku.costCents != null ? formatCents(sku.costCents) : '—'}
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground tabular-nums">
+                        {sku.priceCents != null ? formatCents(sku.priceCents) : '—'}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {skuMeta.totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
+                  <span className="text-xs text-muted-foreground">
+                    Page <span className="font-medium text-foreground">{skuMeta.page}</span> of{' '}
+                    <span className="font-medium text-foreground">{skuMeta.totalPages}</span>
+                  </span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="icon" disabled={skuPage <= 1} onClick={() => setSkuPage((p) => p - 1)} aria-label="Previous page">‹</Button>
+                    <Button variant="outline" size="icon" disabled={skuPage >= skuMeta.totalPages} onClick={() => setSkuPage((p) => p + 1)} aria-label="Next page">›</Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -237,7 +328,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       className="grid grid-cols-[1fr_90px_92px_1fr_110px] items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <ProductThumb label={`${m.sku.code} ${m.sku.name}`} size={40} className="rounded-lg" />
+                        <ProductThumb label={`${m.sku.code} ${m.sku.name}`} size={36} className="rounded-lg shrink-0" />
                         <div className="min-w-0">
                           <span className="block truncate font-medium">{m.sku.code}</span>
                           <span className="block truncate text-xs text-muted-foreground">{m.sku.name}</span>
@@ -262,15 +353,15 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             )}
 
             {/* Pagination */}
-            {meta.totalPages > 1 && (
+            {movMeta.totalPages > 1 && (
               <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
                 <span className="text-xs text-muted-foreground">
-                  Page <span className="font-medium text-foreground">{meta.page}</span> of{' '}
-                  <span className="font-medium text-foreground">{meta.totalPages}</span>
+                  Page <span className="font-medium text-foreground">{movMeta.page}</span> of{' '}
+                  <span className="font-medium text-foreground">{movMeta.totalPages}</span>
                 </span>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="icon" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">‹</Button>
-                  <Button variant="outline" size="icon" disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page">›</Button>
+                  <Button variant="outline" size="icon" disabled={movPage <= 1} onClick={() => setMovPage((p) => p - 1)} aria-label="Previous page">‹</Button>
+                  <Button variant="outline" size="icon" disabled={movPage >= movMeta.totalPages} onClick={() => setMovPage((p) => p + 1)} aria-label="Next page">›</Button>
                 </div>
               </div>
             )}
