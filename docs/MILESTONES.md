@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-31 — MS16 complete: UI/UX overhaul — inventory restructure, sitewide filters, stock approvals, role-based dashboard, reports tabs, dashboard customization.
+> Last updated: 2026-04-01 — MS17 bug fixes + UX polish: dark mode hover fix, reports data fix, inventory History rename, date range + column sorting on all tables, Payables filter, actor column, funnel filter UI.
 
 ---
 
@@ -569,6 +569,7 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | Payroll Module | 🔒 Locked | Post-Phase 5 | Multi-Branch | Regulated domain. Validate demand before committing. |
 | Platform Integrations (Shopee, Lazada) | 🔒 Locked | Post-Phase 5 | Stable core | Webhook security, retry logic, idempotency add complexity. |
 | AI Chatbot + RAG | 🔒 Locked | Post-Phase 5 | Real tenant data | Claude API + pgvector. Feature-flagged per tenant. |
+| **Customer-Seller Chat** | 🔒 Locked | Post-Phase 7 | Customer portal | Two tracks: (1) **Internal order notes** — staff/admin attach notes to a specific order, visible within the ERP; low-effort, high-value for B2B ops. (2) **Buyer-facing portal chat** — real-time or async messaging between buyer and seller, tied to an order/session; requires buyer auth, separate portal surface, and WebSocket infra. Do Track 1 first. Track 2 only after the marketplace (Phase 7) is live and validated. |
 
 ---
 
