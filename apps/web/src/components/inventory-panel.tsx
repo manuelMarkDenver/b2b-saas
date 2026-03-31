@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -99,6 +99,25 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [adjustReason, setAdjustReason] = useState('');
   const [adjustSaving, setAdjustSaving] = useState(false);
   const staffMode = isStaff(tenantSlug);
+
+  // SKU sort
+  const [skuSortKey, setSkuSortKey] = useState<'name' | 'stockOnHand' | 'priceCents' | 'costCents'>('name');
+  const [skuSortDir, setSkuSortDir] = useState<'asc' | 'desc'>('asc');
+
+  function toggleSkuSort(key: typeof skuSortKey) {
+    if (skuSortKey === key) setSkuSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSkuSortKey(key); setSkuSortDir('asc'); }
+  }
+
+  const sortedSkus = useMemo(() => {
+    return [...skus].sort((a, b) => {
+      const dir = skuSortDir === 'asc' ? 1 : -1;
+      if (skuSortKey === 'stockOnHand') return dir * (a.stockOnHand - b.stockOnHand);
+      if (skuSortKey === 'priceCents') return dir * ((a.priceCents ?? 0) - (b.priceCents ?? 0));
+      if (skuSortKey === 'costCents') return dir * ((a.costCents ?? 0) - (b.costCents ?? 0));
+      return dir * a.name.localeCompare(b.name);
+    });
+  }, [skus, skuSortKey, skuSortDir]);
 
   // New product dialog
   const [productOpen, setProductOpen] = useState(false);
@@ -410,12 +429,20 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             <div className="min-w-[440px]">
               <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <div className={`grid items-center gap-3 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}>
-                  <span>Product</span>
+                  <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 hover:text-foreground text-left">
+                    Product {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                  </button>
                   <span>Category</span>
                   {showSkuCol && <span>SKU Code</span>}
-                  <span className="text-right">In Stock</span>
-                  <span className="text-right">Cost</span>
-                  <span className="text-right">Price</span>
+                  <button type="button" onClick={() => toggleSkuSort('stockOnHand')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                    {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} In Stock
+                  </button>
+                  <button type="button" onClick={() => toggleSkuSort('costCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                    {skuSortKey === 'costCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Cost
+                  </button>
+                  <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                    {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
+                  </button>
                   <span />
                 </div>
               </div>
@@ -426,7 +453,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 </div>
               ) : (
                 <div className="divide-y divide-border/60">
-                  {skus.map((sku) => (
+                  {sortedSkus.map((sku) => (
                     <div
                       key={sku.id}
                       className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}

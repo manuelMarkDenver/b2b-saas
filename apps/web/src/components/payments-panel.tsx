@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { FilterBar, FilterValues } from "@/components/ui/filter-bar";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { DateRangePicker, presetToRange, type DateRange } from "@/components/dashboard/date-range-picker";
 import {
   Sheet,
   SheetContent,
@@ -115,6 +117,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [ordersMeta, setOrdersMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [ordersPage, setOrdersPage] = React.useState(1);
   const [payablesFilters, setPayablesFilters] = React.useState<FilterValues>({});
+  const [paymentsDateRange, setPaymentsDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
+  const [sortKey, setSortKey] = React.useState<'createdAt' | 'amountCents' | 'status'>('createdAt');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
@@ -124,11 +129,28 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters) {
+  function toggleSort(key: typeof sortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('desc'); }
+  }
+
+  const sortedPayments = React.useMemo(() => {
+    return [...payments].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      if (sortKey === 'amountCents') return dir * (a.amountCents - b.amountCents);
+      if (sortKey === 'status') return dir * a.status.localeCompare(b.status);
+      return 0;
+    });
+  }, [payments, sortKey, sortDir]);
+
+  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters, pdr = paymentsDateRange) {
     setStatus({ kind: "info", text: "Loading payments..." });
     try {
       const paymentParams = new URLSearchParams({ page: String(pPage), limit: '20' });
       if (pFilters.status) paymentParams.set('status', pFilters.status as string);
+      paymentParams.set('from', pdr.from);
+      paymentParams.set('to', pdr.to);
 
       const ordersParams = new URLSearchParams({ page: String(oPage), limit: '20' });
       if (oFilters.status) ordersParams.set('status', oFilters.status as string);
@@ -170,9 +192,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    void loadData(ordersPage, paymentsPage, paymentFilters, payablesFilters);
+    void loadData(ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters, payablesFilters]);
+  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange]);
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
@@ -424,6 +446,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         <TabsContent value="history" className="mt-4 space-y-3">
 
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker value={paymentsDateRange} onChange={(r) => { setPaymentsDateRange(r); setPaymentsPage(1); }} />
+          </div>
           <FilterBar
             filters={[
               {
@@ -458,16 +483,22 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           <>
             <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Payment</span>
-              <span className="text-right">Amount</span>
+              <button type="button" onClick={() => toggleSort('amountCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                {sortKey === 'amountCents' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Amount
+              </button>
               <span>Order</span>
               <span>Proof</span>
-              <span>Created</span>
-              <span>Status</span>
+              <button type="button" onClick={() => toggleSort('createdAt')} className="flex items-center gap-1 hover:text-foreground">
+                Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+              </button>
+              <button type="button" onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-foreground">
+                Status {sortKey === 'status' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+              </button>
               <span className="text-right">Action</span>
             </div>
 
             <div className="divide-y divide-border/60">
-              {payments.map((payment) => (
+              {sortedPayments.map((payment) => (
                 <div
                   key={payment.id}
                   className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] items-center gap-3 px-4 py-3 text-sm"

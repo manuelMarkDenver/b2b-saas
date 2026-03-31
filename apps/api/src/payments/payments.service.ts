@@ -75,6 +75,8 @@ export class PaymentsService {
     orderId?: string,
     branchId?: string,
     status?: string,
+    from?: string,
+    to?: string,
   ) {
     const skip = (page - 1) * limit;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,6 +84,11 @@ export class PaymentsService {
     if (orderId) where.orderId = orderId;
     if (branchId) where.order = { branchId };
     if (status) where.status = status;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(`${from}T00:00:00.000Z`);
+      if (to) where.createdAt.lte = new Date(`${to}T23:59:59.999Z`);
+    }
     const [data, total] = await this.prisma.$transaction([
       this.prisma.payment.findMany({
         where,

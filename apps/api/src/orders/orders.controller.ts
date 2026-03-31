@@ -38,6 +38,8 @@ export class OrdersController {
     @Query() pagination: PaginationDto,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
     return this.ordersService.listOrders(
@@ -45,7 +47,7 @@ export class OrdersController {
       pagination.page ?? 1,
       pagination.limit ?? 20,
       branchId,
-      { status, search },
+      { status, search, from, to },
     );
   }
 

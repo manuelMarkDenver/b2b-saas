@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Plus, X, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
@@ -10,6 +10,7 @@ import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
 import { FilterBar, FilterValues } from "@/components/ui/filter-bar";
+import { DateRangePicker, presetToRange, type DateRange } from "@/components/dashboard/date-range-picker";
 import {
   Sheet,
   SheetContent,
@@ -111,6 +112,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [meta, setMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [page, setPage] = React.useState(1);
   const [filters, setFilters] = React.useState<FilterValues>({});
+  const [dateRange, setDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
+  const [sortKey, setSortKey] = React.useState<'createdAt' | 'totalCents' | 'status'>('createdAt');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [skus, setSkus] = React.useState<Sku[]>([]);
   const [pageStatus, setPageStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
@@ -132,12 +136,19 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData(p = page, f = filters) {
+  function toggleSort(key: typeof sortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('desc'); }
+  }
+
+  async function loadData(p = page, f = filters, dr = dateRange) {
     setPageStatus({ kind: "info", text: "Loading orders..." });
     try {
       const params = new URLSearchParams({ page: String(p), limit: '20' });
       if (f.search) params.set('search', f.search as string);
       if (f.status) params.set('status', f.status as string);
+      params.set('from', dr.from);
+      params.set('to', dr.to);
       const [ordersRes, skusRes] = await Promise.all([
         apiFetch(`/orders?${params}`, { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
@@ -158,10 +169,20 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     }
   }
 
+  const sortedOrders = React.useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      if (sortKey === 'totalCents') return dir * (a.totalCents - b.totalCents);
+      if (sortKey === 'status') return dir * a.status.localeCompare(b.status);
+      return 0;
+    });
+  }, [orders, sortKey, sortDir]);
+
   React.useEffect(() => {
-    void loadData(page, filters);
+    void loadData(page, filters, dateRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug, page, filters]);
+  }, [tenantSlug, page, filters, dateRange]);
 
   // ── Cart helpers ─────────────────────────────────────────────────────────────
 
@@ -366,7 +387,10 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="mt-4">
+      <div className="mt-4 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DateRangePicker value={dateRange} onChange={(r) => { setDateRange(r); setPage(1); }} />
+        </div>
         <FilterBar
           filters={[
             { type: 'search', key: 'search', placeholder: 'Search order ID or customer ref…' },
@@ -398,9 +422,15 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
         <div className="grid grid-cols-[1fr_60px_120px_120px_160px_100px] gap-3 border-b border-border/60 bg-background px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
-          <span>Status</span>
-          <span className="text-right">Total</span>
-          <span>Created</span>
+          <button type="button" onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-foreground">
+            Status {sortKey === 'status' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+          </button>
+          <button type="button" onClick={() => toggleSort('totalCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+            {sortKey === 'totalCents' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Total
+          </button>
+          <button type="button" onClick={() => toggleSort('createdAt')} className="flex items-center gap-1 hover:text-foreground">
+            Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+          </button>
           <span className="text-right">Action</span>
         </div>
 
@@ -419,7 +449,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         ) : (
           <div className="divide-y divide-border/60">
-            {orders.map((order) => (
+            {sortedOrders.map((order) => (
               <button
                 key={order.id}
                 type="button"
