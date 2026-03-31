@@ -516,32 +516,32 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         </TabsContent>
 
         {/* ── History tab ── */}
-        <TabsContent value="history" className="mt-4">
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <div className="min-w-[550px]">
-            <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
-              <div className="flex gap-1">
-                {(['', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => { setMovFilter(s); setMovPage(1); }}
-                    className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${movFilter === s ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
-                  >
-                    {s === '' ? 'All' : s === 'PENDING' ? `Pending${pendingCount > 0 ? ` (${pendingCount})` : ''}` : s.charAt(0) + s.slice(1).toLowerCase()}
-                  </button>
-                ))}
-              </div>
-              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleExportMovements}>
-                Export CSV
-              </Button>
-            </div>
+        <TabsContent value="history" className="mt-4 space-y-3">
+          <FilterBar
+            filters={[
+              {
+                type: 'select', key: 'approvalStatus', label: 'All statuses',
+                options: [
+                  { value: 'PENDING', label: pendingCount > 0 ? `Pending (${pendingCount})` : 'Pending' },
+                  { value: 'APPROVED', label: 'Approved' },
+                  { value: 'REJECTED', label: 'Rejected' },
+                ],
+              },
+            ]}
+            values={movFilter ? { approvalStatus: movFilter } : {}}
+            onChange={(v) => { setMovFilter((v.approvalStatus as string) ?? ''); setMovPage(1); }}
+            onExport={handleExportMovements}
+          />
 
-            <div className={`grid gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${!staffMode ? 'grid-cols-[1fr_90px_80px_1fr_100px_100px]' : 'grid-cols-[1fr_90px_80px_1fr_110px]'}`}>
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="min-w-[620px]">
+
+            <div className={`grid gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${!staffMode ? 'grid-cols-[1fr_90px_60px_1fr_130px_100px_100px]' : 'grid-cols-[1fr_90px_60px_1fr_130px_110px]'}`}>
               <span>Product</span>
               <span>Type</span>
               <span className="text-right">Qty</span>
               <span>Note / Reason</span>
+              <span>Actioned By</span>
               <span className="text-right">Date</span>
               {!staffMode && <span className="text-right">Actions</span>}
             </div>
@@ -570,7 +570,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   return (
                     <div
                       key={m.id}
-                      className={`grid items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30 ${!staffMode ? 'grid-cols-[1fr_90px_80px_1fr_100px_100px]' : 'grid-cols-[1fr_90px_80px_1fr_110px]'} ${isPending ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''}`}
+                      className={`grid items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30 ${!staffMode ? 'grid-cols-[1fr_90px_60px_1fr_130px_100px_100px]' : 'grid-cols-[1fr_90px_60px_1fr_130px_110px]'} ${isPending ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <ProductThumb label={`${m.sku.code} ${m.sku.name}`} size={32} className="rounded-lg shrink-0" />
@@ -591,7 +591,9 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       </div>
                       <div className="min-w-0">
                         <div className="truncate text-xs text-muted-foreground">{m.note ?? m.reason ?? '—'}</div>
-                        {m.actor && <div className="truncate text-[10px] text-muted-foreground/70">{m.actor.email}</div>}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs text-muted-foreground">{m.actor?.email ?? '—'}</div>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
                         {new Date(m.createdAt).toLocaleDateString()}

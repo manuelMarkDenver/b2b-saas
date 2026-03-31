@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Download, Search, X } from 'lucide-react';
+import { Download, Search, X, ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,11 @@ export function FilterBar({
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      {filters.length > 0 && (
+        <span className={cn('flex items-center gap-1 text-xs text-muted-foreground', hasActiveFilters && 'text-primary')}>
+          <ListFilter className="h-3.5 w-3.5" />
+        </span>
+      )}
       {filters.map((f) => {
         if (f.type === 'search') {
           return (
