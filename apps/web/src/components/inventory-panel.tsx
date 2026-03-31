@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Plus, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FilterBar, FilterValues } from '@/components/ui/filter-bar';
 import { useToast } from '@/components/ui/toast';
 import { ProductThumb } from '@/components/product-thumb';
+import { ImageUpload } from '@/components/image-upload';
 
 type Category = { id: string; name: string; slug: string };
 
@@ -86,6 +87,21 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [form, setForm] = useState({ skuId: '', type: 'IN', quantity: '', note: '' });
   const [saving, setSaving] = useState(false);
 
+  // New product dialog
+  const [productOpen, setProductOpen] = useState(false);
+  const [productForm, setProductForm] = useState({
+    categoryId: '',
+    name: '',
+    costCents: '',
+    priceCents: '',
+    initialQty: '',
+    note: '',
+    imageUrl: '',
+  });
+  const [autoSkuCode, setAutoSkuCode] = useState('');
+  const [productSaving, setProductSaving] = useState(false);
+  const skuCodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Load categories once
   useEffect(() => {
     apiFetch('/categories', { tenantSlug }).then(async (r) => {
@@ -120,6 +136,54 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
   // Reset page to 1 when filters change
   useEffect(() => { setSkuPage(1); }, [filters]);
+
+  function onProductCategoryChange(categoryId: string) {
+    setProductForm((f) => ({ ...f, categoryId }));
+    setAutoSkuCode('…');
+    if (skuCodeDebounceRef.current) clearTimeout(skuCodeDebounceRef.current);
+    skuCodeDebounceRef.current = setTimeout(async () => {
+      const res = await apiFetch(`/skus/next-code?categoryId=${categoryId}`, { tenantSlug });
+      if (res.ok) {
+        const d = await res.json() as { code: string };
+        setAutoSkuCode(d.code ?? '');
+      }
+    }, 300);
+  }
+
+  async function handleCreateProduct(e: React.FormEvent) {
+    e.preventDefault();
+    setProductSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        categoryId: productForm.categoryId,
+        name: productForm.name,
+      };
+      if (productForm.costCents) body.costCents = Math.round(parseFloat(productForm.costCents) * 100);
+      if (productForm.priceCents) body.priceCents = Math.round(parseFloat(productForm.priceCents) * 100);
+      if (productForm.initialQty) body.initialQty = parseInt(productForm.initialQty, 10);
+      if (productForm.note) body.note = productForm.note;
+      if (productForm.imageUrl) body.imageUrl = productForm.imageUrl;
+
+      const res = await apiFetch('/products/with-stock', {
+        method: 'POST',
+        tenantSlug,
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Failed', message: err.message ?? 'Unknown error' });
+      } else {
+        pushToast({ variant: 'success', title: 'Product created', message: 'Product and initial stock logged.' });
+        setProductOpen(false);
+        setProductForm({ categoryId: '', name: '', costCents: '', priceCents: '', initialQty: '', note: '', imageUrl: '' });
+        setAutoSkuCode('');
+        loadSkus();
+        loadMovements();
+      }
+    } finally {
+      setProductSaving(false);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -196,10 +260,16 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           <span className="font-medium text-foreground">{movMeta.total}</span>
           <span>movements</span>
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Log movement
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setAddOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Log movement
+          </Button>
+          <Button onClick={() => setProductOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            New Product
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="stock">
@@ -369,6 +439,99 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* New Product dialog */}
+      <Dialog open={productOpen} onOpenChange={setProductOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Product</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateProduct} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={productForm.categoryId} onValueChange={onProductCategoryChange}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Product name</Label>
+              <Input
+                placeholder="e.g. Chicken Wings 1kg"
+                value={productForm.name}
+                onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))}
+                required
+              />
+            </div>
+
+            {productForm.categoryId && (
+              <div className="space-y-1 rounded-md bg-muted/50 px-3 py-2">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Auto SKU Code</p>
+                <p className="font-mono text-sm font-semibold">{autoSkuCode || '—'}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Cost (₱)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={productForm.costCents}
+                  onChange={(e) => setProductForm((f) => ({ ...f, costCents: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Price (₱)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={productForm.priceCents}
+                  onChange={(e) => setProductForm((f) => ({ ...f, priceCents: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Initial stock qty</Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder="0"
+                value={productForm.initialQty}
+                onChange={(e) => setProductForm((f) => ({ ...f, initialQty: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Photo</Label>
+              <ImageUpload
+                currentUrl={productForm.imageUrl || null}
+                tenantSlug={tenantSlug}
+                size={64}
+                onUploaded={(url) => setProductForm((f) => ({ ...f, imageUrl: url }))}
+                onRemoved={() => setProductForm((f) => ({ ...f, imageUrl: '' }))}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setProductOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={productSaving || !productForm.categoryId || !productForm.name}>
+                {productSaving ? 'Creating…' : 'Create product'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Add movement dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
