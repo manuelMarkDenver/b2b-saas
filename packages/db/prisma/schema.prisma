@@ -296,6 +296,8 @@ model InventoryMovement {
   approvalStatus ApprovalStatus @default(APPROVED)
   actorId        String?        @db.Uuid
   branchId       String?        @db.Uuid
+  /// Reserved for future batch/lot tracking. Nullable until the Batch model is introduced.
+  batchId        String?        @db.Uuid
   createdAt      DateTime       @default(now())
 
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
