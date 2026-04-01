@@ -593,7 +593,7 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | **Customer-Seller Chat** | 🔒 Locked | Post-Phase 7 | Customer portal | Two tracks: (1) **Internal order notes** — staff/admin attach notes to a specific order, visible within the ERP; low-effort, high-value for B2B ops. (2) **Buyer-facing portal chat** — real-time or async messaging between buyer and seller, tied to an order/session; requires buyer auth, separate portal surface, and WebSocket infra. Do Track 1 first. Track 2 only after the marketplace (Phase 7) is live and validated. |
 | **Bill of Materials (BOM) / Recipe Management** | 🟡 Medium | Post-Phase 5 | Stable inventory | ERP term: a finished product is made from N raw material components. Creating 50 pizzas auto-deducts flour, sauce, cheese, etc. Two patterns: (1) **Production BOM** — transform raw → finished goods (production order workflow); (2) **Sales Bundle** — composite SKU that deducts components on each sale. Schema: `SkuComponent(parentSkuId, componentSkuId, quantity)`. When a movement hits a composite SKU, child movements auto-generate for each component. UI: recipe builder on SKU edit page + production order log. Direct value for Metro Pizza Supply (ingredient portioning/pre-packing) and Megabox (product bundles). |
 | **i18n + Language Switcher** | 🟢 Low | Post-Phase 5 | Stable UI | All strings currently hardcoded in components — no translation layer. Solution: `next-intl` (Next.js App Router standard). Requires extracting all UI strings to locale JSON files. Large but mechanical lift. Revenue-gate this: only invest when non-English market is validated. ₱ + PH locale already in place. |
-| **Franchise Network / Organization Layer (MGN)** | 🔒 Locked | Post-Phase 7 | Multi-tenant stable | Enables MGN (MSME Growth Network International) franchise model: each franchisee/distributor = a tenant, grouped under an Organization (the franchisor). Income model: one-time joining fee per franchisee (via PayMongo) + platform take-rate % on every transaction. Features: cross-tenant revenue dashboard, take-rate ledger, no under-the-table transactions (app is the only checkout). Schema additions: `Organization(id, name, takeRateBps)`, `OrganizationMember(orgId, tenantId, role)`. Gated by `features.network: true`. MLM/genealogy tree: `NetworkNode(id, orgId, memberId, parentNodeId)` + `Commission(id, nodeId, orderId, amountCents, status)` — designed, not yet built. See "Product Strategy" below. |
+| **Franchise Network / Organization Layer (MGN)** | 🔒 Locked | Post-Phase 7 | Multi-tenant stable | Enables MGN (MSME Growth Network International) franchise model. Income model: one-time joining fee (via PayMongo) + platform take-rate % on every transaction. The commission/MLM tree is **agent-based** — agents recruit other agents and earn commissions when their downline transacts. Two design options are **open** (decision deferred — needs business rule confirmation): **(A) Tenant-as-agent** — each franchisee/tenant IS an agent node (simpler; works if every agent also runs their own ERP business); **(B) Dedicated agent entity** — `Agent` is its own record, separate from `Tenant` (a pure recruiter who earns commissions but doesn't need an ERP tenant). See "Product Strategy — MGN Network" section. Gated by `features.network: true`. |
 | **Ascendex SaaS — Subscription Billing** | 🔒 Locked | Post-Phase 6 | Go-to-market live | Add `Plan` enum to Tenant: `STARTER → PROFESSIONAL → ENTERPRISE → MARKETPLACE`. Gate features by plan. Billing via PayMongo (recurring subscriptions, PH-native — supports GCash, Maya, cards). This IS the productized version of this platform. Same monorepo, same code — no fork. A separate "Ascendex" brand is just a domain + marketing skin on top of this. |
 
 ---
@@ -643,15 +643,46 @@ Do NOT fork. Do NOT duplicate repos. All surfaces run from the same monorepo:
 > `features.network: true` = MGN-tier. Never set on a standard Ascendex tenant.
 > Standard Ascendex tenants have `network: false` and `marketplace: false` — no MGN UI or data leaks through.
 
-### MGN franchise model architecture (when built)
+### MGN network/agent model architecture (when built)
 
-- Each franchisee/distributor = a `Tenant` (already exists in schema)
-- Franchise network = `Organization` model grouping Tenants under a franchisor (MGN)
-- `Organization.takeRateBps` = platform % (basis points) applied to every order amount
-- Franchisor dashboard: real gross revenue per franchisee, total platform take, per-transaction ledger
-- "No under-the-table" enforcement: the app is the only checkout path (contract + in-app payment verification)
-- Joining fee: franchisee pays MGN via PayMongo one-time payment before tenant is provisioned
-- MLM/genealogy layer (designed, not built): `NetworkNode(id, orgId, memberId, parentNodeId)` + `Commission(id, nodeId, orderId, amountCents, bps, status)` — commission automatically calculated on each verified payment and credited up the tree
+- Franchise network = `Organization` model grouping participants under a franchisor (MGN)
+- `Organization.takeRateBps` = platform % on every transaction
+- Franchisor dashboard: real gross revenue per agent/franchisee, total platform take, per-transaction ledger
+- "No under-the-table" enforcement: the app is the only checkout path
+- Joining fee: paid via PayMongo one-time payment before access is provisioned
+
+#### Agent model — decision pending (two options open)
+
+**Option A — Tenant as Agent** (simpler)
+- Every agent IS a tenant (runs their own ERP business on the platform)
+- `NetworkNode(id, orgId, tenantId, parentNodeId)` — the tree maps tenants
+- Commission fires when a payment under any tenant-node is verified
+- Works when: every agent in the network is also a franchisee operating their own business
+
+**Option B — Dedicated Agent entity** (more flexible)
+- `Agent(id, orgId, userId?, tenantId?, name, code, status)` — separate record, may or may not be linked to a tenant
+- A pure recruiter (earns commissions, doesn't run their own store/ERP) is Agent only
+- A franchisee who also recruits has both `Tenant` + `Agent` records, linked via `tenantId`
+- `NetworkNode(id, orgId, agentId, parentNodeId)` — tree maps agents
+- Works when: some network participants are recruiters only, not operators
+
+#### What both options share (the common core)
+```
+NetworkNode   id, orgId, parentNodeId, [tenantId | agentId]
+Commission    id, networkNodeId, paymentId, orderId,
+              grossAmountCents, bps, commissionAmountCents,
+              status (PENDING | PAID | VOIDED), paidAt
+```
+- Commission calculated on each `Payment.status → VERIFIED`
+- Tree walk: node → parent → grandparent → ... (each ancestor earns their configured bps)
+- Payout: batch-mark commissions PAID + record payout date
+
+#### Decision gates (before building)
+- Do all agents in MGN's network also run their own ERP business? → Option A
+- Are there pure recruiters who earn commissions but don't operate? → Option B
+- How many levels deep does commission propagate? (industry standard: 3–5 levels)
+- Are commission rates fixed org-wide or per-node/per-level?
+- What happens to commissions when an order is cancelled post-verification?
 
 ### Payment gateway — PayMongo (PH-native)
 
