@@ -15,10 +15,11 @@ export interface PlatformConfig {
   /** Short descriptor shown on login/register screens. */
   tagline: string;
   /**
-   * URL (or /public path) to the square icon SVG/PNG.
-   * Used in the sidebar header next to the platform name.
+   * URL to a custom icon image (PNG/SVG) for white-label deployments.
+   * When null, the sidebar renders the built-in inline Ascendex SVG icon,
+   * which supports currentColor and dark/light mode automatically.
    */
-  logoIconUrl: string;
+  logoIconUrl: string | null;
   /** Support e-mail linked in error pages and emails. */
   supportEmail: string;
   /** Link used on "Back to marketing" buttons on auth pages. */
@@ -28,7 +29,8 @@ export interface PlatformConfig {
 export const platformConfig: PlatformConfig = {
   name:         process.env.NEXT_PUBLIC_PLATFORM_NAME         ?? 'Ascendex',
   tagline:      process.env.NEXT_PUBLIC_PLATFORM_TAGLINE      ?? 'Business Operations Platform',
-  logoIconUrl:  process.env.NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL ?? '/logo-icon.svg',
+  // null = use built-in inline SVG; white-label clients set a hosted image URL
+  logoIconUrl:  process.env.NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL ?? null,
   supportEmail: process.env.NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL ?? 'support@ascendex.ph',
   marketingUrl: process.env.NEXT_PUBLIC_PLATFORM_MARKETING_URL ?? 'https://ascendex.ph',
 };
