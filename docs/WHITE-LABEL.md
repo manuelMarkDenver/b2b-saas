@@ -1,6 +1,6 @@
 # White-Label Architecture
 
-This document covers how Ascendex supports multiple branding tiers — from a
+This document covers how Zentral (by Ascendex) supports multiple branding tiers — from a
 standard SaaS subscription all the way to fully rebranded deployments for
 franchise networks and resellers.
 
@@ -10,9 +10,9 @@ franchise networks and resellers.
 
 | Tier | Name | Who | Platform branding | Domain | Billing model |
 |------|------|-----|-------------------|--------|---------------|
-| **1** | Standard | SME subscribers | Full Ascendex | `app.ascendex.ph` | Monthly subscription (PayMongo) |
-| **2** | Custom Domain | Premium Ascendex subscribers | Ascendex + custom URL | `app.theirbusiness.com` | Monthly subscription (PayMongo) |
-| **3** | White Label | MGN (MSME Growth Network) | MGN branding; Ascendex invisible | `app.mgn.ph` | One-time joining fee + % per transaction |
+| **1** | Standard | SME subscribers | Full Zentral (by Ascendex) | `app.zentral.ph` | Monthly subscription (PayMongo) |
+| **2** | Custom Domain | Premium Zentral subscribers | Zentral + custom URL | `app.theirbusiness.com` | Monthly subscription (PayMongo) |
+| **3** | White Label | MGN (MSME Growth Network) | MGN branding; Zentral/Ascendex invisible | `app.mgn.ph` | One-time joining fee + % per transaction |
 | **4** | Reseller | Third-party partners | Partner branding | Partner domain | Negotiated; sublicensing |
 
 ---
@@ -30,23 +30,27 @@ deployment.
 
 ```typescript
 export const platformConfig: PlatformConfig = {
-  name:         process.env.NEXT_PUBLIC_PLATFORM_NAME         ?? 'Ascendex',
-  tagline:      process.env.NEXT_PUBLIC_PLATFORM_TAGLINE      ?? 'Business Operations Platform',
-  logoIconUrl:  process.env.NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL ?? '/logo-icon.svg',
-  supportEmail: process.env.NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL ?? 'support@ascendex.ph',
-  marketingUrl: process.env.NEXT_PUBLIC_PLATFORM_MARKETING_URL ?? 'https://ascendex.ph',
+  name:              process.env.NEXT_PUBLIC_PLATFORM_NAME              ?? 'Zentral',
+  tagline:           process.env.NEXT_PUBLIC_PLATFORM_TAGLINE           ?? 'Business Operations Platform',
+  logoIconUrl:       process.env.NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL     ?? null,
+  supportEmail:      process.env.NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL     ?? 'support@zentral.ph',
+  marketingUrl:      process.env.NEXT_PUBLIC_PLATFORM_MARKETING_URL     ?? 'https://zentral.ph',
+  parentCompanyName: process.env.NEXT_PUBLIC_PLATFORM_PARENT_NAME       ?? 'Ascendex',
+  showPoweredBy:    (process.env.NEXT_PUBLIC_PLATFORM_SHOW_POWERED_BY   ?? 'true') !== 'false',
 };
 ```
 
 ### Environment variables per tier
 
-#### Tier 1 & 2 — Ascendex (defaults, no override needed)
+#### Tier 1 & 2 — Zentral by Ascendex (defaults, no override needed)
 ```env
-NEXT_PUBLIC_PLATFORM_NAME=Ascendex
+NEXT_PUBLIC_PLATFORM_NAME=Zentral
 NEXT_PUBLIC_PLATFORM_TAGLINE=Business Operations Platform
-NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL=/logo-icon.svg
-NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL=support@ascendex.ph
-NEXT_PUBLIC_PLATFORM_MARKETING_URL=https://ascendex.ph
+NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL=           # blank = built-in inline SVG
+NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL=support@zentral.ph
+NEXT_PUBLIC_PLATFORM_MARKETING_URL=https://zentral.ph
+NEXT_PUBLIC_PLATFORM_PARENT_NAME=Ascendex
+NEXT_PUBLIC_PLATFORM_SHOW_POWERED_BY=true
 ```
 
 #### Tier 3 — MGN (separate Vercel/Render deployment)
@@ -69,7 +73,7 @@ their env vars.
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  apps/web          — ERP dashboard (shared across all tiers)     │
-│  apps/marketing    — Ascendex marketing site (Tier 1/2)          │
+│  apps/marketing    — Zentral marketing site (by Ascendex, Tier 1/2) │
 │  apps/marketing-mgn — MGN marketing site (Tier 3)               │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -133,7 +137,7 @@ See `docs/DEPLOYMENT.md` for the step-by-step deployment process for each tier.
 
 | Tier | Web deployment | API deployment | DB |
 |------|---------------|---------------|----|
-| 1/2 (Ascendex) | Vercel — `ascendex` project | Render — `ascendex-api` | Neon |
+| 1/2 (Zentral) | Vercel — `zentral` project | Render — `zentral-api` | Neon |
 | 3 (MGN) | Vercel — `mgn-web` project | Render — `mgn-api` (or same API, different env) | Neon (separate schema or DB) |
 | 4 (Reseller) | Vercel — per partner | Render — per partner | Neon — per partner |
 
@@ -143,19 +147,22 @@ See `docs/DEPLOYMENT.md` for the step-by-step deployment process for each tier.
 
 ```
 ┌─────────────────────────┐
-│  [icon] Ascendex        │  ← platform header (NEXT_PUBLIC_PLATFORM_* vars)
+│  [icon] Zentral         │  ← platform header (NEXT_PUBLIC_PLATFORM_* vars)
 ├─────────────────────────┤
 │  WORKSPACE              │
 │  [logo] Metro Pizza...  │  ← tenant workspace (unchanged, per-tenant)
 │  Branch switcher        │
 ├─────────────────────────┤
 │  nav items              │
+│  ...                    │
+├─────────────────────────┤
+│  Powered by Ascendex    │  ← hidden when SHOW_POWERED_BY=false
 └─────────────────────────┘
 ```
 
 For a Tier 3 (MGN) deployment, the platform header reads "MGN Business Suite"
-with the MGN logo. The workspace section below it still shows each franchisee's
-business name and logo — unchanged.
+with the MGN logo, and "Powered by Ascendex" is hidden. The workspace section
+still shows each franchisee's business name and logo — unchanged.
 
 ---
 

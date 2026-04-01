@@ -10,13 +10,13 @@
  * Tier 4 (reseller):        same approach — separate deployment, different env vars.
  */
 export interface PlatformConfig {
-  /** Platform display name — shown in sidebar header and auth pages. */
+  /** Product display name — shown in sidebar header and auth pages. e.g. "Zentral" */
   name: string;
   /** Short descriptor shown on login/register screens. */
   tagline: string;
   /**
    * URL to a custom icon image (PNG/SVG) for white-label deployments.
-   * When null, the sidebar renders the built-in inline Ascendex SVG icon,
+   * When null, the sidebar renders the built-in inline Zentral SVG icon,
    * which supports currentColor and dark/light mode automatically.
    */
   logoIconUrl: string | null;
@@ -24,13 +24,24 @@ export interface PlatformConfig {
   supportEmail: string;
   /** Link used on "Back to marketing" buttons on auth pages. */
   marketingUrl: string;
+  /**
+   * Parent company name shown as "Powered by {parentCompanyName}" at the
+   * bottom of the sidebar. Set to null or NEXT_PUBLIC_PLATFORM_SHOW_POWERED_BY=false
+   * to hide it entirely (white-label deployments).
+   */
+  parentCompanyName: string | null;
+  /** Whether to show the "Powered by {parentCompanyName}" footer in the sidebar. */
+  showPoweredBy: boolean;
 }
 
 export const platformConfig: PlatformConfig = {
-  name:         process.env.NEXT_PUBLIC_PLATFORM_NAME         ?? 'Ascendex',
-  tagline:      process.env.NEXT_PUBLIC_PLATFORM_TAGLINE      ?? 'Business Operations Platform',
+  name:              process.env.NEXT_PUBLIC_PLATFORM_NAME              ?? 'Zentral',
+  tagline:           process.env.NEXT_PUBLIC_PLATFORM_TAGLINE           ?? 'Business Operations Platform',
   // null = use built-in inline SVG; white-label clients set a hosted image URL
-  logoIconUrl:  process.env.NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL ?? null,
-  supportEmail: process.env.NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL ?? 'support@ascendex.ph',
-  marketingUrl: process.env.NEXT_PUBLIC_PLATFORM_MARKETING_URL ?? 'https://ascendex.ph',
+  logoIconUrl:       process.env.NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL     ?? null,
+  supportEmail:      process.env.NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL     ?? 'support@zentral.ph',
+  marketingUrl:      process.env.NEXT_PUBLIC_PLATFORM_MARKETING_URL     ?? 'https://zentral.ph',
+  // Parent company credit — set NEXT_PUBLIC_PLATFORM_SHOW_POWERED_BY=false to hide for white-label
+  parentCompanyName: process.env.NEXT_PUBLIC_PLATFORM_PARENT_NAME       ?? 'Ascendex',
+  showPoweredBy:    (process.env.NEXT_PUBLIC_PLATFORM_SHOW_POWERED_BY   ?? 'true') !== 'false',
 };

@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
       // AWS S3 / CloudFront (kept for flexibility)
       { protocol: "https", hostname: "*.s3.amazonaws.com", pathname: "/**" },
       { protocol: "https", hostname: "*.cloudfront.net", pathname: "/**" },
-      // Custom CDN domain (e.g. media.ascendex.ph)
+      // Custom CDN domain (e.g. media.zentral.ph)
       { protocol: "https", hostname: "**", pathname: "/uploads/**" },
     ],
   },
