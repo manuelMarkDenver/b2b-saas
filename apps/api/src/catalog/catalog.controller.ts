@@ -85,7 +85,8 @@ export class CatalogController {
     note?: string;
     imageUrl?: string;
   }) {
-    return this.catalogService.createProductWithStock(req.tenant!.id, body);
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    return this.catalogService.createProductWithStock(req.tenant!.id, body, branchId);
   }
 
   // SKUs (tenant-scoped)

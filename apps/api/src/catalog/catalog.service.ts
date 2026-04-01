@@ -273,6 +273,7 @@ export class CatalogService {
       note?: string;
       imageUrl?: string;
     },
+    branchId?: string,
   ) {
     const category = await this.prisma.category.findUnique({
       where: { id: data.categoryId },
@@ -309,6 +310,7 @@ export class CatalogService {
             quantity: data.initialQty,
             referenceType: 'MANUAL',
             note: data.note ?? 'Initial stock',
+            branchId: branchId ?? null,
           },
         });
         await tx.sku.update({
