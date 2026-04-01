@@ -133,6 +133,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   const [payablesDateRange, setPayablesDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
   const [sortKey, setSortKey] = React.useState<'createdAt' | 'amountCents' | 'status'>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+  const [payablesSortKey, setPayablesSortKey] = React.useState<'createdAt' | 'totalCents' | 'status'>('createdAt');
+  const [payablesSortDir, setPayablesSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
@@ -148,6 +150,11 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
+  function togglePayablesSort(key: typeof payablesSortKey) {
+    if (payablesSortKey === key) setPayablesSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setPayablesSortKey(key); setPayablesSortDir('desc'); }
+  }
+
   const sortedPayments = React.useMemo(() => {
     return [...payments].sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
@@ -157,6 +164,15 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       return 0;
     });
   }, [payments, sortKey, sortDir]);
+
+  const sortedOrders = React.useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const dir = payablesSortDir === 'asc' ? 1 : -1;
+      if (payablesSortKey === 'totalCents') return dir * (a.totalCents - b.totalCents);
+      if (payablesSortKey === 'status') return dir * a.status.localeCompare(b.status);
+      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+  }, [orders, payablesSortKey, payablesSortDir]);
 
   async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters, pdr = paymentsDateRange, odr = payablesDateRange) {
     setStatus({ kind: "info", text: "Loading payments..." });
@@ -419,14 +435,20 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         <div className="grid grid-cols-[1fr_60px_120px_120px_160px_80px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           <span>Order</span>
           <span className="text-center">Items</span>
-          <span>Status</span>
-          <span className="text-right">Total</span>
-          <span>Created</span>
+          <button type="button" onClick={() => togglePayablesSort('status')} className="flex items-center gap-1 hover:text-foreground">
+            Status {payablesSortKey === 'status' ? (payablesSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+          </button>
+          <button type="button" onClick={() => togglePayablesSort('totalCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+            {payablesSortKey === 'totalCents' ? (payablesSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Total
+          </button>
+          <button type="button" onClick={() => togglePayablesSort('createdAt')} className="flex items-center gap-1 hover:text-foreground">
+            Created {payablesSortKey === 'createdAt' ? (payablesSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+          </button>
           <span className="text-right">Action</span>
         </div>
 
         <div className="divide-y divide-border/60">
-          {orders.map((o) => (
+          {sortedOrders.map((o) => (
             <button
               key={o.id}
               type="button"

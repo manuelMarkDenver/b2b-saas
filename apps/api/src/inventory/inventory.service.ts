@@ -188,7 +188,7 @@ export class InventoryService {
       this.prisma.inventoryMovement.findMany({
         where,
         include: {
-          sku: { select: { id: true, code: true, name: true } },
+          sku: { select: { id: true, code: true, name: true, imageUrl: true } },
           actor: { select: { id: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },

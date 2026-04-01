@@ -71,7 +71,7 @@ export function AppearanceSettings({ tenantSlug }: { tenantSlug: string }) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              "System" follows your device's dark/light mode preference.
+              &ldquo;System&rdquo; follows your device&apos;s dark/light mode preference.
             </p>
           </div>
         </div>

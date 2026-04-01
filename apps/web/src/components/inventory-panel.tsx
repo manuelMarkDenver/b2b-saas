@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Pencil } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -28,7 +28,7 @@ type Movement = {
   approvalStatus: string;
   referenceType: string;
   createdAt: string;
-  sku: { code: string; name: string };
+  sku: { code: string; name: string; imageUrl?: string | null };
   actor?: { id: string; email: string } | null;
 };
 
@@ -102,6 +102,29 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [adjustReason, setAdjustReason] = useState('');
   const [adjustSaving, setAdjustSaving] = useState(false);
   const staffMode = isStaff(tenantSlug);
+
+  // Edit product dialog
+  const [editSku, setEditSku] = useState<Sku | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', costCents: '', priceCents: '', lowStockThreshold: '', imageUrl: '' });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Movement sort
+  const [movSortKey, setMovSortKey] = useState<'createdAt' | 'quantity' | 'type'>('createdAt');
+  const [movSortDir, setMovSortDir] = useState<'asc' | 'desc'>('desc');
+
+  function toggleMovSort(key: typeof movSortKey) {
+    if (movSortKey === key) setMovSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setMovSortKey(key); setMovSortDir('desc'); }
+  }
+
+  const sortedMovements = useMemo(() => {
+    return [...movements].sort((a, b) => {
+      const dir = movSortDir === 'asc' ? 1 : -1;
+      if (movSortKey === 'quantity') return dir * (a.quantity - b.quantity);
+      if (movSortKey === 'type') return dir * a.type.localeCompare(b.type);
+      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+  }, [movements, movSortKey, movSortDir]);
 
   // SKU sort
   const [skuSortKey, setSkuSortKey] = useState<'name' | 'stockOnHand' | 'priceCents' | 'costCents'>('name');
@@ -319,6 +342,30 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
     }
   }
 
+  async function handleEditSku(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editSku || !editForm.name.trim()) return;
+    setEditSaving(true);
+    try {
+      const body: Record<string, unknown> = { name: editForm.name.trim() };
+      if (editForm.priceCents !== '') body.priceCents = Math.round(parseFloat(editForm.priceCents) * 100);
+      if (editForm.costCents !== '') body.costCents = Math.round(parseFloat(editForm.costCents) * 100);
+      body.lowStockThreshold = parseInt(editForm.lowStockThreshold || '0', 10);
+      if (editForm.imageUrl) body.imageUrl = editForm.imageUrl;
+      const res = await apiFetch(`/skus/${editSku.id}`, { method: 'PATCH', tenantSlug, body: JSON.stringify(body) });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Failed', message: err.message ?? 'Unknown error' });
+      } else {
+        pushToast({ variant: 'success', title: 'Product updated', message: `${editForm.name} has been updated.` });
+        setEditSku(null);
+        loadSkus();
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   function handleExportMovements() {
     const rows: string[][] = [['Product', 'SKU', 'Type', 'Qty', 'Status', 'Note', 'Reason', 'Actor', 'Date']];
     movements.forEach((m) => {
@@ -423,6 +470,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             values={{ ...filters, showSku: showSkuCol }}
             onChange={(v) => {
               setShowSkuCol(v.showSku === true);
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const { showSku: _, ...rest } = v;
               setFilters(rest);
             }}
@@ -464,7 +512,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <ProductThumb label={`${sku.code} ${sku.name}`} size={36} className="rounded-lg shrink-0" />
+                        <ProductThumb src={sku.imageUrl} label={`${sku.code} ${sku.name}`} size={36} className="rounded-lg shrink-0" />
                         <span className="truncate text-sm font-medium">{sku.name}</span>
                       </div>
                       <span className="truncate text-xs text-muted-foreground">{sku.product.category.name}</span>
@@ -497,6 +545,25 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                         >
                           <Minus className="h-3 w-3" />
                         </button>
+                        {!staffMode && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditSku(sku);
+                              setEditForm({
+                                name: sku.name,
+                                costCents: sku.costCents != null ? String(sku.costCents / 100) : '',
+                                priceCents: sku.priceCents != null ? String(sku.priceCents / 100) : '',
+                                lowStockThreshold: String(sku.lowStockThreshold),
+                                imageUrl: sku.imageUrl ?? '',
+                              });
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                            title="Edit product"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -544,11 +611,17 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
             <div className={`grid gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${!staffMode ? 'grid-cols-[1fr_90px_60px_1fr_130px_100px_100px]' : 'grid-cols-[1fr_90px_60px_1fr_130px_110px]'}`}>
               <span>Product</span>
-              <span>Type</span>
-              <span className="text-right">Qty</span>
+              <button type="button" onClick={() => toggleMovSort('type')} className="flex items-center gap-1 hover:text-foreground">
+                Type {movSortKey === 'type' ? (movSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+              </button>
+              <button type="button" onClick={() => toggleMovSort('quantity')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                {movSortKey === 'quantity' ? (movSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Qty
+              </button>
               <span>Note / Reason</span>
               <span>Actioned By</span>
-              <span className="text-right">Date</span>
+              <button type="button" onClick={() => toggleMovSort('createdAt')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                {movSortKey === 'createdAt' ? (movSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Date
+              </button>
               {!staffMode && <span className="text-right">Actions</span>}
             </div>
 
@@ -569,7 +642,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </div>
             ) : (
               <div className="divide-y divide-border/60">
-                {movements.map((m) => {
+                {sortedMovements.map((m) => {
                   const Icon = MOVEMENT_ICON[m.type] ?? ArrowLeftRight;
                   const color = MOVEMENT_COLOR[m.type] ?? '';
                   const isPending = m.approvalStatus === 'PENDING';
@@ -579,7 +652,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       className={`grid items-center gap-0 px-4 py-3 text-sm transition-colors hover:bg-muted/30 ${!staffMode ? 'grid-cols-[1fr_90px_60px_1fr_130px_100px_100px]' : 'grid-cols-[1fr_90px_60px_1fr_130px_110px]'} ${isPending ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <ProductThumb label={`${m.sku.code} ${m.sku.name}`} size={32} className="rounded-lg shrink-0" />
+                        <ProductThumb src={m.sku.imageUrl} label={`${m.sku.code} ${m.sku.name}`} size={32} className="rounded-lg shrink-0" />
                         <div className="min-w-0">
                           <span className="block truncate text-xs font-medium">{m.sku.name}</span>
                           {isPending && (
@@ -694,9 +767,81 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 <Button
                   type="submit"
                   disabled={adjustSaving || !adjustQty || parseInt(adjustQty, 10) < 1}
-                  variant={adjustSku.direction === 'OUT' ? 'destructive' : 'default'}
+                  className={adjustSku.direction === 'OUT' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
                 >
                   {adjustSaving ? 'Saving…' : staffMode ? 'Submit for approval' : (adjustSku.direction === 'IN' ? 'Add stock' : 'Remove stock')}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product dialog */}
+      <Dialog open={!!editSku} onOpenChange={(open) => { if (!open) setEditSku(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          {editSku && (
+            <form onSubmit={handleEditSku} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Product name"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Cost (₱)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.costCents}
+                    onChange={(e) => setEditForm((f) => ({ ...f, costCents: e.target.value }))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Price (₱)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.priceCents}
+                    onChange={(e) => setEditForm((f) => ({ ...f, priceCents: e.target.value }))}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Low Stock Threshold</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editForm.lowStockThreshold}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lowStockThreshold: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Photo</Label>
+                <ImageUpload
+                  currentUrl={editForm.imageUrl || null}
+                  tenantSlug={tenantSlug}
+                  size={64}
+                  onUploaded={(url) => setEditForm((f) => ({ ...f, imageUrl: url }))}
+                  onRemoved={() => setEditForm((f) => ({ ...f, imageUrl: '' }))}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditSku(null)}>Cancel</Button>
+                <Button type="submit" disabled={editSaving || !editForm.name.trim()}>
+                  {editSaving ? 'Saving…' : 'Save changes'}
                 </Button>
               </DialogFooter>
             </form>
