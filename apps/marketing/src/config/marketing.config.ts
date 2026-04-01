@@ -15,6 +15,10 @@ export const marketingConfig = {
     subheadline:
       'Zentral brings inventory, orders, payments, and your team into one place — so you can focus on growth, not admin.',
     logoText: 'Zentral',
+    /** Two-letter badge shown in navbar/footer logo mark */
+    logoAbbr: 'Zn',
+    /** Parent company — shown as "by Ascendex" under logo and in copyright */
+    parentCompany: 'Ascendex',
   },
 
   // ─── URLs ─────────────────────────────────────────────────────────────────
@@ -169,7 +173,7 @@ export const marketingConfig = {
       { label: 'How it works', href: '#how-it-works' },
       { label: 'Book a Demo', href: '' }, // calendly — filled from urls.calendly
     ],
-    copyright: `© ${new Date().getFullYear()} Zentral. All rights reserved.`,
+    copyright: `© ${new Date().getFullYear()} Ascendex. All rights reserved.`,
     madeIn: 'Made in the Philippines 🇵🇭 — built for the world.',
   },
 } as const;
