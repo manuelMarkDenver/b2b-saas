@@ -46,7 +46,7 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  function loadBranches() {
     apiFetch('/branches', { tenantSlug, branchId: null })
       .then((r) => r.json())
       .then((data: Branch[]) => {
@@ -67,7 +67,9 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
         }
       })
       .catch(() => {});
-  }, [tenantSlug]);
+  }
+
+  useEffect(() => { loadBranches(); }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hidden when only 1 branch — invisible at single-branch
   if (branches.length <= 1) return null;
@@ -87,7 +89,7 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
   }
 
   return (
-    <DropdownMenu onOpenChange={(open) => { if (!open) setSearch(''); }}>
+    <DropdownMenu onOpenChange={(open) => { if (open) loadBranches(); else setSearch(''); }}>
       <DropdownMenuTrigger
         className={cn(
           'flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm focus:outline-none',
