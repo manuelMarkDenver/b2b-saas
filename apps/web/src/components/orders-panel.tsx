@@ -149,6 +149,8 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       if (f.status) params.set('status', f.status as string);
       params.set('from', dr.from);
       params.set('to', dr.to);
+      if (f.minAmount) params.set('minCents', String(Math.round(parseFloat(f.minAmount as string) * 100)));
+      if (f.maxAmount) params.set('maxCents', String(Math.round(parseFloat(f.maxAmount as string) * 100)));
       const [ordersRes, skusRes] = await Promise.all([
         apiFetch(`/orders?${params}`, { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
@@ -403,6 +405,8 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                 { value: 'CANCELLED', label: 'Cancelled' },
               ],
             },
+            { type: 'number', key: 'minAmount', placeholder: '₱ Min', min: 0 },
+            { type: 'number', key: 'maxAmount', placeholder: '₱ Max', min: 0 },
           ]}
           values={filters}
           onChange={(v) => { setFilters(v); setPage(1); }}

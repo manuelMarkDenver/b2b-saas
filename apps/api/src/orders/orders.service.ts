@@ -91,7 +91,7 @@ export class OrdersService {
     page: number,
     limit: number,
     branchId?: string,
-    filters: { status?: string; search?: string; from?: string; to?: string } = {},
+    filters: { status?: string; search?: string; from?: string; to?: string; minCents?: number; maxCents?: number } = {},
   ) {
     const skip = (page - 1) * limit;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,6 +108,11 @@ export class OrdersService {
       where.createdAt = {};
       if (filters.from) where.createdAt.gte = new Date(`${filters.from}T00:00:00.000Z`);
       if (filters.to) where.createdAt.lte = new Date(`${filters.to}T23:59:59.999Z`);
+    }
+    if (filters.minCents !== undefined || filters.maxCents !== undefined) {
+      where.totalCents = {};
+      if (filters.minCents !== undefined) where.totalCents.gte = filters.minCents;
+      if (filters.maxCents !== undefined) where.totalCents.lte = filters.maxCents;
     }
     const [data, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({

@@ -30,6 +30,7 @@ export class InventoryController {
     @Query() pagination: PaginationDto,
     @Query('skuId') skuId?: string,
     @Query('approvalStatus') approvalStatus?: string,
+    @Query('skuSearch') skuSearch?: string,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
     return this.inventoryService.listMovements(
@@ -39,6 +40,7 @@ export class InventoryController {
       skuId,
       branchId,
       approvalStatus,
+      skuSearch,
     );
   }
 

@@ -13,7 +13,8 @@ export type FilterOption = { value: string; label: string };
 export type FilterField =
   | { type: 'search'; key: string; placeholder?: string }
   | { type: 'select'; key: string; label: string; options: FilterOption[] }
-  | { type: 'toggle'; key: string; label: string };
+  | { type: 'toggle'; key: string; label: string }
+  | { type: 'number'; key: string; placeholder?: string; min?: number };
 
 export type FilterValues = Record<string, string | boolean>;
 
@@ -53,7 +54,7 @@ export function FilterBar({
 
   const activeCount = filters.filter((f) => {
     const v = values[f.key];
-    return v !== undefined && v !== '' && v !== false;
+    return v !== undefined && v !== '' && v !== false && v !== '0';
   }).length;
 
   const hasActiveFilters = activeCount > 0;
@@ -100,6 +101,30 @@ export function FilterBar({
                 </option>
               ))}
             </select>
+          );
+        }
+
+        if (f.type === 'number') {
+          return (
+            <div key={f.key} className="relative min-w-[100px] max-w-[130px]">
+              <Input
+                type="number"
+                placeholder={f.placeholder ?? '0'}
+                min={f.min}
+                value={(values[f.key] as string) ?? ''}
+                onChange={(e) => set(f.key, e.target.value)}
+                className="h-8 text-sm"
+              />
+              {values[f.key] !== undefined && values[f.key] !== '' && (
+                <button
+                  type="button"
+                  onClick={() => clear(f.key)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           );
         }
 

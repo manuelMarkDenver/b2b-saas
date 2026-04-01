@@ -86,7 +86,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [movMeta, setMovMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [movPage, setMovPage] = useState(1);
-  const [movFilter, setMovFilter] = useState(''); // '' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [movFilter, setMovFilter] = useState<FilterValues>({});
   const [pendingCount, setPendingCount] = useState(0);
 
   // Add movement dialog
@@ -159,7 +159,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
   const loadMovements = useCallback(async () => {
     const params = new URLSearchParams({ page: String(movPage), limit: '20' });
-    if (movFilter) params.set('approvalStatus', movFilter);
+    if (movFilter.approvalStatus) params.set('approvalStatus', movFilter.approvalStatus as string);
+    if (movFilter.skuSearch) params.set('skuSearch', movFilter.skuSearch as string);
     const res = await apiFetch(`/inventory/movements?${params}`, { tenantSlug });
     if (res.ok) {
       const data = await res.json() as { data: Movement[]; meta: Meta };
@@ -522,8 +523,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         {/* ── History tab ── */}
         <TabsContent value="history" className="mt-4 space-y-3">
           <FilterBar
-            collapsible
             filters={[
+              { type: 'search', key: 'skuSearch', placeholder: 'Search product or SKU…' },
               {
                 type: 'select', key: 'approvalStatus', label: 'All statuses',
                 options: [
@@ -533,8 +534,8 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 ],
               },
             ]}
-            values={movFilter ? { approvalStatus: movFilter } : {}}
-            onChange={(v) => { setMovFilter((v.approvalStatus as string) ?? ''); setMovPage(1); }}
+            values={movFilter}
+            onChange={(v) => { setMovFilter(v); setMovPage(1); }}
             onExport={handleExportMovements}
           />
 

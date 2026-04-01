@@ -40,14 +40,18 @@ export class OrdersController {
     @Query('search') search?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('minCents') minCentsRaw?: string,
+    @Query('maxCents') maxCentsRaw?: string,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
+    const minCents = minCentsRaw ? parseInt(minCentsRaw, 10) : undefined;
+    const maxCents = maxCentsRaw ? parseInt(maxCentsRaw, 10) : undefined;
     return this.ordersService.listOrders(
       req.tenant!.id,
       pagination.page ?? 1,
       pagination.limit ?? 20,
       branchId,
-      { status, search, from, to },
+      { status, search, from, to, minCents, maxCents },
     );
   }
 

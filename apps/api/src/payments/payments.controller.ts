@@ -38,9 +38,18 @@ export class PaymentsController {
     @Query('status') status?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('method') method?: string,
+    @Query('minCents') minCentsRaw?: string,
+    @Query('maxCents') maxCentsRaw?: string,
+    @Query('search') search?: string,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
-    return this.paymentsService.listPayments(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20, orderId, branchId, status, from, to);
+    const minCents = minCentsRaw ? parseInt(minCentsRaw, 10) : undefined;
+    const maxCents = maxCentsRaw ? parseInt(maxCentsRaw, 10) : undefined;
+    return this.paymentsService.listPayments(
+      req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20,
+      orderId, branchId, status, from, to, method, minCents, maxCents, search,
+    );
   }
 
   @Get(':id')

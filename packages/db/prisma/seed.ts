@@ -1,4 +1,4 @@
-import { PrismaClient, MovementType, OrderStatus, PaymentStatus, ReferenceType } from "@prisma/client";
+import { PrismaClient, MovementType, OrderStatus, PaymentMethod, PaymentStatus, ReferenceType } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -156,6 +156,19 @@ async function createOrder(opts: {
   return order;
 }
 
+// Realistic PH payment method rotation for seed data
+const PH_METHODS: PaymentMethod[] = [
+  PaymentMethod.GCASH,
+  PaymentMethod.MAYA,
+  PaymentMethod.BANK_TRANSFER,
+  PaymentMethod.CASH,
+  PaymentMethod.CARD,
+];
+let _methodIdx = 0;
+function nextMethod(): PaymentMethod {
+  return PH_METHODS[_methodIdx++ % PH_METHODS.length];
+}
+
 /** Create a payment for an order if none exists yet. */
 async function createPaymentIfAbsent(opts: {
   tenantId: string;
@@ -163,6 +176,7 @@ async function createPaymentIfAbsent(opts: {
   amountCents: number;
   status: PaymentStatus;
   proofUrl?: string;
+  method?: PaymentMethod;
 }) {
   const existing = await prisma.payment.count({ where: { orderId: opts.orderId } });
   if (existing > 0) return;
@@ -172,6 +186,7 @@ async function createPaymentIfAbsent(opts: {
       orderId: opts.orderId,
       amountCents: opts.amountCents,
       status: opts.status,
+      method: opts.method ?? nextMethod(),
       proofUrl: opts.proofUrl ?? null,
     },
   });
