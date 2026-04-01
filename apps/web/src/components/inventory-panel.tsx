@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Pencil } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Pencil, Upload } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -58,6 +58,29 @@ const MOVEMENT_COLOR: Record<string, string> = {
   ADJUSTMENT: 'text-yellow-600',
 };
 
+type ImportResult = {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: Array<{ row: number; reason: string }>;
+};
+
+const CSV_TEMPLATE_HEADERS = 'productName,categorySlug,skuCode,skuName,pricePhp,costPhp,lowStockThreshold';
+
+function downloadCsvTemplate() {
+  const content = [
+    CSV_TEMPLATE_HEADERS,
+    'Example Product,fasteners,SKU-001,Standard Size,99.00,45.00,5',
+  ].join('\n');
+  const blob = new Blob([content], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'catalog-import-template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function stockColor(sku: Sku): string {
   if (sku.lowStockThreshold > 0 && sku.stockOnHand <= sku.lowStockThreshold)
     return 'text-red-500 dark:text-red-400';
@@ -107,6 +130,14 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [editSku, setEditSku] = useState<Sku | null>(null);
   const [editForm, setEditForm] = useState({ name: '', costCents: '', priceCents: '', lowStockThreshold: '', imageUrl: '' });
   const [editSaving, setEditSaving] = useState(false);
+
+  // CSV import dialog
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   // Movement sort
   const [movSortKey, setMovSortKey] = useState<'createdAt' | 'quantity' | 'type'>('createdAt');
@@ -366,6 +397,31 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
     }
   }
 
+  async function handleCsvImport() {
+    if (!importFile) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const res = await apiFetch('/catalog/import', { tenantSlug, method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Import failed', message: err.message ?? `Error ${res.status}` });
+        return;
+      }
+      const result = await res.json() as ImportResult;
+      setImportResult(result);
+      setImportFile(null);
+      if (importFileRef.current) importFileRef.current.value = '';
+      const summary = `${result.imported} added, ${result.updated} updated, ${result.skipped} skipped`;
+      pushToast({ variant: result.errors.length > 0 ? 'error' : 'success', title: 'Import complete', message: summary });
+      if (result.imported > 0 || result.updated > 0) loadSkus();
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   function handleExportMovements() {
     const rows: string[][] = [['Product', 'SKU', 'Type', 'Qty', 'Status', 'Note', 'Reason', 'Actor', 'Date']];
     movements.forEach((m) => {
@@ -441,6 +497,12 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             <Button variant="outline" onClick={() => setAddOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               Adjust Stock
+            </Button>
+          )}
+          {!staffMode && (
+            <Button variant="outline" onClick={() => { setImportOpen(true); setImportResult(null); }}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              Import CSV
             </Button>
           )}
           <Button onClick={() => setProductOpen(true)}>
@@ -939,6 +1001,72 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Import dialog */}
+      <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) { setImportFile(null); setImportResult(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import Products from CSV</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Upserts products and SKUs. Required columns:{' '}
+                <code className="rounded bg-muted px-1 py-0.5 text-[11px]">{CSV_TEMPLATE_HEADERS}</code>
+              </p>
+              <button type="button" className="shrink-0 text-xs text-primary underline-offset-2 hover:underline whitespace-nowrap" onClick={downloadCsvTemplate}>
+                Download template
+              </button>
+            </div>
+
+            {/* Drop zone */}
+            <div
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-border'}`}
+              onClick={() => importFileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) { setImportFile(f); setImportResult(null); } }}
+            >
+              <input ref={importFileRef} type="file" accept=".csv,text/csv" className="hidden"
+                onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportResult(null); }} />
+              {importFile ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">{importFile.name}</span>
+                  <button type="button" className="text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setImportFile(null); if (importFileRef.current) importFileRef.current.value = ''; }}>✕</button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Drop a CSV file here or <span className="text-primary">browse</span></p>
+              )}
+            </div>
+
+            {/* Result summary */}
+            {importResult && (
+              <div className="space-y-2 text-sm">
+                <div className="flex gap-4 text-xs">
+                  <span className="font-medium text-green-600">{importResult.imported} added</span>
+                  <span className="font-medium text-blue-600">{importResult.updated} updated</span>
+                  <span className="text-muted-foreground">{importResult.skipped} skipped</span>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="max-h-28 overflow-y-auto rounded-md bg-destructive/10 p-2 space-y-1">
+                    {importResult.errors.map((e) => (
+                      <p key={e.row} className="text-xs text-destructive">Row {e.row}: {e.reason}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>Close</Button>
+            <Button disabled={!importFile || importLoading} onClick={handleCsvImport}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              {importLoading ? 'Importing…' : 'Import'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
