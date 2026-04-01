@@ -242,6 +242,13 @@ export function Sidebar({
           <LogOut className="h-[18px] w-[18px] shrink-0" />
           <span>Sign out</span>
         </button>
+
+        {/* Powered by — hidden for white-label via NEXT_PUBLIC_PLATFORM_SHOW_POWERED_BY=false */}
+        {platformConfig.showPoweredBy && platformConfig.parentCompanyName && (
+          <p className="pt-1 text-center text-[10px] text-muted-foreground/50">
+            Powered by {platformConfig.parentCompanyName}
+          </p>
+        )}
       </div>
     </aside>
   );

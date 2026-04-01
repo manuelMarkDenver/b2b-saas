@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ascendex-api
+    name: zentral-api
     runtime: node
     # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
     buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter api build
@@ -38,13 +38,13 @@ services:
 
       # ── CORS — set to your Vercel URL after first deploy ─────────────────
       - key: CORS_ALLOWED_ORIGINS
-        sync: false   # e.g. https://ascendex.vercel.app,https://app.ascendex.ph
+        sync: false   # e.g. https://zentral.vercel.app,https://app.zentral.ph
 
       # ── URLs ─────────────────────────────────────────────────────────────
       - key: APP_BASE_URL
-        sync: false   # This service's URL: https://ascendex-api.onrender.com
+        sync: false   # This service's URL: https://zentral-api.onrender.com
       - key: APP_FRONTEND_URL
-        sync: false   # Vercel URL: https://ascendex.vercel.app
+        sync: false   # Vercel URL: https://zentral.vercel.app
 
       # ── Email (Resend) ────────────────────────────────────────────────────
       - key: SMTP_HOST
