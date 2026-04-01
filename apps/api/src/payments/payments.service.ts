@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitPaymentDto } from './dto/submit-payment.dto';
@@ -47,6 +47,7 @@ export class PaymentsService {
         tenantId,
         orderId: dto.orderId,
         amountCents: dto.amountCents,
+        method: dto.method ?? PaymentMethod.CASH,
         proofUrl: dto.proofUrl ?? null,
         status: PaymentStatus.PENDING,
       },
@@ -77,6 +78,10 @@ export class PaymentsService {
     status?: string,
     from?: string,
     to?: string,
+    method?: string,
+    minCents?: number,
+    maxCents?: number,
+    search?: string,
   ) {
     const skip = (page - 1) * limit;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,10 +89,22 @@ export class PaymentsService {
     if (orderId) where.orderId = orderId;
     if (branchId) where.order = { branchId };
     if (status) where.status = status;
+    if (method) where.method = method as PaymentMethod;
     if (from || to) {
       where.createdAt = {};
       if (from) where.createdAt.gte = new Date(`${from}T00:00:00.000Z`);
       if (to) where.createdAt.lte = new Date(`${to}T23:59:59.999Z`);
+    }
+    if (minCents !== undefined || maxCents !== undefined) {
+      where.amountCents = {};
+      if (minCents !== undefined) where.amountCents.gte = minCents;
+      if (maxCents !== undefined) where.amountCents.lte = maxCents;
+    }
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { order: { customerRef: { contains: search, mode: 'insensitive' } } },
+      ];
     }
     const [data, total] = await this.prisma.$transaction([
       this.prisma.payment.findMany({

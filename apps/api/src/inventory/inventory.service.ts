@@ -166,14 +166,24 @@ export class InventoryService {
     skuId?: string,
     branchId?: string,
     approvalStatus?: string,
+    skuSearch?: string,
   ) {
     const skip = (page - 1) * limit;
-    const where = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
       tenantId,
       ...(skuId ? { skuId } : {}),
       ...(branchId ? { branchId } : {}),
       ...(approvalStatus ? { approvalStatus: approvalStatus as ApprovalStatus } : {}),
     };
+    if (skuSearch) {
+      where.sku = {
+        OR: [
+          { code: { contains: skuSearch, mode: 'insensitive' } },
+          { name: { contains: skuSearch, mode: 'insensitive' } },
+        ],
+      };
+    }
     const [data, total] = await this.prisma.$transaction([
       this.prisma.inventoryMovement.findMany({
         where,

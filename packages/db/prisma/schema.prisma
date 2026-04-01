@@ -254,12 +254,22 @@ enum PaymentStatus {
   REJECTED
 }
 
+enum PaymentMethod {
+  CASH
+  GCASH
+  MAYA
+  BANK_TRANSFER
+  CARD
+  CHEQUE
+}
+
 model Payment {
   id          String        @id @default(uuid()) @db.Uuid
   tenantId    String        @db.Uuid
   orderId     String        @db.Uuid
   amountCents Int
   status      PaymentStatus @default(PENDING)
+  method      PaymentMethod @default(CASH)
   proofUrl    String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -270,6 +280,7 @@ model Payment {
   @@index([tenantId])
   @@index([orderId])
   @@index([status])
+  @@index([method])
 }
 
 model InventoryMovement {

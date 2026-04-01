@@ -40,10 +40,22 @@ type Order = {
   }>;
 };
 
+type PaymentMethod = "CASH" | "GCASH" | "MAYA" | "BANK_TRANSFER" | "CARD" | "CHEQUE";
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CASH: "Cash",
+  GCASH: "GCash",
+  MAYA: "Maya",
+  BANK_TRANSFER: "Bank Transfer",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+};
+
 type Payment = {
   id: string;
   orderId: string;
   amountCents: number;
+  method: PaymentMethod;
   status: "PENDING" | "VERIFIED" | "REJECTED";
   proofUrl: string | null;
   createdAt: string;
@@ -125,6 +137,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
   const [amountDollars, setAmountDollars] = React.useState("0.00");
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>("CASH");
   const [proofUrl, setProofUrl] = React.useState("");
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
@@ -150,11 +163,18 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     try {
       const paymentParams = new URLSearchParams({ page: String(pPage), limit: '20' });
       if (pFilters.status) paymentParams.set('status', pFilters.status as string);
+      if (pFilters.method) paymentParams.set('method', pFilters.method as string);
+      if (pFilters.search) paymentParams.set('search', pFilters.search as string);
+      if (pFilters.minAmount) paymentParams.set('minCents', String(Math.round(parseFloat(pFilters.minAmount as string) * 100)));
+      if (pFilters.maxAmount) paymentParams.set('maxCents', String(Math.round(parseFloat(pFilters.maxAmount as string) * 100)));
       paymentParams.set('from', pdr.from);
       paymentParams.set('to', pdr.to);
 
       const ordersParams = new URLSearchParams({ page: String(oPage), limit: '20' });
       if (oFilters.status) ordersParams.set('status', oFilters.status as string);
+      if (oFilters.search) ordersParams.set('search', oFilters.search as string);
+      if (oFilters.minAmount) ordersParams.set('minCents', String(Math.round(parseFloat(oFilters.minAmount as string) * 100)));
+      if (oFilters.maxAmount) ordersParams.set('maxCents', String(Math.round(parseFloat(oFilters.maxAmount as string) * 100)));
       ordersParams.set('from', odr.from);
       ordersParams.set('to', odr.to);
 
@@ -242,6 +262,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       body: JSON.stringify({
         orderId: selectedOrderId,
         amountCents,
+        method: paymentMethod,
         ...(proofUrl.trim() ? { proofUrl: proofUrl.trim() } : {}),
       }),
     });
@@ -302,12 +323,13 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   function handleExportPayments() {
-    const rows: string[][] = [['Payment ID', 'Order ID', 'Amount', 'Status', 'Date']];
+    const rows: string[][] = [['Payment ID', 'Order ID', 'Amount', 'Method', 'Status', 'Date']];
     payments.forEach((p) => {
       rows.push([
         p.id,
         p.orderId,
         formatCents(p.amountCents),
+        PAYMENT_METHOD_LABELS[p.method] ?? p.method,
         p.status,
         new Date(p.createdAt).toLocaleDateString(),
       ]);
@@ -362,8 +384,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
 
           <FilterBar
-            collapsible
             filters={[
+              { type: 'search', key: 'search', placeholder: 'Search order ID or customer ref…' },
               {
                 type: 'select', key: 'status', label: 'All statuses',
                 options: [
@@ -372,6 +394,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                   { value: 'COMPLETED', label: 'Completed' },
                 ],
               },
+              { type: 'number', key: 'minAmount', placeholder: '₱ Min', min: 0 },
+              { type: 'number', key: 'maxAmount', placeholder: '₱ Max', min: 0 },
             ]}
             values={payablesFilters}
             onChange={(v) => { setPayablesFilters(v); setOrdersPage(1); }}
@@ -458,8 +482,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
             <DateRangePicker value={paymentsDateRange} onChange={(r) => { setPaymentsDateRange(r); setPaymentsPage(1); }} />
           </div>
           <FilterBar
-            collapsible
             filters={[
+              { type: 'search', key: 'search', placeholder: 'Search ref or order ID…' },
               {
                 type: 'select', key: 'status', label: 'All statuses',
                 options: [
@@ -468,6 +492,19 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                   { value: 'REJECTED', label: 'Rejected' },
                 ],
               },
+              {
+                type: 'select', key: 'method', label: 'All methods',
+                options: [
+                  { value: 'CASH', label: 'Cash' },
+                  { value: 'GCASH', label: 'GCash' },
+                  { value: 'MAYA', label: 'Maya' },
+                  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+                  { value: 'CARD', label: 'Card' },
+                  { value: 'CHEQUE', label: 'Cheque' },
+                ],
+              },
+              { type: 'number', key: 'minAmount', placeholder: '₱ Min', min: 0 },
+              { type: 'number', key: 'maxAmount', placeholder: '₱ Max', min: 0 },
             ]}
             values={paymentFilters}
             onChange={(v) => { setPaymentFilters(v); setPaymentsPage(1); }}
@@ -490,11 +527,12 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           <div className="px-4 py-6 text-sm text-muted-foreground">No payments yet.</div>
         ) : (
           <>
-            <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="grid grid-cols-[120px_100px_90px_1fr_80px_1fr_100px_180px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Payment</span>
               <button type="button" onClick={() => toggleSort('amountCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                 {sortKey === 'amountCents' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Amount
               </button>
+              <span>Method</span>
               <span>Order</span>
               <span>Proof</span>
               <button type="button" onClick={() => toggleSort('createdAt')} className="flex items-center gap-1 hover:text-foreground">
@@ -510,11 +548,13 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               {sortedPayments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] items-center gap-3 px-4 py-3 text-sm"
+                  className="grid grid-cols-[120px_100px_90px_1fr_80px_1fr_100px_180px] items-center gap-3 px-4 py-3 text-sm"
                 >
                   <span className="font-mono text-xs text-muted-foreground">{payment.id.slice(0, 8)}…</span>
 
                   <span className="text-right font-mono tabular-nums">{formatCents(payment.amountCents)}</span>
+
+                  <span className="text-xs font-medium text-foreground">{PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}</span>
 
                   <div className="min-w-0">
                     <div className="truncate text-xs text-muted-foreground">
@@ -650,7 +690,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                   <div className="text-sm font-medium">Payment details</div>
                   <div className="mt-3 space-y-2">
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₱</span>
                       <input
                         className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
                         type="number"
@@ -661,6 +701,15 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
                         onChange={(e) => setAmountDollars(e.target.value)}
                       />
                     </div>
+                    <select
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                    >
+                      {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((m) => (
+                        <option key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</option>
+                      ))}
+                    </select>
                     <input
                       className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                       placeholder="Proof URL (optional)"
