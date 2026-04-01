@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-03-30 — MS9 + MS11 merged. Pre-staging order revised: functionality first, PWA second-to-last (after all features stabilised).
+> Last updated: 2026-04-01 — MS16 complete (11 phases + round-2 UX polish). MS17 drafted: payment method (PH), accounting filters, BOM backlog. Franchise/Ascendex architecture direction added.
 
 ---
 
@@ -39,7 +39,8 @@
 | 4 | Dashboard / home screen (MS12) | ✅ Done | Summary cards, date range (presets + custom), 4 Recharts: area revenue, bar orders/day, donut status, horizontal bar low stock. |
 | 5 | Basic reports (orders CSV export, date filter) | ✅ Done | MS13 — GET /reports/orders + CSV export, sidebar nav, date picker. |
 | 6 | **Mobile responsive + PWA** | ✅ Done | MS14 — manifest, service worker, mobile drawer, horizontal-scroll tables, responsive sheets. |
-| 7 | Staging deployment | 📋 Planned | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 7 | MS16 — UI/UX overhaul (inventory, filters, stock approvals, reports, dashboard widgets) | ✅ Done | Branch `milestone-16/ui-ux-overhaul` — 11 phases |
+| 8 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
@@ -486,6 +487,47 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 
 ---
 
+### MS17 — Accounting Filters + Payment Method 🚧 In Progress
+
+> Branch: `milestone-17/accounting-filters`
+> Goal: Give operators and accountants the filter set they need for daily reconciliation. Based on real-world input from a practicing accountant using Xero/Loyvers + PH business context.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `Payment.method` enum (`CASH`, `GCASH`, `MAYA`, `BANK_TRANSFER`, `CARD`, `CHEQUE`) | ✅ | Migration `20260401020457_add_payment_method`. Default: CASH. |
+| Payment method select in submit payment form | ✅ | Sheet UI updated |
+| Method column in payments history table | ✅ | With label mapping (GCash, Maya, etc.) |
+| Filter payments by method | ✅ | `GET /payments?method=GCASH` |
+| Filter payments by amount range | ✅ | `GET /payments?minCents=&maxCents=` |
+| Filter orders by amount range | ✅ | `GET /orders?minCents=&maxCents=` |
+| Search payments by customer ref / order ID | ✅ | `GET /payments?search=` (joins order.customerRef) |
+| SKU search on Inventory History | ✅ | `GET /inventory/movements?skuSearch=` (joins sku.code/name) |
+| FilterBar `type: 'number'` field | ✅ | Compact number input with clear button, reusable |
+| Seeder updated with PH payment methods | ✅ | Rotates GCASH/MAYA/BANK_TRANSFER/CASH/CARD |
+| CSV export includes Method column | ✅ | |
+
+---
+
+### MS16 — UI/UX Overhaul ✅ Complete
+
+> Full UX redesign based on real client feedback. Inventory restructure, sitewide filter+export pattern, stock approval workflow, role-based dashboard, and settings improvements.
+
+| Phase | Items | Status |
+|-------|-------|--------|
+| 1 — Quick wins + sitewide filter bar | Labels, nav cleanup, branch badge, role-based dashboard, FilterBar component, Appearance settings | ✅ |
+| 2 — DB migration | `approvalStatus`, `reason`, `actorId` on InventoryMovement; `ApprovalStatus` enum; indexes | ✅ |
+| 3 — Inventory page rebuild | Products table with category/cost/price, SKU toggle, filter+export, FilterBar | ✅ |
+| 4 — New Product modal | Name, category, photo, cost, price, initial qty, auto-SKU (category prefix + counter) | ✅ |
+| 5 — Inline stock adjustment | +/− per row, owner/admin immediate APPROVED, staff → PENDING + notification | ✅ |
+| 6 — Stock History + Approvals | Movement log tabs (All/Pending/Approved/Rejected), pending badge, approve/reject inline, CSV export | ✅ |
+| 7 — Orders filter + export | FilterBar (search + status) + CSV export on orders table | ✅ |
+| 8 — Payments filter + export | FilterBar (status) + CSV export on payments history tab | ✅ |
+| 9 — Reports page | Three tabs: Orders / Payments / Inventory movements; date range picker; CSV export per tab | ✅ |
+| 10 — Dashboard Settings | Widget show/hide toggles (Customize button), localStorage persistence per user per tenant | ✅ |
+| 11 — Docs | MILESTONES updated | ✅ |
+
+---
+
 ## PHASE 7 — Marketplace 🔒
 
 > Do not build yet. Unlocks after Phase 4 is stable and validated demand exists.
@@ -548,6 +590,47 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | Payroll Module | 🔒 Locked | Post-Phase 5 | Multi-Branch | Regulated domain. Validate demand before committing. |
 | Platform Integrations (Shopee, Lazada) | 🔒 Locked | Post-Phase 5 | Stable core | Webhook security, retry logic, idempotency add complexity. |
 | AI Chatbot + RAG | 🔒 Locked | Post-Phase 5 | Real tenant data | Claude API + pgvector. Feature-flagged per tenant. |
+| **Customer-Seller Chat** | 🔒 Locked | Post-Phase 7 | Customer portal | Two tracks: (1) **Internal order notes** — staff/admin attach notes to a specific order, visible within the ERP; low-effort, high-value for B2B ops. (2) **Buyer-facing portal chat** — real-time or async messaging between buyer and seller, tied to an order/session; requires buyer auth, separate portal surface, and WebSocket infra. Do Track 1 first. Track 2 only after the marketplace (Phase 7) is live and validated. |
+| **Bill of Materials (BOM) / Recipe Management** | 🟡 Medium | Post-Phase 5 | Stable inventory | ERP term: a finished product is made from N raw material components. Creating 50 pizzas auto-deducts flour, sauce, cheese, etc. Two patterns: (1) **Production BOM** — transform raw → finished goods (production order workflow); (2) **Sales Bundle** — composite SKU that deducts components on each sale. Schema: `SkuComponent(parentSkuId, componentSkuId, quantity)`. When a movement hits a composite SKU, child movements auto-generate for each component. UI: recipe builder on SKU edit page + production order log. Direct value for Metro Pizza Supply (ingredient portioning/pre-packing) and Megabox (product bundles). |
+| **i18n + Language Switcher** | 🟢 Low | Post-Phase 5 | Stable UI | All strings currently hardcoded in components — no translation layer. Solution: `next-intl` (Next.js App Router standard). Requires extracting all UI strings to locale JSON files. Large but mechanical lift. Revenue-gate this: only invest when non-English market is validated. ₱ + PH locale already in place. |
+| **Franchise Network / Organization Layer** | 🔒 Locked | Post-Phase 7 | Multi-tenant stable | Enables your brother's franchise model: each franchisee = a tenant, grouped under an Organization (the franchisor). Features: cross-tenant revenue dashboard, platform take-rate on every transaction (auto-recorded), no under-the-table transactions enforced by the app being the only checkout. Schema additions: `Organization(id, name, takeRateBps)`, `OrganizationMember(orgId, tenantId, role)`. The franchisor sees real gross income per franchisee. This is the `MARKETPLACE` feature flag plan tier. Do NOT fork the codebase — this is the same product with a higher-tier plan enabled. See "Ascendex / One Codebase" strategy below. |
+| **Ascendex SaaS — Subscription Billing** | 🔒 Locked | Post-Phase 6 | Go-to-market live | Add `Plan` enum to Tenant: `STARTER → PROFESSIONAL → ENTERPRISE → MARKETPLACE`. Gate features by plan. Billing via Stripe (recurring subscriptions). This IS the productized version of this platform. Same monorepo, same code — no fork. A separate "Ascendex" brand is just a domain + marketing skin on top of this. |
+
+---
+
+## Product Strategy — Ascendex / One Codebase
+
+> Decision record: 2026-04-01. Do not revisit until Phase 6 is live.
+
+### The vision
+
+Three future products are being considered:
+1. **Ascendex SaaS** — multi-tenant ERP sold via subscription to any SMB
+2. **Franchise Network platform** — a specific customer (distributor/franchise owner) wants all their franchisees' transactions to flow through a single app, takes a platform % on every transaction, monitors real income per franchisee, eliminates under-the-table deals
+3. **Marketplace** (Phase 7) — buyer-facing storefront
+
+### The answer: one codebase, multiple plan tiers
+
+Do NOT fork. Do NOT duplicate repos. All three are the same product at different plan tiers:
+
+| Plan | Who uses it | Key features |
+|------|-------------|--------------|
+| `STARTER` | Single SMB owner | Current ERP features |
+| `PROFESSIONAL` | Multi-branch SMB | + Branch management, advanced reports |
+| `ENTERPRISE` | Large operator | + Team management, audit log, advanced permissions |
+| `MARKETPLACE` | Franchise/distributor network | + Organization layer, cross-tenant dashboard, platform take-rate, forced-through-app checkout |
+
+### Franchise model architecture (when built)
+- Each franchisee = a Tenant (already exists)
+- Franchise network = `Organization` model (groups Tenants under a franchisor)
+- `Organization.takeRateBps` = platform % (basis points) applied to every order amount
+- Franchisor gets an org-level dashboard: real gross revenue per franchisee, total platform take, per-transaction ledger
+- "No under-the-table" enforcement = the app is the only way to place and receive orders (franchisee onboarding contract + technical lock-in via required payment verification in-app)
+
+### References
+- Toast POS — franchise chain management model
+- Shopify Plus — brand + merchant network model
+- Grab/Foodpanda — platform take-rate on each transaction
 
 ---
 

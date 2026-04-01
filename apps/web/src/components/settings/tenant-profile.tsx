@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Settings, Users } from 'lucide-react';
+import { Settings, Users, Palette } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ interface TenantProfileSettingsProps {
 const SETTINGS_NAV = [
   { label: 'Profile', href: 'profile', icon: Settings },
   { label: 'Team & Permissions', href: 'team', icon: Users },
+  { label: 'Appearance', href: 'appearance', icon: Palette },
 ];
 
 export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps) {

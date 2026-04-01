@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { apiFetch } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
+import { setUserRole as persistUserRole } from '@/lib/user-role';
 import { cn } from '@/lib/utils';
 
 type TenantFeatures = {
@@ -71,6 +72,7 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
         if (current?.tenant.features) {
           setFeatures(current.tenant.features);
           setTenantLogoUrl(current.tenant.logoUrl ?? null);
+          persistUserRole(tenantSlug, current.role);
           setUserRole(current.role);
         } else {
           const first = memberships.find((m) => m.status === 'ACTIVE');

@@ -1,4 +1,5 @@
 import { OrdersPanel } from '@/components/orders-panel';
+import { PageHeader } from '@/components/layout/page-header';
 
 type Props = { params: Promise<{ tenantSlug: string }> };
 
@@ -6,10 +7,7 @@ export default async function OrdersPage({ params }: Props) {
   const { tenantSlug } = await params;
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Orders</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Create and manage customer orders.</p>
-      </div>
+      <PageHeader tenantSlug={tenantSlug} title="Orders" description="Create and manage customer orders." />
       <OrdersPanel tenantSlug={tenantSlug} />
     </div>
   );

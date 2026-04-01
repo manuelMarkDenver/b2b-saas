@@ -8,8 +8,6 @@ import {
   CreditCard,
   Boxes,
   Settings,
-  BookOpen,
-  Users,
   GitBranch,
   FileText,
   LogOut,
@@ -54,16 +52,14 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'Catalog & Reports',
+    label: 'Reports',
     items: [
-      { label: 'Catalog', href: '/catalog', icon: BookOpen, featureKey: 'catalog' },
       { label: 'Reports', href: '/reports', icon: FileText, featureKey: 'reports' },
     ],
   },
   {
     label: 'Manage',
     items: [
-      { label: 'Team', href: '/settings/team', icon: Users, featureKey: 'team' },
       { label: 'Branches', href: '/settings/branches', icon: GitBranch },
       { label: 'Settings', href: '/settings', icon: Settings },
     ],
@@ -104,9 +100,14 @@ export function Sidebar({
 
   function isItemActive(item: NavItem) {
     const href = `${base}${item.href}`;
-    return item.href === ''
-      ? pathname === base || pathname === `${base}/`
-      : pathname === href || pathname.startsWith(`${href}/`);
+    if (item.href === '') return pathname === base || pathname === `${base}/`;
+    if (pathname === href) return true;
+    // Prefix match only if no more specific sibling matches the current path
+    const allHrefs = NAV_SECTIONS.flatMap((s) => s.items.map((i) => `${base}${i.href}`));
+    const moreSpecificSiblingMatches = allHrefs.some(
+      (h) => h !== href && h.startsWith(href) && (pathname === h || pathname.startsWith(`${h}/`)),
+    );
+    return !moreSpecificSiblingMatches && pathname.startsWith(`${href}/`);
   }
 
   async function handleLogoUploaded(url: string) {

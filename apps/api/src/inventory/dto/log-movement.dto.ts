@@ -22,4 +22,8 @@ export class LogMovementDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

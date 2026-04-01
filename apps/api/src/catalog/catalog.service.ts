@@ -89,14 +89,47 @@ export class CatalogService {
     });
   }
 
-  async listSkus(tenantId: string, page: number, limit: number) {
+  async listSkus(
+    tenantId: string,
+    page: number,
+    limit: number,
+    filters: { search?: string; categoryId?: string; lowStock?: boolean } = {},
+  ) {
     const skip = (page - 1) * limit;
-    const where = { tenantId, isArchived: false };
+
+    const andClauses: object[] = [{ tenantId }, { isArchived: false }];
+
+    if (filters.search) {
+      andClauses.push({
+        OR: [
+          { name: { contains: filters.search, mode: 'insensitive' } },
+          { code: { contains: filters.search, mode: 'insensitive' } },
+          { product: { name: { contains: filters.search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    if (filters.categoryId) {
+      andClauses.push({ product: { categoryId: filters.categoryId } });
+    }
+    if (filters.lowStock) {
+      // Items with stock at or below their low-stock threshold (minimum 1 to exclude zero-threshold SKUs)
+      andClauses.push({ lowStockThreshold: { gt: 0 }, stockOnHand: { lte: 10 } });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where = { AND: andClauses } as any;
+
     const [data, total] = await this.prisma.$transaction([
       this.prisma.sku.findMany({
         where,
         include: {
-          product: { select: { id: true, name: true } },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              category: { select: { id: true, name: true, slug: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -210,6 +243,82 @@ export class CatalogService {
     ]);
 
     return this.prisma.product.findUnique({ where: { id: productId } });
+  }
+
+  async generateNextSkuCode(tenantId: string, categoryId: string): Promise<string> {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { slug: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+
+    // Derive a 3-char prefix from slug (e.g. "food-beverage" → "FOO", "hardware" → "HRD")
+    const slug = category.slug.replace(/-/g, '').toUpperCase();
+    const prefix = (slug.length >= 3 ? `${slug[0]}${slug[1]}${slug[2]}` : slug.padEnd(3, 'X'));
+
+    const count = await this.prisma.sku.count({
+      where: { tenantId, code: { startsWith: `${prefix}-` } },
+    });
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  async createProductWithStock(
+    tenantId: string,
+    data: {
+      categoryId: string;
+      name: string;
+      priceCents?: number;
+      costCents?: number;
+      initialQty?: number;
+      note?: string;
+      imageUrl?: string;
+    },
+  ) {
+    const category = await this.prisma.category.findUnique({
+      where: { id: data.categoryId },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+
+    const code = await this.generateNextSkuCode(tenantId, data.categoryId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data: { tenantId, categoryId: data.categoryId, name: data.name.trim() },
+      });
+
+      const sku = await tx.sku.create({
+        data: {
+          tenantId,
+          productId: product.id,
+          code,
+          name: data.name.trim(),
+          priceCents: data.priceCents ?? null,
+          costCents: data.costCents ?? null,
+          imageUrl: data.imageUrl ?? null,
+          stockOnHand: 0,
+        },
+      });
+
+      if (data.initialQty && data.initialQty > 0) {
+        await tx.inventoryMovement.create({
+          data: {
+            tenantId,
+            skuId: sku.id,
+            type: 'IN',
+            quantity: data.initialQty,
+            referenceType: 'MANUAL',
+            note: data.note ?? 'Initial stock',
+          },
+        });
+        await tx.sku.update({
+          where: { id: sku.id },
+          data: { stockOnHand: data.initialQty },
+        });
+      }
+
+      return { product, sku };
+    });
   }
 
 }

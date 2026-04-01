@@ -65,11 +65,45 @@ export class CatalogController {
     return this.catalogService.archiveProduct(req.tenant!.id, id, req.membership!.role);
   }
 
+  // Auto-generate next SKU code preview
+  @Get('skus/next-code')
+  @UseGuards(TenantGuard)
+  async getNextSkuCode(@Req() req: RequestWithUser, @Query('categoryId') categoryId: string) {
+    const code = await this.catalogService.generateNextSkuCode(req.tenant!.id, categoryId);
+    return { code };
+  }
+
+  // Create product + SKU + initial stock movement in one transaction
+  @Post('products/with-stock')
+  @UseGuards(TenantGuard)
+  createProductWithStock(@Req() req: RequestWithUser, @Body() body: {
+    categoryId: string;
+    name: string;
+    priceCents?: number;
+    costCents?: number;
+    initialQty?: number;
+    note?: string;
+    imageUrl?: string;
+  }) {
+    return this.catalogService.createProductWithStock(req.tenant!.id, body);
+  }
+
   // SKUs (tenant-scoped)
   @Get('skus')
   @UseGuards(TenantGuard)
-  listSkus(@Req() req: RequestWithUser, @Query() pagination: PaginationDto) {
-    return this.catalogService.listSkus(req.tenant!.id, pagination.page ?? 1, pagination.limit ?? 20);
+  listSkus(
+    @Req() req: RequestWithUser,
+    @Query() pagination: PaginationDto,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('lowStock') lowStock?: string,
+  ) {
+    return this.catalogService.listSkus(
+      req.tenant!.id,
+      pagination.page ?? 1,
+      pagination.limit ?? 20,
+      { search, categoryId, lowStock: lowStock === 'true' },
+    );
   }
 
   @Post('skus')

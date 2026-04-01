@@ -50,6 +50,60 @@ export class ReportsService {
     }));
   }
 
+  async getPaymentsReport({ tenantId, from, to, branchId }: OrdersReportQuery) {
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId,
+        createdAt: { gte: from, lte: to },
+        ...(branchId ? { order: { branchId } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+      include: {
+        order: { select: { id: true, status: true, totalCents: true, customerRef: true } },
+      },
+    });
+    return payments.map((p) => ({
+      id: p.id,
+      orderId: p.orderId,
+      amountCents: p.amountCents,
+      status: p.status,
+      proofUrl: p.proofUrl,
+      createdAt: p.createdAt,
+      orderStatus: p.order.status,
+      orderTotalCents: p.order.totalCents,
+      customerRef: p.order.customerRef,
+    }));
+  }
+
+  async getInventoryReport({ tenantId, from, to }: OrdersReportQuery) {
+    const movements = await this.prisma.inventoryMovement.findMany({
+      where: { tenantId, createdAt: { gte: from, lte: to } },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+      include: {
+        sku: {
+          select: {
+            code: true, name: true, stockOnHand: true,
+            product: { select: { category: { select: { name: true } } } },
+          },
+        },
+      },
+    });
+    return movements.map((m) => ({
+      id: m.id,
+      skuCode: m.sku.code,
+      skuName: m.sku.name,
+      category: m.sku.product.category.name,
+      type: m.type,
+      quantity: m.quantity,
+      approvalStatus: m.approvalStatus,
+      note: m.note,
+      reason: m.reason,
+      createdAt: m.createdAt,
+    }));
+  }
+
   generateOrdersCsv(orders: OrderReportRow[]): string {
     const headers = ['Order ID', 'Date', 'Customer Ref', 'Total (₱)', 'Status', 'Item Count', 'Branch'];
     const rows = orders.map((o) => [

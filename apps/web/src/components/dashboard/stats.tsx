@@ -5,10 +5,12 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { ShoppingCart, CreditCard, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, CreditCard, AlertTriangle, Settings2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
 import { getActiveBranchId, setActiveBranchId } from '@/lib/branch';
+import { isStaff } from '@/lib/user-role';
+import { getDashboardWidgets, setDashboardWidgets, WIDGET_LABELS, type DashboardWidgets } from '@/lib/dashboard-prefs';
 import { DateRangePicker, presetToRange, type DateRange } from './date-range-picker';
 import { BranchBreakdown } from './branch-breakdown';
 
@@ -120,8 +122,17 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   const [range, setRange] = useState<DateRange>(presetToRange('7d'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [widgets, setWidgets] = useState<DashboardWidgets>(() => getDashboardWidgets(tenantSlug));
   // Read active branch from global sidebar state (localStorage)
   const activeBranchId = getActiveBranchId(tenantSlug);
+  const staffOnly = isStaff(tenantSlug);
+
+  function toggleWidget(key: keyof DashboardWidgets) {
+    const updated = { ...widgets, [key]: !widgets[key] };
+    setWidgets(updated);
+    setDashboardWidgets(tenantSlug, updated);
+  }
 
   const load = useCallback(async (r: DateRange) => {
     setLoading(true);
@@ -189,17 +200,52 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Date range control */}
-      <div className="flex items-center justify-between">
+      {/* Date range control + Customize */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           Showing data from <span className="font-medium text-foreground">{range.from}</span> to{' '}
           <span className="font-medium text-foreground">{range.to}</span>
         </p>
-        <DateRangePicker value={range} onChange={handleRangeChange} />
+        <div className="flex items-center gap-2">
+          <DateRangePicker value={range} onChange={handleRangeChange} />
+          <button
+            type="button"
+            onClick={() => setShowCustomize((v) => !v)}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors ${showCustomize ? 'border-primary bg-primary/10 text-primary' : 'border-input bg-background text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            Customize
+          </button>
+        </div>
       </div>
 
+      {/* Widget toggle panel */}
+      {showCustomize && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dashboard widgets</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {(Object.keys(WIDGET_LABELS) as Array<keyof DashboardWidgets>)
+              .filter((k) => {
+                if (staffOnly && (k === 'lowStock' || k === 'revenue' || k === 'revenueChart' || k === 'lowStockChart')) return false;
+                return true;
+              })
+              .map((k) => (
+                <label key={k} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={widgets[k]}
+                    onChange={() => toggleWidget(k)}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  {WIDGET_LABELS[k]}
+                </label>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Branch breakdown — only shown when "All branches" is selected in the sidebar */}
-      {activeBranchId === null && (
+      {activeBranchId === null && widgets.branchBreakdown && (
         <BranchBreakdown
           tenantSlug={tenantSlug}
           range={range}
@@ -209,39 +255,55 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
       )}
 
       {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Orders Today"
-          value={s?.ordersToday ?? 0}
-          description="Orders created today"
-          icon={ShoppingCart}
-        />
-        <StatCard
-          label="Pending Payments"
-          value={s?.pendingPayments ?? 0}
-          description="Confirmed orders awaiting payment"
-          icon={CreditCard}
-          highlight={(s?.pendingPayments ?? 0) > 0}
-        />
-        <StatCard
-          label="Low Stock Items"
-          value={s?.lowStockSkus ?? 0}
-          description="SKUs at or below threshold"
-          icon={AlertTriangle}
-          highlight={(s?.lowStockSkus ?? 0) > 0}
-        />
-        <StatCard
-          label="Revenue (range)"
-          value={formatCents(s?.revenueRangeCents ?? 0)}
-          description="Verified payments in selected range"
-          icon={CreditCard}
-        />
+      <div className={`grid gap-4 sm:grid-cols-2 ${staffOnly ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
+        {widgets.ordersToday && (
+          <StatCard
+            label="Orders Today"
+            value={s?.ordersToday ?? 0}
+            description="Orders created today"
+            icon={ShoppingCart}
+          />
+        )}
+        {widgets.pendingPayments && (
+          <StatCard
+            label="Pending Payments"
+            value={s?.pendingPayments ?? 0}
+            description="Confirmed orders awaiting payment"
+            icon={CreditCard}
+            highlight={(s?.pendingPayments ?? 0) > 0}
+          />
+        )}
+        {!staffOnly && widgets.lowStock && (
+          <StatCard
+            label="Low Stock Items"
+            value={s?.lowStockSkus ?? 0}
+            description="Products at or below threshold"
+            icon={AlertTriangle}
+            highlight={(s?.lowStockSkus ?? 0) > 0}
+          />
+        )}
+        {!staffOnly && widgets.revenue && (
+          <StatCard
+            label="Revenue (range)"
+            value={formatCents(s?.revenueRangeCents ?? 0)}
+            description="Verified payments in selected range"
+            icon={CreditCard}
+          />
+        )}
       </div>
 
-      {/* Charts — row 1 */}
+      {/* Low stock alert badge for staff */}
+      {staffOnly && (s?.lowStockSkus ?? 0) > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-2.5 text-sm text-yellow-800 dark:border-yellow-800/40 dark:bg-yellow-900/20 dark:text-yellow-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span><span className="font-semibold">{s?.lowStockSkus}</span> product{(s?.lowStockSkus ?? 0) !== 1 ? 's' : ''} low on stock — check inventory.</span>
+        </div>
+      )}
+
+      {/* Charts — row 1 (revenue hidden from staff) */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Revenue area chart */}
-        <ChartCard title="Revenue over time">
+        {/* Revenue area chart — owner/admin only */}
+        {!staffOnly && widgets.revenueChart && <ChartCard title="Revenue over time">
           {revenueData.length === 0 ? (
             <EmptyChart message="No verified payments in this range" />
           ) : (
@@ -264,10 +326,10 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
               </AreaChart>
             </ResponsiveContainer>
           )}
-        </ChartCard>
+        </ChartCard>}
 
         {/* Orders per day bar chart */}
-        <ChartCard title="Orders per day">
+        {widgets.ordersChart && <ChartCard title="Orders per day">
           {ordersData.length === 0 ? (
             <EmptyChart message="No orders in this range" />
           ) : (
@@ -279,18 +341,19 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v, 'Orders']}
+                  cursor={{ fill: 'hsl(var(--muted) / 0.4)' }}
                 />
                 <Bar dataKey="orders" fill={CHART_COLORS.orders} radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </ChartCard>
+        </ChartCard>}
       </div>
 
       {/* Charts — row 2 */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Order status donut */}
-        <ChartCard title="Orders by status">
+        {widgets.ordersStatusChart && <ChartCard title="Orders by status">
           {statusData.length === 0 ? (
             <EmptyChart message="No orders in this range" />
           ) : (
@@ -327,10 +390,10 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
               </div>
             </div>
           )}
-        </ChartCard>
+        </ChartCard>}
 
-        {/* Low stock horizontal bar */}
-        <ChartCard title="Low stock SKUs">
+        {/* Low stock horizontal bar — owner/admin only */}
+        {!staffOnly && widgets.lowStockChart && <ChartCard title="Low stock products">
           {lowStockData.length === 0 ? (
             <EmptyChart message="All items are above threshold" />
           ) : (
@@ -350,11 +413,11 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="threshold" fill={CHART_COLORS.threshold} radius={[0, 4, 4, 0]} maxBarSize={14} name="Threshold" isAnimationActive />
-                <Bar dataKey="stock" fill={CHART_COLORS.lowStock} radius={[0, 4, 4, 0]} maxBarSize={14} name="On hand" isAnimationActive />
+                <Bar dataKey="stock" fill={CHART_COLORS.lowStock} radius={[0, 4, 4, 0]} maxBarSize={14} name="In stock" isAnimationActive />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </ChartCard>
+        </ChartCard>}
       </div>
     </div>
   );

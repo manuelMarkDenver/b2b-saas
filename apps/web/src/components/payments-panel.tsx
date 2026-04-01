@@ -9,6 +9,9 @@ import { ProductThumb } from "@/components/product-thumb";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
+import { FilterBar, FilterValues } from "@/components/ui/filter-bar";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { DateRangePicker, presetToRange, type DateRange } from "@/components/dashboard/date-range-picker";
 import {
   Sheet,
   SheetContent,
@@ -107,9 +110,17 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   type Meta = { total: number; page: number; limit: number; totalPages: number };
 
   const [payments, setPayments] = React.useState<Payment[]>([]);
+  const [paymentsMeta, setPaymentsMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [paymentsPage, setPaymentsPage] = React.useState(1);
+  const [paymentFilters, setPaymentFilters] = React.useState<FilterValues>({});
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [ordersMeta, setOrdersMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [ordersPage, setOrdersPage] = React.useState(1);
+  const [payablesFilters, setPayablesFilters] = React.useState<FilterValues>({});
+  const [paymentsDateRange, setPaymentsDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
+  const [payablesDateRange, setPayablesDateRange] = React.useState<DateRange>(() => presetToRange('30d'));
+  const [sortKey, setSortKey] = React.useState<'createdAt' | 'amountCents' | 'status'>('createdAt');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   const [selectedOrderId, setSelectedOrderId] = React.useState("");
@@ -119,12 +130,37 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
   const { pushToast } = useToast();
 
-  async function loadData(oPage = ordersPage) {
+  function toggleSort(key: typeof sortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('desc'); }
+  }
+
+  const sortedPayments = React.useMemo(() => {
+    return [...payments].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      if (sortKey === 'amountCents') return dir * (a.amountCents - b.amountCents);
+      if (sortKey === 'status') return dir * a.status.localeCompare(b.status);
+      return 0;
+    });
+  }, [payments, sortKey, sortDir]);
+
+  async function loadData(oPage = ordersPage, pPage = paymentsPage, pFilters = paymentFilters, oFilters = payablesFilters, pdr = paymentsDateRange, odr = payablesDateRange) {
     setStatus({ kind: "info", text: "Loading payments..." });
     try {
+      const paymentParams = new URLSearchParams({ page: String(pPage), limit: '20' });
+      if (pFilters.status) paymentParams.set('status', pFilters.status as string);
+      paymentParams.set('from', pdr.from);
+      paymentParams.set('to', pdr.to);
+
+      const ordersParams = new URLSearchParams({ page: String(oPage), limit: '20' });
+      if (oFilters.status) ordersParams.set('status', oFilters.status as string);
+      ordersParams.set('from', odr.from);
+      ordersParams.set('to', odr.to);
+
       const [paymentsRes, ordersRes] = await Promise.all([
-        apiFetch("/payments", { tenantSlug }),
-        apiFetch(`/orders?page=${oPage}&limit=20`, { tenantSlug }),
+        apiFetch(`/payments?${paymentParams}`, { tenantSlug }),
+        apiFetch(`/orders?${ordersParams}`, { tenantSlug }),
       ]);
 
       if (!paymentsRes.ok) throw new Error(`Payments failed: ${paymentsRes.status}`);
@@ -135,7 +171,10 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
         ordersRes.json() as Promise<unknown>,
       ]);
 
-      const paymentsList = unwrapList<Payment>(paymentsData);
+      const parsedPayments = paymentsData as { data?: Payment[]; meta?: Meta };
+      const paymentsList = parsedPayments.data ?? unwrapList<Payment>(paymentsData);
+      if (parsedPayments.meta) setPaymentsMeta(parsedPayments.meta);
+
       const parsedOrders = ordersData as { data?: Order[]; meta?: Meta };
       const ordersList = parsedOrders.data ?? unwrapList<Order>(ordersData);
       if (parsedOrders.meta) setOrdersMeta(parsedOrders.meta);
@@ -156,9 +195,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   React.useEffect(() => {
-    void loadData(ordersPage);
+    void loadData(ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange, payablesDateRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug, ordersPage]);
+  }, [tenantSlug, ordersPage, paymentsPage, paymentFilters, payablesFilters, paymentsDateRange, payablesDateRange]);
 
   React.useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
@@ -243,6 +282,44 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
     await loadData();
   }
 
+  function handleExportPayables() {
+    const rows: string[][] = [['Order ID', 'Status', 'Items', 'Total', 'Date']];
+    orders.forEach((o) => {
+      rows.push([
+        o.id,
+        o.status,
+        String(o.items?.length ?? 0),
+        formatCents(o.totalCents),
+        new Date(o.createdAt).toLocaleDateString(),
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'payables.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleExportPayments() {
+    const rows: string[][] = [['Payment ID', 'Order ID', 'Amount', 'Status', 'Date']];
+    payments.forEach((p) => {
+      rows.push([
+        p.id,
+        p.orderId,
+        formatCents(p.amountCents),
+        p.status,
+        new Date(p.createdAt).toLocaleDateString(),
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'payments.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between gap-3">
@@ -278,7 +355,28 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           </div>
         </div>
 
-        <TabsContent value="payables" className="mt-4">
+        <TabsContent value="payables" className="mt-4 space-y-3">
+
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker value={payablesDateRange} onChange={(r) => { setPayablesDateRange(r); setOrdersPage(1); }} />
+          </div>
+
+          <FilterBar
+            collapsible
+            filters={[
+              {
+                type: 'select', key: 'status', label: 'All statuses',
+                options: [
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'CONFIRMED', label: 'Confirmed' },
+                  { value: 'COMPLETED', label: 'Completed' },
+                ],
+              },
+            ]}
+            values={payablesFilters}
+            onChange={(v) => { setPayablesFilters(v); setOrdersPage(1); }}
+            onExport={handleExportPayables}
+          />
 
       <div className="overflow-x-auto rounded-md border border-border/60">
         <div className="min-w-[640px]">
@@ -354,7 +452,27 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
         </TabsContent>
 
-        <TabsContent value="history" className="mt-4">
+        <TabsContent value="history" className="mt-4 space-y-3">
+
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker value={paymentsDateRange} onChange={(r) => { setPaymentsDateRange(r); setPaymentsPage(1); }} />
+          </div>
+          <FilterBar
+            collapsible
+            filters={[
+              {
+                type: 'select', key: 'status', label: 'All statuses',
+                options: [
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'VERIFIED', label: 'Verified' },
+                  { value: 'REJECTED', label: 'Rejected' },
+                ],
+              },
+            ]}
+            values={paymentFilters}
+            onChange={(v) => { setPaymentFilters(v); setPaymentsPage(1); }}
+            onExport={handleExportPayments}
+          />
 
       <div className="overflow-x-auto rounded-md border border-border/60">
         <div className="min-w-[800px]">
@@ -365,7 +483,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
               Review payment history. Pending payments can be verified or rejected.
             </div>
           </div>
-          <div className="text-xs text-muted-foreground">{payments.length} total</div>
+          <div className="text-xs text-muted-foreground">{paymentsMeta.total} total</div>
         </div>
 
         {payments.length === 0 ? (
@@ -374,16 +492,22 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
           <>
             <div className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] gap-3 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <span>Payment</span>
-              <span className="text-right">Amount</span>
+              <button type="button" onClick={() => toggleSort('amountCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                {sortKey === 'amountCents' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Amount
+              </button>
               <span>Order</span>
               <span>Proof</span>
-              <span>Created</span>
-              <span>Status</span>
+              <button type="button" onClick={() => toggleSort('createdAt')} className="flex items-center gap-1 hover:text-foreground">
+                Created {sortKey === 'createdAt' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+              </button>
+              <button type="button" onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-foreground">
+                Status {sortKey === 'status' ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+              </button>
               <span className="text-right">Action</span>
             </div>
 
             <div className="divide-y divide-border/60">
-              {payments.map((payment) => (
+              {sortedPayments.map((payment) => (
                 <div
                   key={payment.id}
                   className="grid grid-cols-[120px_110px_1fr_90px_1fr_120px_220px] items-center gap-3 px-4 py-3 text-sm"
