@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-01 — MS16 complete (11 phases + round-2 UX polish). MS17 drafted: payment method (PH), accounting filters, BOM backlog. Franchise/Ascendex architecture direction added.
+> Last updated: 2026-04-01 — MS16 complete (11 phases + round-2 UX polish). MS17 drafted: payment method (PH), accounting filters, BOM backlog. Product strategy updated: Ascendex (SaaS/subscription) vs MGN (MSME Growth Network International, franchise/one-time fee), PayMongo replaces Stripe, three-surface architecture + isolation model documented.
 
 ---
 
@@ -233,7 +233,7 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 
 | Feature | Status |
 |---------|--------|
-| `Tenant.features` JSONB: `inventory`, `orders`, `payments`, `marketplace` | ✅ |
+| `Tenant.features` JSONB: `inventory`, `orders`, `payments`, `marketplace`, `network` | ✅ (network flag designed; not yet in schema — add when Organization layer is built) |
 | Super Admin role (`isPlatformAdmin: true` on User) | ✅ |
 | Super Admin dashboard: tenant list, feature flag toggle, user management | ✅ |
 | `POST /admin/tenants` — Super Admin creates tenants | ✅ |
@@ -540,7 +540,7 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | Customer auth | Separate from staff auth. `CustomerProfile` ≠ `TenantMembership` |
 | Multi-tenant cart | Splits into separate orders per tenant at checkout |
 | Inventory reservation | `reservedQty` on listing, 30-min TTL |
-| Payment gateway | Stripe / PayMongo — NOT manual proof upload |
+| Payment gateway | PayMongo — NOT manual proof upload (GCash, Maya, cards, recurring billing — PH-native) |
 | Feature flag | `marketplace: true` per tenant, controlled by Super Admin |
 
 ---
@@ -593,8 +593,8 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | **Customer-Seller Chat** | 🔒 Locked | Post-Phase 7 | Customer portal | Two tracks: (1) **Internal order notes** — staff/admin attach notes to a specific order, visible within the ERP; low-effort, high-value for B2B ops. (2) **Buyer-facing portal chat** — real-time or async messaging between buyer and seller, tied to an order/session; requires buyer auth, separate portal surface, and WebSocket infra. Do Track 1 first. Track 2 only after the marketplace (Phase 7) is live and validated. |
 | **Bill of Materials (BOM) / Recipe Management** | 🟡 Medium | Post-Phase 5 | Stable inventory | ERP term: a finished product is made from N raw material components. Creating 50 pizzas auto-deducts flour, sauce, cheese, etc. Two patterns: (1) **Production BOM** — transform raw → finished goods (production order workflow); (2) **Sales Bundle** — composite SKU that deducts components on each sale. Schema: `SkuComponent(parentSkuId, componentSkuId, quantity)`. When a movement hits a composite SKU, child movements auto-generate for each component. UI: recipe builder on SKU edit page + production order log. Direct value for Metro Pizza Supply (ingredient portioning/pre-packing) and Megabox (product bundles). |
 | **i18n + Language Switcher** | 🟢 Low | Post-Phase 5 | Stable UI | All strings currently hardcoded in components — no translation layer. Solution: `next-intl` (Next.js App Router standard). Requires extracting all UI strings to locale JSON files. Large but mechanical lift. Revenue-gate this: only invest when non-English market is validated. ₱ + PH locale already in place. |
-| **Franchise Network / Organization Layer** | 🔒 Locked | Post-Phase 7 | Multi-tenant stable | Enables your brother's franchise model: each franchisee = a tenant, grouped under an Organization (the franchisor). Features: cross-tenant revenue dashboard, platform take-rate on every transaction (auto-recorded), no under-the-table transactions enforced by the app being the only checkout. Schema additions: `Organization(id, name, takeRateBps)`, `OrganizationMember(orgId, tenantId, role)`. The franchisor sees real gross income per franchisee. This is the `MARKETPLACE` feature flag plan tier. Do NOT fork the codebase — this is the same product with a higher-tier plan enabled. See "Ascendex / One Codebase" strategy below. |
-| **Ascendex SaaS — Subscription Billing** | 🔒 Locked | Post-Phase 6 | Go-to-market live | Add `Plan` enum to Tenant: `STARTER → PROFESSIONAL → ENTERPRISE → MARKETPLACE`. Gate features by plan. Billing via Stripe (recurring subscriptions). This IS the productized version of this platform. Same monorepo, same code — no fork. A separate "Ascendex" brand is just a domain + marketing skin on top of this. |
+| **Franchise Network / Organization Layer (MGN)** | 🔒 Locked | Post-Phase 7 | Multi-tenant stable | Enables MGN (MSME Growth Network International) franchise model. Income model: one-time joining fee (via PayMongo) + platform take-rate % on every transaction. The commission/MLM tree is **agent-based** — agents recruit other agents and earn commissions when their downline transacts. Two design options are **open** (decision deferred — needs business rule confirmation): **(A) Tenant-as-agent** — each franchisee/tenant IS an agent node (simpler; works if every agent also runs their own ERP business); **(B) Dedicated agent entity** — `Agent` is its own record, separate from `Tenant` (a pure recruiter who earns commissions but doesn't need an ERP tenant). See "Product Strategy — MGN Network" section. Gated by `features.network: true`. |
+| **Ascendex SaaS — Subscription Billing** | 🔒 Locked | Post-Phase 6 | Go-to-market live | Add `Plan` enum to Tenant: `STARTER → PROFESSIONAL → ENTERPRISE → MARKETPLACE`. Gate features by plan. Billing via PayMongo (recurring subscriptions, PH-native — supports GCash, Maya, cards). This IS the productized version of this platform. Same monorepo, same code — no fork. A separate "Ascendex" brand is just a domain + marketing skin on top of this. |
 
 ---
 
@@ -602,35 +602,104 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 
 > Decision record: 2026-04-01. Do not revisit until Phase 6 is live.
 
-### The vision
+### Two brands, one codebase
 
-Three future products are being considered:
-1. **Ascendex SaaS** — multi-tenant ERP sold via subscription to any SMB
-2. **Franchise Network platform** — a specific customer (distributor/franchise owner) wants all their franchisees' transactions to flow through a single app, takes a platform % on every transaction, monitors real income per franchisee, eliminates under-the-table deals
-3. **Marketplace** (Phase 7) — buyer-facing storefront
+| Brand | Owner | Business model | Surface |
+|-------|-------|---------------|---------|
+| **Ascendex** | You (the builder) | SaaS subscription — SMB pays monthly/annually via PayMongo recurring | `apps/marketing` (Ascendex site) + ERP |
+| **MGN (MSME Growth Network International)** | Your brother's company | One-time joining fee per franchisee/distributor (via PayMongo) + platform take-rate % on every transaction | `apps/marketing-mgn` (MGN site) + ERP + Marketplace |
+
+> These are NOT two separate products. Same codebase, same ERP, same API. Different plan tier and feature flags.
+> You are the builder and platform owner. MGN is an enterprise licensee/customer of the platform.
+
+### Three surfaces
+
+| Surface | What it is | Who sees it |
+|---------|-----------|-------------|
+| **ERP** (`apps/web`) | The core product — inventory, orders, payments, reports | All tenants (both Ascendex clients and MGN franchisees) |
+| **Ascendex Marketing** (`apps/marketing`) | Ascendex brand site, self-serve signup CTA, PayMongo subscription onboarding | Prospects who find Ascendex directly |
+| **MGN Marketing** (`apps/marketing-mgn`) | MGN brand site, demo-focused (MGN sales team closes deals), PayMongo one-time joining fee | MGN prospects and franchisee applicants |
+| **Marketplace** (`/marketplace`) | Phase 7 — buyer-facing storefront. MGN-exclusive (`features.marketplace: true`) | End customers of MGN franchisees |
 
 ### The answer: one codebase, multiple plan tiers
 
-Do NOT fork. Do NOT duplicate repos. All three are the same product at different plan tiers:
+Do NOT fork. Do NOT duplicate repos. All surfaces run from the same monorepo:
 
-| Plan | Who uses it | Key features |
-|------|-------------|--------------|
-| `STARTER` | Single SMB owner | Current ERP features |
-| `PROFESSIONAL` | Multi-branch SMB | + Branch management, advanced reports |
-| `ENTERPRISE` | Large operator | + Team management, audit log, advanced permissions |
-| `MARKETPLACE` | Franchise/distributor network | + Organization layer, cross-tenant dashboard, platform take-rate, forced-through-app checkout |
+| Plan | Who uses it | Key features | Gated by |
+|------|-------------|--------------|---------|
+| `STARTER` | Single SMB owner (Ascendex) | Current ERP features | Default |
+| `PROFESSIONAL` | Multi-branch SMB | + Branch management, advanced reports | `features.*` |
+| `ENTERPRISE` | Large operator | + Team management, audit log, advanced permissions | `features.*` |
+| `MARKETPLACE` | MGN franchise/distributor network | + Organization layer, cross-tenant dashboard, take-rate ledger, marketplace, MLM tree | `features.network: true` + `features.marketplace: true` |
 
-### Franchise model architecture (when built)
-- Each franchisee = a Tenant (already exists)
-- Franchise network = `Organization` model (groups Tenants under a franchisor)
-- `Organization.takeRateBps` = platform % (basis points) applied to every order amount
-- Franchisor gets an org-level dashboard: real gross revenue per franchisee, total platform take, per-transaction ledger
-- "No under-the-table" enforcement = the app is the only way to place and receive orders (franchisee onboarding contract + technical lock-in via required payment verification in-app)
+### Feature flag isolation model (3 layers)
+
+| Layer | Mechanism | What it isolates |
+|-------|-----------|-----------------|
+| **1 — Feature flags** | `Tenant.features` JSONB (`network`, `marketplace`, `orders`, etc.) | UI panels and API routes per tenant |
+| **2 — Organization scope** | `organizationId` on tenant, org-level guards | Cross-tenant data access (MGN franchisor sees all franchisees; Ascendex clients never see each other) |
+| **3 — Tenant isolation** | `tenantId` on every row, `TenantGuard` on every API route | Data-level: no tenant can ever read another tenant's orders/inventory/payments |
+
+> `features.network: true` = MGN-tier. Never set on a standard Ascendex tenant.
+> Standard Ascendex tenants have `network: false` and `marketplace: false` — no MGN UI or data leaks through.
+
+### MGN network/agent model architecture (when built)
+
+- Franchise network = `Organization` model grouping participants under a franchisor (MGN)
+- `Organization.takeRateBps` = platform % on every transaction
+- Franchisor dashboard: real gross revenue per agent/franchisee, total platform take, per-transaction ledger
+- "No under-the-table" enforcement: the app is the only checkout path
+- Joining fee: paid via PayMongo one-time payment before access is provisioned
+
+#### Agent model — decision pending (two options open)
+
+**Option A — Tenant as Agent** (simpler)
+- Every agent IS a tenant (runs their own ERP business on the platform)
+- `NetworkNode(id, orgId, tenantId, parentNodeId)` — the tree maps tenants
+- Commission fires when a payment under any tenant-node is verified
+- Works when: every agent in the network is also a franchisee operating their own business
+
+**Option B — Dedicated Agent entity** (more flexible)
+- `Agent(id, orgId, userId?, tenantId?, name, code, status)` — separate record, may or may not be linked to a tenant
+- A pure recruiter (earns commissions, doesn't run their own store/ERP) is Agent only
+- A franchisee who also recruits has both `Tenant` + `Agent` records, linked via `tenantId`
+- `NetworkNode(id, orgId, agentId, parentNodeId)` — tree maps agents
+- Works when: some network participants are recruiters only, not operators
+
+#### What both options share (the common core)
+```
+NetworkNode   id, orgId, parentNodeId, [tenantId | agentId]
+Commission    id, networkNodeId, paymentId, orderId,
+              grossAmountCents, bps, commissionAmountCents,
+              status (PENDING | PAID | VOIDED), paidAt
+```
+- Commission calculated on each `Payment.status → VERIFIED`
+- Tree walk: node → parent → grandparent → ... (each ancestor earns their configured bps)
+- Payout: batch-mark commissions PAID + record payout date
+
+#### Decision gates (before building)
+- Do all agents in MGN's network also run their own ERP business? → Option A
+- Are there pure recruiters who earn commissions but don't operate? → Option B
+- How many levels deep does commission propagate? (industry standard: 3–5 levels)
+- Are commission rates fixed org-wide or per-node/per-level?
+- What happens to commissions when an order is cancelled post-verification?
+
+### Payment gateway — PayMongo (PH-native)
+
+> **Stripe is not the right choice for the Philippines.** PayMongo is used instead throughout.
+
+| Use case | PayMongo feature |
+|----------|-----------------|
+| Ascendex monthly subscriptions | Recurring billing (PayMongo Subscriptions) |
+| MGN one-time joining fee | One-time payment link |
+| Marketplace checkout (Phase 7) | Checkout Session (GCash, Maya, cards) |
+| Manual proof upload (current) | Not PayMongo — this is the manual fallback for pre-gateway |
 
 ### References
 - Toast POS — franchise chain management model
 - Shopify Plus — brand + merchant network model
-- Grab/Foodpanda — platform take-rate on each transaction
+- Grab / Foodpanda — platform take-rate on each transaction
+- PayMongo — PH payment gateway (GCash, Maya, cards, recurring)
 
 ---
 
