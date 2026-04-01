@@ -15,8 +15,12 @@ export class UploadsService {
     this.storageType = this.config.get<string>('storage.type') ?? 'local';
 
     if (this.storageType === 's3') {
+      const endpoint = this.config.get<string>('storage.aws.endpoint');
       this.s3Client = new S3Client({
-        region: this.config.get<string>('storage.aws.region') ?? 'us-east-1',
+        // For Cloudflare R2: region must be 'auto'; for AWS S3: your bucket region
+        region: this.config.get<string>('storage.aws.region') ?? 'auto',
+        // R2 requires a custom endpoint; omit for standard AWS S3
+        ...(endpoint ? { endpoint } : {}),
         credentials: {
           accessKeyId: this.config.get<string>('storage.aws.accessKeyId') ?? '',
           secretAccessKey: this.config.get<string>('storage.aws.secretAccessKey') ?? '',
@@ -67,6 +71,12 @@ export class UploadsService {
     );
 
     const base = this.s3PublicUrl ?? `https://${this.s3Bucket}.s3.amazonaws.com`;
+
+    // Clean up the temp disk file written by multer (not needed after S3 upload)
+    if (file.path) {
+      fs.unlink(file.path, () => { /* ignore errors — file may already be gone */ });
+    }
+
     return `${base}/${key}`;
   }
 }

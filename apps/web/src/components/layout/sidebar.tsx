@@ -21,6 +21,7 @@ import { isFeatureActive } from '@repo/shared';
 import { BranchSwitcher } from '@/components/branch-switcher';
 import { NotificationBell } from '@/components/notifications/bell';
 import { ModeToggle } from '@/components/mode-toggle';
+import { platformConfig } from '@/lib/platform-config';
 
 export type TenantFeatures = Record<string, boolean>;
 
@@ -122,6 +123,18 @@ export function Sidebar({
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-background">
+      {/* Platform header — swappable for white-label via NEXT_PUBLIC_PLATFORM_* env vars */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/50">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={platformConfig.logoIconUrl}
+          alt={platformConfig.name}
+          className="h-5 w-5 shrink-0"
+          style={{ color: 'currentcolor' }}
+        />
+        <span className="text-sm font-bold tracking-tight">{platformConfig.name}</span>
+      </div>
+
       {/* Workspace header */}
       <div className="px-4 pt-5 pb-4 border-b border-border">
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">

@@ -35,6 +35,7 @@ export function configuration(env: Env) {
         secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
         bucket: env.AWS_S3_BUCKET,
         publicUrl: env.AWS_S3_PUBLIC_URL,
+        endpoint: env.AWS_S3_ENDPOINT,
       },
     },
   };

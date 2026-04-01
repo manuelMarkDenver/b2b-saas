@@ -1,32 +1,52 @@
 services:
   - type: web
-    name: b2b-saas-api
+    name: ascendex-api
     runtime: node
-    rootDir: apps/api
-    buildCommand: npm install && npm run build
-    startCommand: node dist/main
+    # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter api build
+    startCommand: node apps/api/dist/main
+    # Runs prisma migrate deploy before every new release goes live
+    preDeployCommand: pnpm --filter @repo/db run migrate:deploy
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: "3001"
+
+      # ── Database ──────────────────────────────────────────────────────────
       - key: DATABASE_URL
-        sync: false   # Set in Render dashboard — Neon connection string
+        sync: false   # Neon connection string — set in Render dashboard
+
+      # ── Auth ─────────────────────────────────────────────────────────────
       - key: JWT_SECRET
-        sync: false   # Set in Render dashboard — random 64-char string
+        sync: false   # Random 64-char string — set in Render dashboard
       - key: JWT_EXPIRES_IN_SECONDS
         value: "86400"
+
+      # ── Logging ──────────────────────────────────────────────────────────
       - key: LOG_LEVEL
         value: info
       - key: LOG_PRETTY
         value: "false"
+
+      # ── Rate limiting ─────────────────────────────────────────────────────
       - key: THROTTLE_TTL
         value: "60000"
       - key: THROTTLE_LIMIT
-        value: "10"
+        value: "100"
+
+      # ── CORS — set to your Vercel URL after first deploy ─────────────────
       - key: CORS_ALLOWED_ORIGINS
-        sync: false   # Set in Render dashboard — your Vercel URL
+        sync: false   # e.g. https://ascendex.vercel.app,https://app.ascendex.ph
+
+      # ── URLs ─────────────────────────────────────────────────────────────
+      - key: APP_BASE_URL
+        sync: false   # This service's URL: https://ascendex-api.onrender.com
+      - key: APP_FRONTEND_URL
+        sync: false   # Vercel URL: https://ascendex.vercel.app
+
+      # ── Email (Resend) ────────────────────────────────────────────────────
       - key: SMTP_HOST
         value: smtp.resend.com
       - key: SMTP_PORT
@@ -34,8 +54,22 @@ services:
       - key: SMTP_USER
         value: resend
       - key: SMTP_PASS
-        sync: false   # Set in Render dashboard — Resend API key
+        sync: false   # Resend API key — set in Render dashboard
       - key: SMTP_FROM
-        sync: false   # Set in Render dashboard — e.g. noreply@yourplatform.com
-      - key: APP_BASE_URL
-        sync: false   # Set in Render dashboard — your Vercel URL
+        sync: false   # e.g. noreply@ascendex.ph
+
+      # ── File storage (Cloudflare R2) ──────────────────────────────────────
+      - key: STORAGE_TYPE
+        value: s3     # 's3' works for both AWS S3 and Cloudflare R2
+      - key: AWS_REGION
+        value: auto   # R2 uses 'auto'; for AWS S3 use your bucket region
+      - key: AWS_S3_ENDPOINT
+        sync: false   # R2: https://<account-id>.r2.cloudflarestorage.com
+      - key: AWS_ACCESS_KEY_ID
+        sync: false   # R2 Access Key ID — set in Render dashboard
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false   # R2 Secret Access Key — set in Render dashboard
+      - key: AWS_S3_BUCKET
+        sync: false   # R2 bucket name, e.g. ascendex-uploads
+      - key: AWS_S3_PUBLIC_URL
+        sync: false   # R2 public URL, e.g. https://pub-xxxx.r2.dev
