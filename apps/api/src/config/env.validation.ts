@@ -28,7 +28,8 @@ export const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_S3_BUCKET: z.string().optional(),
-  AWS_S3_PUBLIC_URL: z.string().optional(), // e.g. https://cdn.yourdomain.com
+  AWS_S3_PUBLIC_URL: z.string().optional(),  // e.g. https://pub-xxxx.r2.dev
+  AWS_S3_ENDPOINT: z.string().optional(),    // R2: https://<account-id>.r2.cloudflarestorage.com (omit for AWS S3)
 });
 
 export type Env = z.infer<typeof envSchema>;
