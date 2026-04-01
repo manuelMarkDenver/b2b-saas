@@ -14,11 +14,14 @@ export function Footer() {
         <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-2">
-            <a href="/" className="flex items-center gap-2 font-bold text-xl text-white mb-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-black text-sm">
-                Op
+            <a href="/" className="flex items-center gap-2 mb-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-black text-sm shrink-0">
+                {brand.logoAbbr}
               </span>
-              {brand.logoText}
+              <div className="leading-tight">
+                <p className="font-bold text-xl text-white leading-none">{brand.logoText}</p>
+                <p className="text-[10px] text-slate-500 leading-none">by {brand.parentCompany}</p>
+              </div>
             </a>
             <p className="text-sm text-slate-400 max-w-xs leading-relaxed">{footer.tagline}</p>
             <p className="mt-4 text-xs text-slate-500">{footer.madeIn}</p>

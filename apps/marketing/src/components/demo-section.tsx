@@ -140,7 +140,7 @@ export function DemoSection() {
                 <span className="h-3 w-3 rounded-full bg-yellow-500/70" />
                 <span className="h-3 w-3 rounded-full bg-emerald-500/70" />
                 <div className="ml-3 flex-1 rounded-md bg-slate-700 h-5 max-w-xs text-xs text-slate-400 flex items-center px-3">
-                  app.operix.io
+                  app.zentral.ph
                 </div>
               </div>
 

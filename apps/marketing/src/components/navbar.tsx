@@ -24,11 +24,14 @@ export function Navbar() {
     >
       <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-16">
         {/* Logo */}
-        <a href="/" className="flex items-center gap-2 font-bold text-xl text-slate-900">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-black text-sm">
-            Op
+        <a href="/" className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-black text-sm shrink-0">
+            {brand.logoAbbr}
           </span>
-          {brand.logoText}
+          <div className="leading-tight">
+            <p className="font-bold text-xl text-slate-900 leading-none">{brand.logoText}</p>
+            <p className="text-[10px] text-slate-400 leading-none">by {brand.parentCompany}</p>
+          </div>
         </a>
 
         {/* Desktop nav */}
