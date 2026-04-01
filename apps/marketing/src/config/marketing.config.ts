@@ -15,8 +15,6 @@ export const marketingConfig = {
     subheadline:
       'Zentral brings inventory, orders, payments, and your team into one place — so you can focus on growth, not admin.',
     logoText: 'Zentral',
-    /** Two-letter badge shown in navbar/footer logo mark */
-    logoAbbr: 'Zn',
     /** Parent company — shown as "by Ascendex" under logo and in copyright */
     parentCompany: 'Ascendex',
   },

@@ -14,10 +14,12 @@ export function Footer() {
         <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-2">
-            <a href="/" className="flex items-center gap-2 mb-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-black text-sm shrink-0">
-                {brand.logoAbbr}
-              </span>
+            <a href="/" className="flex items-center gap-3 mb-3">
+              <svg className="h-9 w-9 shrink-0 text-indigo-400" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                <rect x="1" y="15" width="6" height="8" rx="1.5" fill="currentColor" opacity="0.35"/>
+                <rect x="9" y="9" width="6" height="14" rx="1.5" fill="currentColor" opacity="0.65"/>
+                <rect x="17" y="2" width="6" height="21" rx="1.5" fill="currentColor"/>
+              </svg>
               <div className="leading-tight">
                 <p className="font-bold text-xl text-white leading-none">{brand.logoText}</p>
                 <p className="text-[10px] text-slate-500 leading-none">by {brand.parentCompany}</p>
