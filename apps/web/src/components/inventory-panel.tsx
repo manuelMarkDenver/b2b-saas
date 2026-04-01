@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Pencil } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Pencil, Upload } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -16,6 +16,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/components/ui/toast';
 import { ProductThumb } from '@/components/product-thumb';
 import { ImageUpload } from '@/components/image-upload';
+import {
+  parseCsvPreview, validateCsvHeaders, allHeadersPresent,
+  REQUIRED_CSV_HEADERS, CATALOG_CSV_COLUMNS,
+  type CsvPreview,
+} from '@/lib/csv';
 
 type Category = { id: string; name: string; slug: string };
 
@@ -107,6 +112,21 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [editSku, setEditSku] = useState<Sku | null>(null);
   const [editForm, setEditForm] = useState({ name: '', costCents: '', priceCents: '', lowStockThreshold: '', imageUrl: '' });
   const [editSaving, setEditSaving] = useState(false);
+
+  // CSV import dialog
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  // Auto-parse CSV as soon as a file is selected — gives instant preview feedback
+  useEffect(() => {
+    if (!importFile) { setCsvPreview(null); return; }
+    importFile.text().then((text) => setCsvPreview(parseCsvPreview(text)));
+  }, [importFile]);
 
   // Movement sort
   const [movSortKey, setMovSortKey] = useState<'createdAt' | 'quantity' | 'type'>('createdAt');
@@ -366,6 +386,32 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
     }
   }
 
+  async function handleCsvImport() {
+    if (!importFile || !csvPreview || !allHeadersPresent(csvPreview.headers)) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      const res = await apiFetch('/catalog/import', { tenantSlug, method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json() as { message?: string };
+        pushToast({ variant: 'error', title: 'Import failed', message: err.message ?? `Error ${res.status}` });
+        return;
+      }
+      const result = await res.json() as typeof importResult;
+      setImportResult(result);
+      setImportFile(null);
+      setCsvPreview(null);
+      if (importFileRef.current) importFileRef.current.value = '';
+      const summary = `${result!.imported} added, ${result!.updated} updated, ${result!.skipped} skipped`;
+      pushToast({ variant: result!.errors.length > 0 ? 'error' : 'success', title: 'Import complete', message: summary });
+      if (result!.imported > 0 || result!.updated > 0) loadSkus();
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   function handleExportMovements() {
     const rows: string[][] = [['Product', 'SKU', 'Type', 'Qty', 'Status', 'Note', 'Reason', 'Actor', 'Date']];
     movements.forEach((m) => {
@@ -441,6 +487,12 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             <Button variant="outline" onClick={() => setAddOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               Adjust Stock
+            </Button>
+          )}
+          {!staffMode && (
+            <Button variant="outline" onClick={() => { setImportOpen(true); setImportResult(null); setImportFile(null); setCsvPreview(null); }}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              Import CSV
             </Button>
           )}
           <Button onClick={() => setProductOpen(true)}>
@@ -1047,6 +1099,155 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── CSV Import dialog ──────────────────────────────────────────────── */}
+      <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) { setImportFile(null); setCsvPreview(null); setImportResult(null); } }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Products from CSV</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            {/* Instructions + template download */}
+            <div className="flex items-start justify-between gap-4 rounded-lg bg-muted/50 px-4 py-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">How it works</p>
+                <p className="text-xs text-muted-foreground">
+                  Upload a CSV with the required columns. Existing SKU codes are updated; new ones are created.
+                  Download the template to see sample data for every column.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="shrink-0 text-xs font-medium text-primary underline-offset-2 hover:underline"
+                onClick={() => {
+                  const header = REQUIRED_CSV_HEADERS.join(',');
+                  const sample = CATALOG_CSV_COLUMNS.map((c) => c.example).join(',');
+                  const blob = new Blob([[header, sample].join('\n')], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'zentral-products-template.csv'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download template
+              </button>
+            </div>
+
+            {/* Drop zone */}
+            <div
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'border-border/60 hover:border-border'}`}
+              onClick={() => importFileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setImportFile(f); }}
+            >
+              <input ref={importFileRef} type="file" accept=".csv,text/csv" className="hidden"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
+              {importFile ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <Upload className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{importFile.name}</span>
+                  <button type="button" className="text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setImportFile(null); if (importFileRef.current) importFileRef.current.value = ''; }}>
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Upload className="mx-auto h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Drop your CSV here or <span className="text-primary">browse</span></p>
+                  <p className="text-xs text-muted-foreground/60">Accepts .csv files only</p>
+                </div>
+              )}
+            </div>
+
+            {/* Column validation — appears once file is parsed */}
+            {csvPreview && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Column check ({validateCsvHeaders(csvPreview.headers).filter((v) => v.present).length}/{REQUIRED_CSV_HEADERS.length} required)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {validateCsvHeaders(csvPreview.headers).map((v) => (
+                      <span key={v.key} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${v.present ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                        {v.present ? '✓' : '✗'} {v.label}
+                      </span>
+                    ))}
+                  </div>
+                  {!allHeadersPresent(csvPreview.headers) && (
+                    <p className="text-xs text-destructive">
+                      Fix the missing columns above, then re-upload. Download the template to see the exact header names.
+                    </p>
+                  )}
+                </div>
+
+                {/* Preview table */}
+                {allHeadersPresent(csvPreview.headers) && csvPreview.rows.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Preview — first {csvPreview.rows.length} of {csvPreview.totalRows} rows
+                    </p>
+                    <div className="overflow-x-auto rounded-lg border border-border/60">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            {csvPreview.headers.map((h) => (
+                              <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40">
+                          {csvPreview.rows.map((row, i) => (
+                            <tr key={i} className="hover:bg-muted/30">
+                              {row.map((cell, j) => (
+                                <td key={j} className="px-3 py-2 text-foreground/80 whitespace-nowrap max-w-[160px] truncate" title={cell}>{cell || <span className="text-muted-foreground/40">—</span>}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">{csvPreview.totalRows}</span> total rows will be processed
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Post-import result summary */}
+            {importResult && (
+              <div className="space-y-2">
+                <div className="flex gap-4 text-xs">
+                  <span className="font-semibold text-green-600">{importResult.imported} added</span>
+                  <span className="font-semibold text-blue-600">{importResult.updated} updated</span>
+                  <span className="text-muted-foreground">{importResult.skipped} skipped</span>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="max-h-28 overflow-y-auto rounded-lg bg-destructive/10 p-2 space-y-1">
+                    {importResult.errors.map((e) => (
+                      <p key={e.row} className="text-xs text-destructive">Row {e.row}: {e.reason}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>Close</Button>
+            <Button
+              disabled={!importFile || !csvPreview || !allHeadersPresent(csvPreview.headers) || importLoading}
+              onClick={handleCsvImport}
+            >
+              <Upload className="mr-1.5 h-4 w-4" />
+              {importLoading ? 'Importing…' : `Import ${csvPreview?.totalRows ?? ''} rows`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
