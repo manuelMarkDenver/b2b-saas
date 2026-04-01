@@ -49,13 +49,6 @@ export function AppearanceSettings({ tenantSlug }: { tenantSlug: string }) {
 
       {/* Appearance content */}
       <div className="flex-1 space-y-4">
-        <div>
-          <h1 className="text-lg font-semibold">Appearance</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Customize how the app looks on your device.
-          </p>
-        </div>
-
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="space-y-3">
             <p className="text-sm font-medium">Theme</p>
