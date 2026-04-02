@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { MovementType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
@@ -6,6 +7,28 @@ import { CreateTransferDto } from './dto/create-transfer.dto';
 @Injectable()
 export class TransfersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async getBranchStock(tenantId: string, branchId: string) {
+    const movements = await this.prisma.inventoryMovement.findMany({
+      where: {
+        tenantId,
+        branchId,
+        approvalStatus: 'APPROVED',
+        type: { in: [MovementType.IN, MovementType.OUT, MovementType.TRANSFER_IN, MovementType.TRANSFER_OUT] },
+      },
+      select: { skuId: true, type: true, quantity: true },
+    });
+
+    const stock = new Map<string, number>();
+    for (const m of movements) {
+      const delta =
+        m.type === MovementType.OUT || m.type === MovementType.TRANSFER_OUT
+          ? -m.quantity
+          : m.quantity;
+      stock.set(m.skuId, (stock.get(m.skuId) ?? 0) + delta);
+    }
+    return stock;
+  }
 
   async create(tenantId: string, userId: string, dto: CreateTransferDto) {
     if (dto.fromBranchId && dto.fromBranchId === dto.toBranchId) {
@@ -34,12 +57,25 @@ export class TransfersService {
       throw new NotFoundException('One or more SKUs not found');
     }
 
-    for (const item of dto.items) {
-      const sku = skus.find((s) => s.id === item.skuId)!;
-      if (sku.stockOnHand < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for ${sku.name} (${sku.code}): available ${sku.stockOnHand}, requested ${item.quantity}`,
-        );
+    if (dto.fromBranchId) {
+      const branchStock = await this.getBranchStock(tenantId, dto.fromBranchId);
+      for (const item of dto.items) {
+        const available = branchStock.get(item.skuId) ?? 0;
+        if (available < item.quantity) {
+          const sku = skus.find((s) => s.id === item.skuId)!;
+          throw new BadRequestException(
+            `Insufficient stock at source branch for ${sku.name} (${sku.code}): available ${available}, requested ${item.quantity}`,
+          );
+        }
+      }
+    } else {
+      for (const item of dto.items) {
+        const sku = skus.find((s) => s.id === item.skuId)!;
+        if (sku.stockOnHand < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for ${sku.name} (${sku.code}): available ${sku.stockOnHand}, requested ${item.quantity}`,
+          );
+        }
       }
     }
 
@@ -66,22 +102,26 @@ export class TransfersService {
       for (const item of dto.items) {
         const pairId = randomUUID();
 
-        // TRANSFER_OUT — goods leave source; no stockOnHand change (tenant-wide stock)
-        await tx.inventoryMovement.create({
-          data: {
-            tenantId,
-            skuId: item.skuId,
-            type: 'TRANSFER_OUT',
-            quantity: item.quantity,
-            referenceType: 'TRANSFER',
-            referenceId: transfer.id,
-            branchId: dto.fromBranchId ?? null,
-            transferPairId: pairId,
-            actorId: userId,
-          },
-        });
+        if (dto.fromBranchId) {
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId,
+              skuId: item.skuId,
+              type: 'TRANSFER_OUT',
+              quantity: item.quantity,
+              referenceType: 'TRANSFER',
+              referenceId: transfer.id,
+              branchId: dto.fromBranchId,
+              transferPairId: pairId,
+              actorId: userId,
+            },
+          });
+          await tx.sku.update({
+            where: { id: item.skuId },
+            data: { stockOnHand: { decrement: item.quantity } },
+          });
+        }
 
-        // TRANSFER_IN — goods arrive at destination; no stockOnHand change (tenant-wide stock)
         await tx.inventoryMovement.create({
           data: {
             tenantId,
@@ -94,6 +134,10 @@ export class TransfersService {
             transferPairId: pairId,
             actorId: userId,
           },
+        });
+        await tx.sku.update({
+          where: { id: item.skuId },
+          data: { stockOnHand: { increment: item.quantity } },
         });
       }
 

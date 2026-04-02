@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-02 — MS19d complete: partial payments, BranchType, stockTransfers/paymentTerms flags. MS17: payment method (PH), accounting filters. Product strategy: Ascendex (SaaS) vs MGN (franchise), PayMongo, three-surface architecture.
+> Last updated: 2026-04-02 — MS19e: branch stock transfer fix. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo.
 
 ---
 
@@ -42,7 +42,8 @@
 | 7 | MS16 — UI/UX overhaul (inventory, filters, stock approvals, reports, dashboard widgets) | ✅ Done | Branch `milestone-16/ui-ux-overhaul` — 11 phases |
 | 8 | Partial payments (MS19) | ✅ Done | `POST /orders/:id/pay`, overpayment guard, paid/balance computed, UI shows payment history |
 | 9 | BranchType UI (MS19c) | ✅ Done | BranchType enum in schema, badge in page header + branch switcher |
-| 10 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 10 | Branch stock transfer fix (MS19e) | ✅ Done | Derived branch stock from movements, transfer updates tenant-wide stock |
+| 11 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
@@ -116,6 +117,7 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 27 | `uploads` controller missing `TenantGuard` | ❌ Open | `uploads.controller.ts:23` — any authenticated user can upload regardless of tenant. Add `TenantGuard` and scope files under `tenantId/`. |
 | 28 | Hardcoded tenant slugs in `tenant-theme.ts` | ❌ Open | `tenant-theme.ts:46,62` — `peak-hardware` and `corner-general` baked into frontend theming. Move to a `theme` JSON column on `Tenant` before real clients onboard. |
 | 33 | No partial payments / AR tracking | ✅ MS19 | `POST /orders/:id/pay`, computed balance, payment history UI |
+| 34 | Stock transfer doesn't update stockOnHand | ✅ MS19e | Transfer OUT/IN now updates tenant-wide stock; branch stock derived from movements |
 
 ### 🟢 Advisory — log and revisit
 
@@ -573,6 +575,48 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | BranchType badge in UI | ✅ | Page header + branch switcher dropdown |
 | Feature flags | ✅ | `stockTransfers`, `paymentTerms` added to Tenant.features |
 | Stock Transfers nav | ✅ | Sidebar item (feature-gated, OWNER/ADMIN only) |
+
+---
+
+### MS19e — Branch Stock Transfer Fix ✅ Done
+
+> Branch: `fix/branch-stock-transfer`
+> Goal: Fix stock transfer to properly update tenant-wide stock and derive branch stock from movements.
+
+#### The Problem
+
+Stock transfers created movement records (TRANSFER_OUT/TRANSFER_IN) but did NOT update `stockOnHand`. This caused:
+- Tenant-wide stock unchanged after transfer
+- Branch stock could not be accurately derived
+
+#### The Fix
+
+| Change | Before | After |
+|--------|--------|-------|
+| Transfer OUT | Movement logged, no stock update | Movement logged + `stockOnHand` decremented |
+| Transfer IN | Movement logged, no stock update | Movement logged + `stockOnHand` incremented |
+| Branch stock derivation | Not implemented | `getBranchStock()` aggregates movements per branch |
+
+#### How Branch Stock Works
+
+```
+branchStock(sku, branch) = 
+  SUM(TRANSFER_IN) + SUM(IN) - SUM(TRANSFER_OUT) - SUM(OUT)
+```
+
+- **Tenant-wide stock** (`Sku.stockOnHand`) = central control, updated on every transfer
+- **Branch stock** = derived from movements aggregation, no duplication
+- **Consistency guaranteed**: sum of all branch stock = tenant-wide stock
+
+#### API
+
+| Method | Notes |
+|--------|-------|
+| `GET /inventory/branch-stock` | New endpoint to query derived branch stock |
+
+#### Validation
+
+Transfer now checks source branch stock (derived from movements) before allowing transfer.
 
 ---
 
