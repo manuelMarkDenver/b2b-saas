@@ -2,12 +2,16 @@
 
 import * as React from "react";
 
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { ImageUpload } from "@/components/image-upload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CreateItemModal } from "@/components/create-item-modal";
+import { FilterBar, FilterField, FilterValues } from "@/components/ui/filter-bar";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -83,6 +87,8 @@ type ImportResult = {
   errors: Array<{ row: number; reason: string }>;
 };
 
+type Meta = { total: number; page: number; limit: number; totalPages: number };
+
 const CSV_TEMPLATE_HEADERS = 'productName,categorySlug,skuCode,skuName,pricePhp,costPhp,lowStockThreshold';
 
 function downloadCsvTemplate() {
@@ -101,11 +107,17 @@ function downloadCsvTemplate() {
 
 export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [categories, setCategories] = React.useState<Category[]>([]);
-  const [products, setProducts] = React.useState<Product[]>([]);
   const [skus, setSkus] = React.useState<Sku[]>([]);
+  const [skuMeta, setSkuMeta] = React.useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [skuPage, setSkuPage] = React.useState(1);
+  const [filters, setFilters] = React.useState<FilterValues>({});
   const [status, setStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(
     null,
   );
+
+  // Sort state
+  const [skuSortKey, setSkuSortKey] = React.useState<'name' | 'stockOnHand' | 'priceCents' | 'costCents'>('name');
+  const [skuSortDir, setSkuSortDir] = React.useState<'asc' | 'desc'>('asc');
 
   // Create Item modal
   const [createItemOpen, setCreateItemOpen] = React.useState(false);
@@ -155,47 +167,51 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       const summary = `${result.imported} added, ${result.updated} updated, ${result.skipped} skipped`;
       pushToast({ variant: result.errors.length > 0 ? 'error' : 'success', title: 'Import complete', message: summary });
-      if (result.imported > 0 || result.updated > 0) await loadAll();
+      if (result.imported > 0 || result.updated > 0) await loadSkus();
     } finally {
       setImportLoading(false);
     }
   }
 
-  async function loadAll() {
-    setStatus({ kind: "info", text: "Loading catalog..." });
+  const loadSkus = React.useCallback(async () => {
+    setStatus({ kind: "info", text: "Loading items..." });
     try {
-      const [catsRes, productsRes, skusRes] = await Promise.all([
+      const params = new URLSearchParams({ page: String(skuPage), limit: '20' });
+      if (filters.search) params.set('search', filters.search as string);
+      if (filters.categoryId) params.set('categoryId', filters.categoryId as string);
+      if (filters.lowStock === true) params.set('lowStock', 'true');
+
+      const [catsRes, skusRes] = await Promise.all([
         apiFetch("/categories"),
-        apiFetch("/products", { tenantSlug }),
-        apiFetch("/skus", { tenantSlug }),
+        apiFetch(`/skus?${params}`, { tenantSlug }),
       ]);
 
       if (!catsRes.ok) throw new Error(`Categories failed: ${catsRes.status}`);
-      if (!productsRes.ok) throw new Error(`Products failed: ${productsRes.status}`);
-      if (!skusRes.ok) throw new Error(`Skus failed: ${skusRes.status}`);
+      if (!skusRes.ok) throw new Error(`Items failed: ${skusRes.status}`);
 
-      const [cats, prods, skus] = await Promise.all([
-        catsRes.json() as Promise<unknown>,
-        productsRes.json() as Promise<unknown>,
-        skusRes.json() as Promise<unknown>,
-      ]);
+      const cats = await catsRes.json() as unknown;
+      const skuData = await skusRes.json() as { data: Sku[]; meta: Meta };
 
       setCategories(unwrapList<Category>(cats));
-      setProducts(unwrapList<Product>(prods));
-      setSkus(unwrapList<Sku>(skus));
+      setSkus(skuData.data);
+      setSkuMeta(skuData.meta);
       setStatus(null);
     } catch (err) {
       setStatus({
         kind: "error",
-        text: err instanceof Error ? err.message : "Unable to load catalog",
+        text: err instanceof Error ? err.message : "Unable to load items",
       });
     }
-  }
+  }, [tenantSlug, skuPage, filters]);
 
   React.useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantSlug]);
+    loadSkus();
+  }, [loadSkus]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setSkuPage(1);
+  }, [filters]);
 
   async function archiveProduct(id: string, name: string) {
     const res = await apiFetch(`/products/${id}/archive`, { tenantSlug, method: 'PATCH' });
@@ -205,7 +221,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       return;
     }
     pushToast({ variant: 'success', title: 'Product archived', message: name });
-    await loadAll();
+    await loadSkus();
   }
 
   async function updateSkuImage(skuId: string, imageUrl: string | null) {
@@ -214,7 +230,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       method: 'PATCH',
       body: JSON.stringify({ imageUrl }),
     });
-    await loadAll();
+    await loadSkus();
   }
 
   async function archiveSku(id: string, code: string) {
@@ -224,9 +240,33 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       setStatus({ kind: 'error', text: `Archive failed: ${res.status}${msg ? ` (${msg})` : ''}` });
       return;
     }
-    pushToast({ variant: 'success', title: 'SKU archived', message: code });
-    await loadAll();
+    pushToast({ variant: 'success', title: 'Item archived', message: code });
+    await loadSkus();
   }
+
+  // Sort toggle
+  function toggleSkuSort(key: typeof skuSortKey) {
+    if (skuSortKey === key) setSkuSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSkuSortKey(key); setSkuSortDir('asc'); }
+  }
+
+  // Sorted SKUs (client-side sort)
+  const sortedSkus = React.useMemo(() => {
+    return [...skus].sort((a, b) => {
+      const dir = skuSortDir === 'asc' ? 1 : -1;
+      if (skuSortKey === 'stockOnHand') return dir * (a.stockOnHand - b.stockOnHand);
+      if (skuSortKey === 'priceCents') return dir * ((a.priceCents ?? 0) - (b.priceCents ?? 0));
+      if (skuSortKey === 'costCents') return dir * ((a.costCents ?? 0) - (b.costCents ?? 0));
+      return dir * a.name.localeCompare(b.name);
+    });
+  }, [skus, skuSortKey, skuSortDir]);
+
+  // Filter fields for FilterBar
+  const filterFields: FilterField[] = React.useMemo(() => [
+    { type: 'search', key: 'search', placeholder: 'Search items...' },
+    { type: 'select', key: 'categoryId', label: 'All categories', options: categories.map(c => ({ value: c.id, label: c.name })) },
+    { type: 'toggle', key: 'lowStock', label: 'Low stock' },
+  ], [categories]);
 
   function openEditProduct(product: Product) {
     setEditProduct(product);
@@ -263,9 +303,9 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         }),
       });
       if (res.ok) {
-        pushToast({ variant: 'success', title: 'SKU updated', message: editSkuCode });
+        pushToast({ variant: 'success', title: 'Item updated', message: editSkuCode });
         setEditOpen(false);
-        await loadAll();
+        await loadSkus();
       } else {
         const msg = await readApiError(res);
         pushToast({ variant: 'error', title: 'Update failed', message: msg });
@@ -294,7 +334,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
           </button>
           <button
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            onClick={loadAll}
+            onClick={loadSkus}
             type="button"
           >
             Refresh
@@ -322,7 +362,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       ) : null}
 
-      <div className="mt-5">
+      <div className="mt-5 flex items-center justify-between gap-3">
         <button
           className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
           type="button"
@@ -332,59 +372,112 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         </button>
       </div>
 
-      <div className="mt-6">
-        <div className="rounded-md border border-border/60 p-4">
-          <div className="text-sm font-medium">Items</div>
-          <div className="mt-3 space-y-2 text-sm">
-            {skus.length === 0 ? (
-              <div className="text-muted-foreground">No items yet.</div>
-            ) : null}
-            {skus.map((s) => (
-              <div
-                key={s.id}
-                className={`flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 ${s.isArchived ? "opacity-50" : ""}`}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <ImageUpload
-                    currentUrl={s.imageUrl}
-                    tenantSlug={tenantSlug}
-                    size={48}
-                    onUploaded={(url) => void updateSkuImage(s.id, url)}
-                    onRemoved={() => void updateSkuImage(s.id, null)}
-                  />
-                  <div>
-                    <div className="font-medium">{s.code} · {s.name}</div>
-                    <div className="text-xs text-muted-foreground">{s.product.category.name}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right text-xs text-muted-foreground">
-                    <div>Stock: {s.stockOnHand}</div>
-                    <div>Low: {s.lowStockThreshold}</div>
-                  </div>
-                  {s.isArchived ? (
-                    <span className="text-xs text-muted-foreground">Archived</span>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => openEditSku(s)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs text-destructive hover:underline"
-                        onClick={() => archiveSku(s.id, s.code)}
-                      >
-                        Archive
-                      </button>
+      <div className="mt-4 space-y-3">
+        <FilterBar
+          filters={filterFields}
+          values={filters}
+          onChange={setFilters}
+        />
+
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <div className="min-w-[500px]">
+            <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="grid grid-cols-[1fr_100px_80px_80px_80px_80px_auto] items-center gap-2">
+                <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
+                  Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                </button>
+                <span>Category</span>
+                <button type="button" onClick={() => toggleSkuSort('stockOnHand')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                  {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Stock
+                </button>
+                <button type="button" onClick={() => toggleSkuSort('costCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                  {skuSortKey === 'costCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Cost
+                </button>
+                <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                  {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
+                </button>
+                <span className="text-right">Low</span>
+                <span />
+              </div>
+            </div>
+
+            {sortedSkus.length === 0 ? (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                No items found.
+              </div>
+            ) : (
+              <div className="divide-y divide-border/60">
+                {sortedSkus.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`grid grid-cols-[1fr_100px_80px_80px_80px_80px_auto] items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ImageUpload
+                        currentUrl={s.imageUrl}
+                        tenantSlug={tenantSlug}
+                        size={36}
+                        onUploaded={(url) => void updateSkuImage(s.id, url)}
+                        onRemoved={() => void updateSkuImage(s.id, null)}
+                      />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{s.name}</div>
+                        <div className="truncate font-mono text-xs text-muted-foreground">{s.code}</div>
+                      </div>
                     </div>
-                  )}
+                    <span className="truncate text-xs text-muted-foreground">{s.product.category.name}</span>
+                    <div className={`text-right text-sm font-bold tabular-nums ${s.lowStockThreshold > 0 && s.stockOnHand <= s.lowStockThreshold ? 'text-red-500 dark:text-red-400' : s.stockOnHand <= 10 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+                      {s.stockOnHand}
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground tabular-nums">
+                      {s.costCents != null ? formatCents(s.costCents) : '—'}
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground tabular-nums">
+                      {s.priceCents != null ? formatCents(s.priceCents) : '—'}
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground tabular-nums">
+                      {s.lowStockThreshold}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {s.isArchived ? (
+                        <span className="text-xs text-muted-foreground">Archived</span>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => openEditSku(s)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs text-destructive hover:underline"
+                            onClick={() => archiveSku(s.id, s.code)}
+                          >
+                            Archive
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {skuMeta.totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
+                <span className="text-xs text-muted-foreground">
+                  Page <span className="font-medium text-foreground">{skuMeta.page}</span> of{' '}
+                  <span className="font-medium text-foreground">{skuMeta.totalPages}</span>
+                </span>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="icon" disabled={skuPage <= 1} onClick={() => setSkuPage((p) => p - 1)} aria-label="Previous page">‹</Button>
+                  <Button variant="outline" size="icon" disabled={skuPage >= skuMeta.totalPages} onClick={() => setSkuPage((p) => p + 1)} aria-label="Next page">›</Button>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -529,7 +622,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                     if (res.ok) {
                       pushToast({ variant: 'success', title: 'Product updated', message: '' });
                       setEditOpen(false);
-                      await loadAll();
+                      await loadSkus();
                     } else {
                       const msg = await readApiError(res);
                       pushToast({ variant: 'error', title: 'Update failed', message: msg });
@@ -543,12 +636,12 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             )}
             {editSku && (
               <>
-                {/* Large optional image - 100% centered */}
-                <div className="w-full">
+                {/* Hero image - centered dropzone */}
+                <div className="mx-auto w-full max-w-[300px]">
                   <ImageUpload
                     currentUrl={editSkuImageUrl}
                     tenantSlug={tenantSlug}
-                    size={200}
+                    variant="dropzone"
                     onUploaded={(url) => setEditSkuImageUrl(url)}
                     onRemoved={() => setEditSkuImageUrl(null)}
                   />
@@ -623,7 +716,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         onOpenChange={setCreateItemOpen}
         tenantSlug={tenantSlug}
         categories={categories}
-        onCreated={loadAll}
+        onCreated={loadSkus}
       />
     </div>
   );
