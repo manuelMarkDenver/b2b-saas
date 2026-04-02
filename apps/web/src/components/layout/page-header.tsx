@@ -4,7 +4,15 @@ import { getActiveBranchId } from '@/lib/branch';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 
-type Branch = { id: string; name: string };
+type Branch = { id: string; name: string; type: string };
+
+const TYPE_LABELS: Record<string, string> = {
+  STANDARD: 'Standard',
+  PRODUCTION: 'Production',
+  DISTRIBUTION: 'Distribution',
+  RETAIL: 'Retail',
+  WAREHOUSE: 'Warehouse',
+};
 
 // Stable color palette — assigned by branch index (consistent across sessions)
 const BRANCH_COLORS = [
@@ -43,17 +51,25 @@ export function PageHeader({ tenantSlug, title, description }: PageHeaderProps) 
       ? BRANCH_COLORS[branchIndex % BRANCH_COLORS.length]
       : ALL_BRANCHES_COLOR;
   const badgeLabel = activeBranch ? activeBranch.name : 'All Branches';
+  const showBranchType = activeBranch;
 
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {branches.length > 0 && (
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeColor}`}
-          >
-            {badgeLabel}
-          </span>
+          <>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeColor}`}
+            >
+              {badgeLabel}
+            </span>
+            {showBranchType && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700/40">
+                {TYPE_LABELS[activeBranch.type] ?? activeBranch.type}
+              </span>
+            )}
+          </>
         )}
       </div>
       {description && (

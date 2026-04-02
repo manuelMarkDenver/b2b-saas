@@ -19,12 +19,17 @@ import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { PaymentsService } from '../payments/payments.service';
+import { PaymentMethod } from '@prisma/client';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, TenantGuard, FeatureFlagGuard)
 @RequireFeature('orders')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly paymentsService: PaymentsService,
+  ) {}
 
   @Post()
   createOrder(@Req() req: RequestWithUser, @Body() body: CreateOrderDto) {
@@ -79,5 +84,19 @@ export class OrdersController {
     @Body() body: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateOrderStatus(req.tenant!.id, id, body);
+  }
+
+  @Post(':id/pay')
+  recordPayment(
+    @Req() req: RequestWithUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { amountCents: number; method?: PaymentMethod },
+  ) {
+    return this.paymentsService.recordPayment(
+      req.tenant!.id,
+      id,
+      body.amountCents,
+      body.method,
+    );
   }
 }

@@ -1,0 +1,294 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Plus, ArrowRight, Package } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+
+type Branch = { id: string; name: string; isDefault: boolean; status: string };
+type Sku = { id: string; code: string; name: string; stockOnHand: number };
+type TransferItem = { skuId: string; quantity: number; sku: { id: string; code: string; name: string } };
+type Transfer = {
+  id: string;
+  createdAt: string;
+  fromBranch: { id: string; name: string } | null;
+  toBranch: { id: string; name: string };
+  note: string | null;
+  items: TransferItem[];
+};
+
+type LineItem = { skuId: string; quantity: number };
+
+interface TransfersPanelProps {
+  tenantSlug: string;
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [skus, setSkus] = useState<Sku[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [fromBranchId, setFromBranchId] = useState('');
+  const [toBranchId, setToBranchId] = useState('');
+  const [note, setNote] = useState('');
+  const [lines, setLines] = useState<LineItem[]>([{ skuId: '', quantity: 1 }]);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const canManage = userRole === 'OWNER' || userRole === 'ADMIN';
+
+  async function load() {
+    setLoading(true);
+    const [trRes, brRes, skuRes, memRes] = await Promise.all([
+      apiFetch('/transfers', { tenantSlug }),
+      apiFetch('/branches', { tenantSlug }),
+      apiFetch('/catalog/skus', { tenantSlug }),
+      apiFetch('/memberships', { tenantSlug }),
+    ]);
+    if (trRes.ok) setTransfers(await trRes.json());
+    else setError('Failed to load transfers');
+    if (brRes.ok) {
+      const all: Branch[] = await brRes.json();
+      setBranches(all.filter((b) => b.status === 'ACTIVE'));
+    }
+    if (skuRes.ok) {
+      const data = await skuRes.json();
+      setSkus(Array.isArray(data) ? data : (data.data ?? []));
+    }
+    if (memRes.ok) {
+      const memberships: Array<{ role: string; tenant: { slug: string }; status: string }> = await memRes.json();
+      const m = memberships.find((m) => m.tenant.slug === tenantSlug && m.status === 'ACTIVE');
+      if (m) setUserRole(m.role);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openDialog() {
+    setFromBranchId('');
+    setToBranchId('');
+    setNote('');
+    setLines([{ skuId: '', quantity: 1 }]);
+    setFormError(null);
+    setDialogOpen(true);
+  }
+
+  function setLine(idx: number, patch: Partial<LineItem>) {
+    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  }
+
+  function addLine() {
+    setLines((prev) => [...prev, { skuId: '', quantity: 1 }]);
+  }
+
+  function removeLine(idx: number) {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function handleSubmit() {
+    if (!toBranchId) { setFormError('Destination branch is required'); return; }
+    if (fromBranchId && fromBranchId === toBranchId) { setFormError('Source and destination must differ'); return; }
+    const validLines = lines.filter((l) => l.skuId && l.quantity > 0);
+    if (validLines.length === 0) { setFormError('Add at least one item'); return; }
+
+    setSaving(true);
+    setFormError(null);
+
+    const body = JSON.stringify({
+      fromBranchId: fromBranchId || undefined,
+      toBranchId,
+      note: note.trim() || undefined,
+      items: validLines,
+    });
+
+    const res = await apiFetch('/transfers', { tenantSlug, method: 'POST', body });
+    if (res.ok) {
+      setDialogOpen(false);
+      await load();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setFormError(data.message ?? 'Something went wrong');
+    }
+    setSaving(false);
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading transfers…</p>;
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold">Stock Transfers</h2>
+          <p className="text-sm text-muted-foreground">Move inventory between branches.</p>
+        </div>
+        {canManage && (
+          <button
+            onClick={openDialog}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New transfer
+          </button>
+        )}
+      </div>
+
+      {transfers.length === 0 ? (
+        <div className="rounded-lg border border-border py-12 text-center text-sm text-muted-foreground">
+          No transfers yet.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {transfers.map((t) => (
+            <div key={t.id} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium">
+                  <span className="truncate">{t.fromBranch?.name ?? 'HQ'}</span>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{t.toBranch.name}</span>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">{formatDate(t.createdAt)}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {t.items.map((item) => (
+                  <span
+                    key={item.skuId}
+                    className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    <Package className="h-3 w-3" />
+                    {item.sku.code} · {item.quantity}
+                  </span>
+                ))}
+              </div>
+              {t.note && <p className="mt-2 text-xs text-muted-foreground">{t.note}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* New Transfer dialog */}
+      {dialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 py-10">
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-base font-semibold">New Stock Transfer</h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">From branch</label>
+                <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={fromBranchId}
+                  onChange={(e) => setFromBranchId(e.target.value)}
+                >
+                  <option value="">HQ / All branches</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">To branch *</label>
+                <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={toBranchId}
+                  onChange={(e) => setToBranchId(e.target.value)}
+                >
+                  <option value="">Select destination…</option>
+                  {branches
+                    .filter((b) => !fromBranchId || b.id !== fromBranchId)
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="text-sm font-medium">Items *</label>
+                  <button
+                    type="button"
+                    onClick={addLine}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    + Add item
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {lines.map((line, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <select
+                        className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        value={line.skuId}
+                        onChange={(e) => setLine(idx, { skuId: e.target.value })}
+                      >
+                        <option value="">Select product…</option>
+                        {skus.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.code} — {s.name} (stock: {s.stockOnHand})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        className="w-20 rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        value={line.quantity}
+                        onChange={(e) => setLine(idx, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                      />
+                      {lines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeLine(idx)}
+                          className="text-xs text-destructive hover:underline"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Note</label>
+                <input
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+
+              {formError && <p className="text-sm text-destructive">{formError}</p>}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setDialogOpen(false)}
+                className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {saving ? 'Transferring…' : 'Transfer stock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

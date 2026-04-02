@@ -25,6 +25,7 @@ export class BranchesService {
     return this.prisma.branch.findMany({
       where: { tenantId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true, name: true, isDefault: true, status: true, type: true },
     });
   }
 

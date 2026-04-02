@@ -140,12 +140,18 @@ export class OrdersService {
         items: {
           include: { sku: { select: { id: true, code: true, name: true, imageUrl: true } } },
         },
+        payments: {
+          where: { status: 'VERIFIED' },
+          select: { id: true, amountCents: true, method: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
     if (!order) throw new NotFoundException('Order not found');
 
-    return order;
+    const paidCents = order.payments.reduce((s, p) => s + p.amountCents, 0);
+    return { ...order, paidCents, balanceCents: Math.max(0, order.totalCents - paidCents) };
   }
 
   async updateOrder(tenantId: string, orderId: string, dto: UpdateOrderDto) {

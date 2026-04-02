@@ -31,17 +31,6 @@ export class PaymentsService {
       throw new BadRequestException('Cannot submit payment for a cancelled order');
     }
 
-    const pendingPayment = await this.prisma.payment.findFirst({
-      where: { orderId: dto.orderId, tenantId, status: 'PENDING' },
-      select: { id: true },
-    });
-
-    if (pendingPayment) {
-      throw new BadRequestException(
-        'A pending payment already exists for this order. Reject it before submitting a new one.',
-      );
-    }
-
     const payment = await this.prisma.payment.create({
       data: {
         tenantId,
@@ -169,5 +158,50 @@ export class PaymentsService {
     );
 
     return updated;
+  }
+
+  /**
+   * Record a payment directly as VERIFIED — for cash/on-hand payments
+   * that don't need proof upload or admin approval.
+   */
+  async recordPayment(
+    tenantId: string,
+    orderId: string,
+    amountCents: number,
+    method: PaymentMethod = PaymentMethod.CASH,
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      select: { id: true, status: true, totalCents: true },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status === 'CANCELLED') {
+      throw new BadRequestException('Cannot record payment for a cancelled order');
+    }
+
+    const paidCents = await this.prisma.payment
+      .aggregate({ where: { orderId, status: 'VERIFIED' }, _sum: { amountCents: true } })
+      .then((r) => r._sum.amountCents ?? 0);
+    const balanceCents = order.totalCents - paidCents;
+
+    if (amountCents > balanceCents) {
+      throw new BadRequestException(
+        `Payment of ${(amountCents / 100).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })} exceeds remaining balance of ${(balanceCents / 100).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })}`,
+      );
+    }
+
+    const payment = await this.prisma.payment.create({
+      data: { tenantId, orderId, amountCents, method, status: PaymentStatus.VERIFIED },
+    });
+
+    this.logger.log(`payment.recorded tenantId=${tenantId} paymentId=${payment.id} orderId=${orderId}`);
+
+    return {
+      payment,
+      totalCents: order.totalCents,
+      paidCents,
+      balanceCents: Math.max(0, order.totalCents - paidCents),
+    };
   }
 }

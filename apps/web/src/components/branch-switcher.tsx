@@ -111,8 +111,8 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
         <span className={cn('truncate', compact ? 'flex-1 text-left' : 'max-w-[120px] hidden sm:block')}>
           {activeBranch?.name ?? 'All branches'}
         </span>
-        {activeBranch && activeBranch.type !== 'STANDARD' && (
-          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+        {activeBranch && (
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground dark:bg-muted/80">
             {TYPE_LABELS[activeBranch.type] ?? activeBranch.type}
           </span>
         )}
@@ -182,11 +182,9 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
               >
                 <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
                   <span className="truncate">{branch.name}</span>
-                  {branch.type !== 'STANDARD' && (
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
-                      {TYPE_LABELS[branch.type] ?? branch.type}
-                    </span>
-                  )}
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground dark:bg-muted/80">
+                    {TYPE_LABELS[branch.type] ?? branch.type}
+                  </span>
                   {branch.isDefault && (
                     <span className="shrink-0 text-[10px] text-muted-foreground">(default)</span>
                   )}

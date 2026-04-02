@@ -36,12 +36,22 @@ type OrderItem = {
   sku: { id: string; code: string; name: string; imageUrl?: string | null };
 };
 
+type OrderPayment = {
+  id: string;
+  amountCents: number;
+  method: string;
+  createdAt: string;
+};
+
 type Order = {
   id: string;
   status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
   totalCents: number;
+  paidCents?: number;
+  balanceCents?: number;
   createdAt: string;
   items: OrderItem[];
+  payments?: OrderPayment[];
 };
 
 type CartLine = { skuId: string; quantity: number };
@@ -127,6 +137,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   // Order detail sheet
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
+
+  // Payment recording
+  const [payOpen, setPayOpen] = React.useState(false);
+  const [payAmount, setPayAmount] = React.useState('');
+  const [payMethod, setPayMethod] = React.useState('CASH');
+  const [payLoading, setPayLoading] = React.useState(false);
 
   // Edit mode (within detail sheet, PENDING only)
   const [editMode, setEditMode] = React.useState(false);
@@ -321,6 +337,33 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   function openDetail(order: Order) {
     setSelectedOrder(order);
     setDetailOpen(true);
+    setPayOpen(false);
+    setPayAmount('');
+    setPayMethod('CASH');
+  }
+
+  async function handleRecordPayment() {
+    if (!selectedOrder) return;
+    const cents = Math.round(parseFloat(payAmount) * 100);
+    if (!cents || cents <= 0) return;
+    setPayLoading(true);
+    const res = await apiFetch(`/orders/${selectedOrder.id}/pay`, {
+      tenantSlug,
+      method: 'POST',
+      body: JSON.stringify({ amountCents: cents, method: payMethod }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setSelectedOrder((o) => o ? { ...o, paidCents: data.paidCents, balanceCents: data.balanceCents, payments: [...(o.payments ?? []), data.payment] } : o);
+      setPayOpen(false);
+      setPayAmount('');
+      pushToast({ variant: 'success', title: 'Payment recorded', message: `Balance: ₱${(data.balanceCents / 100).toFixed(2)}` });
+      await loadData();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      pushToast({ variant: 'error', title: 'Payment failed', message: d.message ?? 'Something went wrong' });
+    }
+    setPayLoading(false);
   }
 
   async function updateStatus(orderId: string, newStatus: Order["status"]) {
@@ -789,6 +832,86 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Payments */}
+                  <div className="rounded-xl border border-border/60 bg-card">
+                    <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+                      <span className="text-sm font-semibold">Payments</span>
+                      {selectedOrder.status !== 'CANCELLED' && (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-primary hover:underline"
+                          onClick={() => setPayOpen((v) => !v)}
+                        >
+                          {payOpen ? 'Cancel' : '+ Record payment'}
+                        </button>
+                      )}
+                    </div>
+
+                    {payOpen && (
+                      <div className="border-b border-border/60 p-4 space-y-3">
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Amount (₱)"
+                            className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                          />
+                          <select
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            value={payMethod}
+                            onChange={(e) => setPayMethod(e.target.value)}
+                          >
+                            <option value="CASH">Cash</option>
+                            <option value="GCASH">GCash</option>
+                            <option value="MAYA">Maya</option>
+                            <option value="BANK_TRANSFER">Bank Transfer</option>
+                            <option value="CARD">Card</option>
+                            <option value="CHEQUE">Cheque</option>
+                          </select>
+                          <button
+                            type="button"
+                            disabled={payLoading || !payAmount}
+                            onClick={handleRecordPayment}
+                            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {payLoading ? '…' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="divide-y divide-border/60 px-4">
+                      {(selectedOrder.payments ?? []).length === 0 ? (
+                        <p className="py-3 text-xs text-muted-foreground">No payments recorded.</p>
+                      ) : (
+                        (selectedOrder.payments ?? []).map((p) => (
+                          <div key={p.id} className="flex items-center justify-between py-2.5 text-sm">
+                            <span className="text-muted-foreground">{new Date(p.createdAt).toLocaleDateString()} · {p.method}</span>
+                            <span className="font-medium text-green-700 dark:text-green-400">{formatCents(p.amountCents)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {(selectedOrder.totalCents > 0) && (
+                      <div className="border-t border-border/60 px-4 py-3 space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Paid</span>
+                          <span className="text-green-700 dark:text-green-400 font-medium">{formatCents(selectedOrder.paidCents ?? 0)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-semibold">
+                          <span>Balance</span>
+                          <span className={(selectedOrder.balanceCents ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
+                            {formatCents(selectedOrder.balanceCents ?? selectedOrder.totalCents)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
