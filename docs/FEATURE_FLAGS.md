@@ -116,10 +116,13 @@ Use this when the flag key is not in the `FeatureFlag` type (i.e. `shipped: fals
 | `payments` | ✅ | true | ✅ decorator | ✅ featureKey | Core feature |
 | `reports` | ✅ | true | ✅ decorator | ✅ featureKey | Core feature |
 | `marketplace` | ✅ | false | — | — | Phase 7, not built |
-| `stockTransfers` | ❌ Coming Soon | false | ✅ inline | ✅ shipped gate | MS21 — built but hidden |
+| `stockTransfers` | ❌ Coming Soon | false | ✅ inline | ✅ shipped gate | MS21 — built but hidden from marketing |
 | `paymentTerms` | ❌ Coming Soon | false | ✅ inline | — (no nav item) | MS21 — DTO field guarded |
+| `advancedAnalytics` | ❌ Not built | false | — | — | Post-Phase 5 — Key Metrics + Product/Customer Ranking |
 
 > **`stockTransfers` note:** The API and UI are built (`shipped` was temporarily set to `false` to hide from nav during pre-staging). The inline guard enforces it at the API level regardless.
+
+> **`advancedAnalytics` scope:** (1) Shopee-style Key Metrics dashboard — clickable stat cards toggle multi-line trend chart, up to 4 metrics selected, delta vs previous period shown. (2) Product ranking by revenue/units/frequency. (3) Customer ranking by spend. Full design notes in `MILESTONES.md`.
 
 ---
 

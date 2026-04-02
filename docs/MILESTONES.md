@@ -849,11 +849,103 @@ Post-staging approach: Phase 1 = history-only audit trail. Phase 2 = real stock 
 | Payroll Module | 🔒 Locked | Post-Phase 5 | Multi-Branch | Regulated domain. Validate demand before committing. |
 | Platform Integrations (Shopee, Lazada) | 🔒 Locked | Post-Phase 5 | Stable core | Webhook security, retry logic, idempotency add complexity. |
 | AI Chatbot + RAG | 🔒 Locked | Post-Phase 5 | Real tenant data | Claude API + pgvector. Feature-flagged per tenant. |
+| **Advanced Analytics — Key Metrics Dashboard** | 🟡 Medium | Post-Phase 5 | Stable dashboard | Shopee-style: clickable stat cards that toggle multi-line trend chart. Select up to 4 metrics; chart renders one colored line per metric. Cards show delta vs previous period (% change + arrow). Gated by `features.advancedAnalytics`. See design notes below. |
+| **Sales + Product Ranking** | 🟡 Medium | Post-Phase 5 | Reports stable | Top products by revenue/units/frequency; top customers by spend. Leaderboard view in Reports tab. Feeds into Key Metrics cards. Gated by `features.advancedAnalytics`. |
+| **n8n Automation Integration** | 🟡 Medium | Post-Phase 5 | Stable events | Webhook-based event dispatch to n8n for custom automation. Events: order created, order overdue, low stock triggered, payment recorded, new customer. Tenant configures webhook URL in Settings. n8n handles routing to Slack/Messenger/WhatsApp/email/SMS. Replaces the manual notification backlog and enables no-code automation without hardcoding notification logic. Schema: `TenantWebhook(tenantId, url, events[], secret)`. |
 | **Customer-Seller Chat** | 🔒 Locked | Post-Phase 7 | Customer portal | Two tracks: (1) **Internal order notes** — staff/admin attach notes to a specific order, visible within the ERP; low-effort, high-value for B2B ops. (2) **Buyer-facing portal chat** — real-time or async messaging between buyer and seller, tied to an order/session; requires buyer auth, separate portal surface, and WebSocket infra. Do Track 1 first. Track 2 only after the marketplace (Phase 7) is live and validated. |
 | **Bill of Materials (BOM) / Recipe Management** | 🟡 Medium | Post-Phase 5 | Stable inventory | ERP term: a finished product is made from N raw material components. Creating 50 pizzas auto-deducts flour, sauce, cheese, etc. Two patterns: (1) **Production BOM** — transform raw → finished goods (production order workflow); (2) **Sales Bundle** — composite SKU that deducts components on each sale. Schema: `SkuComponent(parentSkuId, componentSkuId, quantity)`. When a movement hits a composite SKU, child movements auto-generate for each component. UI: recipe builder on SKU edit page + production order log. Direct value for Metro Pizza Supply (ingredient portioning/pre-packing) and Megabox (product bundles). |
 | **i18n + Language Switcher** | 🟢 Low | Post-Phase 5 | Stable UI | All strings currently hardcoded in components — no translation layer. Solution: `next-intl` (Next.js App Router standard). Requires extracting all UI strings to locale JSON files. Large but mechanical lift. Revenue-gate this: only invest when non-English market is validated. ₱ + PH locale already in place. |
 | **Franchise Network / Organization Layer (MGN)** | 🔒 Locked | Post-Phase 7 | Multi-tenant stable | Enables MGN (MSME Growth Network International) franchise model. Income model: one-time joining fee (via PayMongo) + platform take-rate % on every transaction. The commission/MLM tree is **agent-based** — agents recruit other agents and earn commissions when their downline transacts. Two design options are **open** (decision deferred — needs business rule confirmation): **(A) Tenant-as-agent** — each franchisee/tenant IS an agent node (simpler; works if every agent also runs their own ERP business); **(B) Dedicated agent entity** — `Agent` is its own record, separate from `Tenant` (a pure recruiter who earns commissions but doesn't need an ERP tenant). See "Product Strategy — MGN Network" section. Gated by `features.network: true`. |
 | **Zentral SaaS — Subscription Billing** | 🔒 Locked | Post-Phase 6 | Go-to-market live | Add `Plan` enum to Tenant: `STARTER → PROFESSIONAL → ENTERPRISE → MARKETPLACE`. Gate features by plan. Billing via PayMongo (recurring subscriptions, PH-native — supports GCash, Maya, cards). This IS the productized version of this platform. Same monorepo, same code — no fork. Zentral is the product brand; Ascendex is the parent company that owns and operates it. |
+
+---
+
+## Design Notes — Advanced Analytics Dashboard
+
+> Inspired by Shopee Seller Center "Business Insights" pattern. Decision record: 2026-04-03.
+
+### Key Metrics + Trend Chart
+
+**Concept:** Stat cards at the top of the dashboard are clickable/toggleable. Selecting a card adds its metric to a shared multi-line trend chart below. Up to 4 metrics can be active simultaneously.
+
+**How it works:**
+1. Each stat card shows: current value + delta vs previous period (% + arrow colored green/red)
+2. Clicking a card toggles it — selected cards are highlighted with a colored border matching their chart line color
+3. A single `<LineChart>` below renders one line per selected metric, each in a distinct color
+4. Selection is persisted to localStorage (same as widget prefs)
+5. The chart time axis matches the global date range picker
+
+**Metrics available:**
+| Key | Label | Source |
+|-----|-------|--------|
+| `revenue` | Revenue | Verified payments in range |
+| `orders` | Orders | Order count in range |
+| `cancelledOrders` | Cancelled | Orders with status CANCELLED |
+| `pendingPayments` | Pending AR | Orders confirmed, balance > 0 |
+| `newCustomers` | New Customers | Contacts created in range |
+| `avgOrderValue` | Avg Order Value | revenue / orders |
+
+**Feature flag:** `features.advancedAnalytics` (default: false). Gate in dashboard stats component — falls back to current static card layout if not enabled.
+
+**Implementation notes:**
+- The current `DashboardData.summary` already has `ordersToday`, `pendingPayments`, `revenueRangeCents`, `lowStockSkus`. Extend API to return previous-period values alongside current period for delta calculation.
+- Recharts `LineChart` with `syncId` for tooltip sync. Each metric gets a distinct `stroke` color from a fixed palette.
+- State: `selectedMetrics: string[]` in localStorage, max 4 items. Card click toggles in/out.
+- "Metrics Selected X/4" counter in the chart header (Shopee pattern).
+
+---
+
+## Design Notes — n8n Automation Integration
+
+> Intent recorded: 2026-04-03. Build after Phase 5 (reports/team stable).
+
+**What it is:** n8n is an open-source workflow automation platform (self-hostable or cloud). Rather than hardcoding notification logic (email for low stock, SMS for overdue), Zentral fires structured webhook events and n8n routes them to any channel.
+
+**Architecture:**
+```
+Zentral event (order.created, payment.overdue, stock.low)
+  → POST to tenant's configured webhook URL (n8n incoming webhook node)
+  → n8n workflow → Slack / Messenger / WhatsApp / Gmail / SMS / custom
+```
+
+**Tenant configuration:** Settings page → "Automations" tab → paste n8n webhook URL + select events to forward. Stored in `TenantWebhook` table.
+
+**Event payload shape (all events):**
+```json
+{
+  "event": "order.overdue",
+  "tenantSlug": "metro-pizza-supply",
+  "timestamp": "2026-04-03T10:00:00Z",
+  "data": { ...event-specific fields... }
+}
+```
+
+**Value for first client:** Brother's business (Manager's Pizza + Megabox) can build WhatsApp collection reminders, daily sales summaries to Messenger, low stock alerts to group chat — all without us coding the delivery logic.
+
+**Alternative path:** If n8n is too heavy for early clients, start with direct webhook dispatch (no n8n) and let the client handle routing. Same schema applies.
+
+---
+
+## Design Notes — Sales & Product Ranking
+
+> Intent recorded: 2026-04-03.
+
+**Product Ranking:**
+- Top N products by: (1) revenue generated, (2) units sold, (3) order frequency (appears in most orders)
+- Time-windowed: last 7d, 30d, 90d
+- Lives in the Reports tab as a "Top Products" card
+- API: `GET /reports/products/ranking?limit=10&by=revenue&from=&to=`
+
+**Customer Ranking:**
+- Top N customers by: (1) total spend, (2) order count, (3) average order value
+- Lives in Customers panel as a sortable column (already have billed/balance — just need sorting)
+- Helps identify key accounts to prioritize for credit review
+
+**Branch Ranking:**
+- Already partially built via `BranchBreakdown` on dashboard
+- Extend to show rank by revenue, orders, avg order value
+
+**Feature flag:** `features.advancedAnalytics` (same gate as Key Metrics). Both ranking and Key Metrics are part of the same analytics tier.
 
 ---
 
