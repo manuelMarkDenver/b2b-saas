@@ -17,3 +17,6 @@ apps/marketing/out
 apps/marketing/.next
 apps/marketing/tsconfig.tsbuildinfo
 apps/api/uploads/
+
+apps/web/playwright-report/
+apps/web/test-results/
