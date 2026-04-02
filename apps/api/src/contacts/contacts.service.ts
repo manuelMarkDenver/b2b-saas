@@ -132,13 +132,22 @@ export class ContactsService {
    * Tenant-wide AR overview — all contacts with outstanding balances.
    * Used for the Customers report tab.
    */
-  async getArOverview(tenantId: string, role: string) {
+  async getArOverview(tenantId: string, role: string, from?: string, to?: string) {
     this.requireAdminOrOwner(role);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orderWhere: any = { status: { not: 'CANCELLED' } };
+    if (from || to) {
+      orderWhere.createdAt = {};
+      if (from) orderWhere.createdAt.gte = new Date(`${from}T00:00:00.000Z`);
+      if (to)   orderWhere.createdAt.lte = new Date(`${to}T23:59:59.999Z`);
+    }
+
     const contacts = await this.prisma.contact.findMany({
       where: { tenantId, isActive: true },
       include: {
         orders: {
-          where: { status: { not: 'CANCELLED' } },
+          where: orderWhere,
           select: {
             totalCents: true,
             createdAt: true,
