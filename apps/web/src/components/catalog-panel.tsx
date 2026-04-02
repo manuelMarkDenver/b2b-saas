@@ -390,7 +390,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <div className="min-w-[440px]">
             <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <div className="grid grid-cols-[2fr_1fr_80px_80px_70px_auto] items-center gap-3">
+              <div className="grid grid-cols-[2fr_1fr_90px_90px_80px_auto] items-center gap-3">
                 <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
                   Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
                 </button>
@@ -402,9 +402,9 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                   {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
                 </button>
                 <button type="button" onClick={() => toggleSkuSort('lowStockThreshold')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                  {skuSortKey === 'lowStockThreshold' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Low
+                  {skuSortKey === 'lowStockThreshold' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Low Stock
                 </button>
-                <span />
+                <span>Actions</span>
               </div>
             </div>
 
@@ -417,10 +417,10 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 {sortedSkus.map((s) => (
                   <div
                     key={s.id}
-                    className={`grid grid-cols-[2fr_1fr_80px_80px_70px_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
+                    className={`grid grid-cols-[2fr_1fr_90px_90px_80px_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <ProductThumb src={s.imageUrl} label={`${s.code} ${s.name}`} size={36} className="rounded-lg shrink-0" />
+                      <ProductThumb src={s.imageUrl} label={`${s.code} ${s.name}`} size={40} className="rounded-md shrink-0" />
                       <span className="truncate text-sm font-medium">{s.name}</span>
                     </div>
                     <span className="truncate text-xs text-muted-foreground">{s.product.category.name}</span>
@@ -634,12 +634,12 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             )}
             {editSku && (
               <>
-                {/* Hero image - centered dropzone */}
-                <div className="mx-auto w-full max-w-[300px]">
+                {/* Product image - centered square */}
+                <div className="mx-auto">
                   <ImageUpload
                     currentUrl={editSkuImageUrl}
                     tenantSlug={tenantSlug}
-                    variant="dropzone"
+                    size={160}
                     onUploaded={(url) => setEditSkuImageUrl(url)}
                     onRemoved={() => setEditSkuImageUrl(null)}
                   />
