@@ -49,6 +49,8 @@ model User {
   tenantsCreated       Tenant[]           @relation("TenantCreatedBy")
   notifications        Notification[]
   inventoryMovements   InventoryMovement[]
+  transfersRequested   StockTransferRequest[] @relation("TransferRequester")
+  transfersApproved    StockTransferRequest[] @relation("TransferApprover")
 }
 
 enum BranchStatus {
@@ -88,6 +90,8 @@ model Tenant {
   inventoryMovements InventoryMovement[]
   orders             Order[]
   payments           Payment[]
+  contacts           Contact[]
+  stockTransfers     StockTransferRequest[]
 }
 
 model Branch {
@@ -100,9 +104,11 @@ model Branch {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  tenant    Tenant             @relation(fields: [tenantId], references: [id])
-  orders    Order[]
-  movements InventoryMovement[]
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  orders          Order[]
+  movements       InventoryMovement[]
+  transfersFrom   StockTransferRequest[] @relation("TransferFrom")
+  transfersTo     StockTransferRequest[] @relation("TransferTo")
 
   @@index([tenantId])
 }
@@ -157,6 +163,7 @@ model Sku {
   product            Product             @relation(fields: [productId], references: [id])
   inventoryMovements InventoryMovement[]
   orderItems         OrderItem[]
+  transferItems      StockTransferItem[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -198,11 +205,14 @@ enum MovementType {
   IN
   OUT
   ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
 }
 
 enum ReferenceType {
   ORDER
   MANUAL
+  TRANSFER
 }
 
 enum OrderStatus {
@@ -212,24 +222,59 @@ enum OrderStatus {
   CANCELLED
 }
 
+// ─── Contact / AR ─────────────────────────────────────────────────────────────
+
+enum ContactType {
+  CUSTOMER
+  DISTRIBUTOR
+}
+
+model Contact {
+  id               String      @id @default(uuid()) @db.Uuid
+  tenantId         String      @db.Uuid
+  name             String
+  type             ContactType @default(CUSTOMER)
+  phone            String?
+  address          String?
+  /// 0 = COD / no credit extended. Set a positive value to enable AR tracking for this contact.
+  creditLimitCents Int         @default(0)
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  tenant           Tenant      @relation(fields: [tenantId], references: [id])
+  orders           Order[]
+
+  @@index([tenantId])
+  @@index([type])
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
 model Order {
-  id            String      @id @default(uuid()) @db.Uuid
-  tenantId      String      @db.Uuid
-  status        OrderStatus @default(PENDING)
-  totalCents    Int         @default(0)
-  branchId      String?     @db.Uuid
-  customerRef   String?     // B2B customer reference: "Jollibee Branch 3", "PO #1234", etc.
-  note          String?     // Internal note for staff
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @db.Uuid
+  status         OrderStatus @default(PENDING)
+  totalCents     Int         @default(0)
+  branchId       String?     @db.Uuid
+  /// Linked contact for AR tracking. Null = walk-in / untracked customer.
+  contactId      String?     @db.Uuid
+  customerRef    String?     // Free-text fallback when contactId is null: "Jollibee Branch 3", "PO #1234"
+  note           String?     // Internal note for staff
+  /// Credit due date for AR orders. Null = COD / no terms.
+  paymentDueDate DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id])
   branch     Branch?     @relation(fields: [branchId], references: [id])
+  contact    Contact?    @relation(fields: [contactId], references: [id])
   items      OrderItem[]
   payments   Payment[]
 
   @@index([tenantId])
   @@index([branchId])
+  @@index([contactId])
   @@index([status])
   @@index([createdAt])
 }
@@ -240,6 +285,8 @@ model OrderItem {
   skuId       String @db.Uuid
   quantity    Int
   priceAtTime Int
+  /// Cost of the SKU at time of order — used for accurate COGS reporting.
+  costAtTime  Int    @default(0)
 
   order       Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
   sku         Sku    @relation(fields: [skuId], references: [id], onDelete: Restrict)
@@ -247,6 +294,8 @@ model OrderItem {
   @@index([orderId])
   @@index([skuId])
 }
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
 
 enum PaymentStatus {
   PENDING
@@ -283,6 +332,8 @@ model Payment {
   @@index([method])
 }
 
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
 model InventoryMovement {
   id             String         @id @default(uuid()) @db.Uuid
   tenantId       String         @db.Uuid
@@ -296,6 +347,8 @@ model InventoryMovement {
   approvalStatus ApprovalStatus @default(APPROVED)
   actorId        String?        @db.Uuid
   branchId       String?        @db.Uuid
+  /// Links the TRANSFER_OUT movement to its corresponding TRANSFER_IN movement.
+  transferPairId String?        @db.Uuid
   /// Reserved for future batch/lot tracking. Nullable until the Batch model is introduced.
   batchId        String?        @db.Uuid
   createdAt      DateTime       @default(now())
@@ -310,7 +363,58 @@ model InventoryMovement {
   @@index([branchId])
   @@index([approvalStatus])
   @@index([actorId])
+  @@index([transferPairId])
 }
+
+// ─── Stock Transfers ──────────────────────────────────────────────────────────
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+model StockTransferRequest {
+  id            String         @id @default(uuid()) @db.Uuid
+  tenantId      String         @db.Uuid
+  /// Null = HQ / no specific source branch
+  fromBranchId  String?        @db.Uuid
+  toBranchId    String         @db.Uuid
+  status        TransferStatus @default(PENDING)
+  requestedById String         @db.Uuid
+  approvedById  String?        @db.Uuid
+  note          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  fromBranch    Branch?        @relation("TransferFrom", fields: [fromBranchId], references: [id])
+  toBranch      Branch         @relation("TransferTo", fields: [toBranchId], references: [id])
+  requestedBy   User           @relation("TransferRequester", fields: [requestedById], references: [id])
+  approvedBy    User?          @relation("TransferApprover", fields: [approvedById], references: [id])
+  items         StockTransferItem[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([fromBranchId])
+  @@index([toBranchId])
+}
+
+model StockTransferItem {
+  id         String               @id @default(uuid()) @db.Uuid
+  transferId String               @db.Uuid
+  skuId      String               @db.Uuid
+  quantity   Int
+
+  transfer   StockTransferRequest @relation(fields: [transferId], references: [id])
+  sku        Sku                  @relation(fields: [skuId], references: [id])
+
+  @@index([transferId])
+  @@index([skuId])
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
 
 enum NotificationType {
   ORDER_CREATED
