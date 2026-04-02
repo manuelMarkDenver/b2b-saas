@@ -15,6 +15,35 @@ export class InventoryService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** Get stock per branch, derived from movements (IN - OUT - TRANSFER_OUT + TRANSFER_IN). */
+  async getBranchStock(tenantId: string, branchId?: string, skuId?: string) {
+    const where: Record<string, unknown> = {
+      tenantId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      type: { in: [MovementType.IN, MovementType.OUT, MovementType.TRANSFER_IN, MovementType.TRANSFER_OUT] },
+    };
+    if (branchId) where.branchId = branchId;
+    if (skuId) where.skuId = skuId;
+
+    const movements = await this.prisma.inventoryMovement.findMany({
+      where,
+      select: { branchId: true, skuId: true, type: true, quantity: true },
+    });
+
+    const branchStock = new Map<string, Map<string, number>>();
+    for (const m of movements) {
+      if (!m.branchId) continue;
+      if (!branchStock.has(m.branchId)) branchStock.set(m.branchId, new Map());
+      const current = branchStock.get(m.branchId)!.get(m.skuId) ?? 0;
+      const delta =
+        m.type === MovementType.OUT || m.type === MovementType.TRANSFER_OUT
+          ? -m.quantity
+          : m.quantity;
+      branchStock.get(m.branchId)!.set(m.skuId, current + delta);
+    }
+    return branchStock;
+  }
+
   async logMovement(
     tenantId: string,
     data: {
