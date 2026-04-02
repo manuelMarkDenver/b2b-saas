@@ -131,16 +131,14 @@ export function CreateItemModal({
           <DialogTitle>Create Item</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Hero Image */}
-          <div className="w-full rounded-lg border border-border/60 bg-muted/30 p-4 flex items-center justify-center">
-            <ImageUpload
-              currentUrl={form.imageUrl || null}
-              tenantSlug={tenantSlug}
-              size={180}
-              onUploaded={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
-              onRemoved={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-            />
-          </div>
+          {/* Hero Image Dropzone */}
+          <ImageUpload
+            currentUrl={form.imageUrl || null}
+            tenantSlug={tenantSlug}
+            variant="dropzone"
+            onUploaded={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+            onRemoved={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+          />
 
           {/* Divider */}
           <div className="border-t border-border/60" />

@@ -386,7 +386,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           )}
           <Button onClick={() => setProductOpen(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
-            New Product
+            Create Item
           </Button>
         </div>
       </div>
