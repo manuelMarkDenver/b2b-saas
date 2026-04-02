@@ -772,7 +772,7 @@ async function main() {
   // ===========================
 
   async function createTransferIfAbsent(tenantId: string, fromBranchId: string, toBranchId: string, userId: string, items: Array<{ skuId: string; quantity: number }>, note?: string) {
-    const existing = await prisma.stockTransferRequest.findFirst({ where: { tenantId, fromBranchId, toBranchId } });
+    const existing = await prisma.stockTransferRequest.findFirst({ where: { tenantId, fromBranchId, toBranchId, note: note ?? null } });
     if (existing) return;
 
     const skus = await prisma.sku.findMany({ where: { id: { in: items.map((i) => i.skuId) }, tenantId }, select: { id: true, stockOnHand: true } });
@@ -804,20 +804,38 @@ async function main() {
   }
 
   // Use the owner user IDs for requestedBy
+  // Peak Hardware — 2 transfers
   await createTransferIfAbsent(
     hardwareTenant.id, hwMainBranch.id, hwRetailBranch.id, users.hardwareOwner.id,
     [{ skuId: boltSku.id, quantity: 200 }, { skuId: washerSku.id, quantity: 200 }, { skuId: glovesSku.id, quantity: 10 }],
     "Restocking retail counter from warehouse",
   );
   await createTransferIfAbsent(
+    hardwareTenant.id, hwMainBranch.id, hwRetailBranch.id, users.hardwareOwner.id,
+    [{ skuId: boltSku.id, quantity: 50 }, { skuId: glovesSku.id, quantity: 5 }],
+    "Emergency top-up for weekend rush",
+  );
+  // Metro Pizza Supply — 2 transfers
+  await createTransferIfAbsent(
     foodTenant.id, mpsCentralBranch.id, mpsKatiBranch.id, users.foodOwner.id,
     [{ skuId: flourSku.id, quantity: 20 }, { skuId: mozzaSku.id, quantity: 15 }, { skuId: sauceSku.id, quantity: 10 }],
     "Weekly supply to Katipunan outlet",
   );
   await createTransferIfAbsent(
+    foodTenant.id, mpsCentralBranch.id, mpsKatiBranch.id, users.foodOwner.id,
+    [{ skuId: flourSku.id, quantity: 10 }, { skuId: sauceSku.id, quantity: 5 }],
+    "Midweek top-up — Katipunan outlet",
+  );
+  // Cagayan General Store — 2 transfers
+  await createTransferIfAbsent(
     retailTenant.id, cgsMainBranch.id, cgsAnnexBranch.id, users.retailOwner.id,
     [{ skuId: colaSku.id, quantity: 120 }, { skuId: waterSku.id, quantity: 240 }, { skuId: noodlesSku.id, quantity: 60 }],
     "Annex branch restock",
+  );
+  await createTransferIfAbsent(
+    retailTenant.id, cgsMainBranch.id, cgsAnnexBranch.id, users.retailOwner.id,
+    [{ skuId: colaSku.id, quantity: 48 }, { skuId: noodlesSku.id, quantity: 24 }],
+    "Fiesta weekend stock top-up",
   );
 
   // ===========================

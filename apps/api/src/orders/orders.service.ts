@@ -94,7 +94,7 @@ export class OrdersService {
     page: number,
     limit: number,
     branchId?: string,
-    filters: { status?: string; search?: string; from?: string; to?: string; minCents?: number; maxCents?: number } = {},
+    filters: { status?: string; search?: string; from?: string; to?: string; minCents?: number; maxCents?: number; hasTerms?: string } = {},
   ) {
     const skip = (page - 1) * limit;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,6 +117,8 @@ export class OrdersService {
       if (filters.minCents !== undefined) where.totalCents.gte = filters.minCents;
       if (filters.maxCents !== undefined) where.totalCents.lte = filters.maxCents;
     }
+    if (filters.hasTerms === 'true') where.paymentDueDate = { not: null };
+    if (filters.hasTerms === 'false') where.paymentDueDate = null;
     const [data, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({
         where,

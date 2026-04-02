@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-02 — MS19g: unified Create Item flow (shared modal, auto-SKU with override, single endpoint). Transfers hidden (shipped: false) — history-only for staging. MS19f: feature flags (stockTransfers/paymentTerms), customer in orders, CSV import modal, catalog UI fixes. MS19e: branch stock. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo. Feature flag system documented at [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
+> Last updated: 2026-04-03 — PR#67: order UX (credit limit warning, paymentDueDate hidden for walk-in, customer auto-search on focus), customers panel (orders col, remaining credit, branch in history, COD clarification), dashboard (branch banner, AR stat cards), transfers (pagination, actor, filters). feat/ux-polish branch: 3-col compact product grid, Terms/Overdue badges on orders + hasTerms filter, SKU archive button (OWNER/ADMIN), seeder updated (2 transfers per tenant, idempotency by note). Archive behavior documented below. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
 
 ---
 
@@ -194,6 +194,15 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | CRUD for products and SKUs via REST API | ✅ |
 | Tenant isolation enforced at service layer | ✅ |
 | Seed: realistic products + SKUs for 3 demo tenants | ✅ |
+| Archive SKU / Archive Product (`PATCH /catalog/skus/:id/archive`) | ✅ |
+
+**Archive behavior (SKU):**
+- `PATCH /catalog/skus/:id/archive` sets `isArchived: true, isActive: false`. OWNER/ADMIN only.
+- Archived SKUs are hidden from the product picker in new/edit orders (the `/skus` endpoint filters `isArchived: false`).
+- Archived SKUs still appear in the **Inventory panel** because movements are factual history and must be preserved. Movements reference the SKU directly and are never deleted.
+- Existing **Order items** that reference an archived SKU remain intact — they store a snapshot of the price at time of sale (`priceAtTime`) and will always display correctly.
+- To unarchive: update `isArchived: false, isActive: true` via the admin or a future UI toggle.
+- If you archive a product: all its SKUs are also archived in the same transaction.
 
 ---
 
@@ -221,6 +230,17 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | Negative stock prevention on order confirmation | ✅ |
 | Pagination: `GET /orders?page&limit` → `{ data, meta }` | ✅ |
 | Orders panel UI with right-side detail Sheet | ✅ |
+| `paymentDueDate` on Order — null = COD, set = credit/terms order | ✅ |
+| Terms badge (blue) + Overdue badge (red) on order rows | ✅ |
+| Filter: `GET /orders?hasTerms=true\|false` to show only terms or COD orders | ✅ |
+| Customer type selection (walk-in / existing / new) in order sheet | ✅ |
+| Credit limit check when selecting existing customer | ✅ |
+
+**Terms vs COD orders:**
+- **COD (Cash on Delivery):** `paymentDueDate = null`. Payment is expected at time of order. No outstanding AR created.
+- **Terms order:** `paymentDueDate` is set. Indicates a credit agreement — customer owes the balance. Requires `paymentTerms` feature flag enabled for the tenant.
+- A terms order appears with a blue "Terms" badge in the order list. If `paymentDueDate` has passed and balance > 0, it shows red "Overdue".
+- The Customers panel AR summary tracks all unpaid terms orders per contact.
 
 ### MS6 — Payments ✅
 
