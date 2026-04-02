@@ -15,7 +15,7 @@ export default async function TenantDashboard({ params }: Props) {
         title={theme.brandName}
         description="Overview of your inventory, orders, and payments."
       />
-      <DashboardStats tenantSlug={tenantSlug} />
+      <DashboardStats tenantSlug={tenantSlug} brandName={theme.brandName} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MovementType } from '@prisma/client';
+import { MovementType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
@@ -145,16 +145,66 @@ export class TransfersService {
     });
   }
 
-  list(tenantId: string) {
-    return this.prisma.stockTransferRequest.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        fromBranch: { select: { id: true, name: true } },
-        toBranch: { select: { id: true, name: true } },
-        requestedBy: { select: { id: true, email: true } },
-        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-      },
-    });
+  async list(
+    tenantId: string,
+    opts: {
+      from?: string;
+      to?: string;
+      fromBranchId?: string;
+      toBranchId?: string;
+      skuSearch?: string;
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, opts.limit ?? 20);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.StockTransferRequestWhereInput = {
+      tenantId,
+    };
+    if (opts.from) where.createdAt = { ...(where.createdAt as object), gte: new Date(opts.from) };
+    if (opts.to) {
+      const toEnd = new Date(opts.to);
+      toEnd.setHours(23, 59, 59, 999);
+      where.createdAt = { ...(where.createdAt as object), lte: toEnd };
+    }
+    if (opts.fromBranchId) where.fromBranchId = opts.fromBranchId;
+    if (opts.toBranchId) where.toBranchId = opts.toBranchId;
+    if (opts.skuSearch) {
+      const q = opts.skuSearch;
+      where.items = {
+        some: {
+          sku: {
+            OR: [
+              { code: { contains: q, mode: 'insensitive' } },
+              { name: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        },
+      };
+    }
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.stockTransferRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          fromBranch: { select: { id: true, name: true } },
+          toBranch: { select: { id: true, name: true } },
+          requestedBy: { select: { id: true, email: true } },
+          items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+        },
+      }),
+      this.prisma.stockTransferRequest.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 }

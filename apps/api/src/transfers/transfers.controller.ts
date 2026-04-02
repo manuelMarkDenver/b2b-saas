@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
 import type { RequestWithUser } from '../common/auth/auth.types';
@@ -11,12 +11,27 @@ export class TransfersController {
   constructor(private readonly transfersService: TransfersService) {}
 
   @Get()
-  list(@Req() req: RequestWithUser) {
+  list(
+    @Req() req: RequestWithUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('fromBranchId') fromBranchId?: string,
+    @Query('toBranchId') toBranchId?: string,
+    @Query('skuSearch') skuSearch?: string,
+    @Query('page') page?: string,
+  ) {
     const features = req.tenant!.features as Record<string, boolean> | null;
     if (!features?.stockTransfers) {
       throw new ForbiddenException("Feature 'stockTransfers' is not enabled for this tenant");
     }
-    return this.transfersService.list(req.tenant!.id);
+    return this.transfersService.list(req.tenant!.id, {
+      from,
+      to,
+      fromBranchId: fromBranchId || undefined,
+      toBranchId: toBranchId || undefined,
+      skuSearch: skuSearch || undefined,
+      page: page ? parseInt(page, 10) : undefined,
+    });
   }
 
   @Post()
