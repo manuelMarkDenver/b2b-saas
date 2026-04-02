@@ -41,8 +41,12 @@ export class ContactsController {
   }
 
   @Get('ar-overview')
-  arOverview(@Req() req: RequestWithUser) {
-    return this.contacts.getArOverview(req.tenant!.id, req.membership!.role);
+  arOverview(
+    @Req() req: RequestWithUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.contacts.getArOverview(req.tenant!.id, req.membership!.role, from, to);
   }
 
   @Get(':id')

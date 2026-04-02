@@ -45,6 +45,19 @@ type InventoryRow = {
   createdAt: string;
 };
 
+type ArRow = {
+  id: string;
+  name: string;
+  type: 'CUSTOMER' | 'DISTRIBUTOR';
+  phone: string | null;
+  creditLimitCents: number;
+  totalBilledCents: number;
+  totalPaidCents: number;
+  balanceCents: number;
+  overdueCents: number;
+  orderCount: number;
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function downloadCsv(rows: string[][], filename: string) {
@@ -85,6 +98,7 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
+  const [arRows, setArRows] = useState<ArRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('orders');
@@ -94,16 +108,18 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
     setError(null);
     try {
       const params = `from=${dateRange.from}&to=${dateRange.to}`;
-      const [oRes, pRes, iRes] = await Promise.all([
+      const [oRes, pRes, iRes, arRes] = await Promise.all([
         apiFetch(`/reports/orders?${params}`, { tenantSlug, branchId: null }),
         apiFetch(`/reports/payments?${params}`, { tenantSlug, branchId: null }),
         apiFetch(`/reports/inventory?${params}`, { tenantSlug, branchId: null }),
+        apiFetch(`/contacts/ar-overview?${params}`, { tenantSlug }),
       ]);
       if (!oRes.ok || !pRes.ok || !iRes.ok) throw new Error('Failed to fetch report data');
       const [oData, pData, iData] = await Promise.all([oRes.json(), pRes.json(), iRes.json()]);
       setOrders(oData.data);
       setPayments(pData.data);
       setInventory(iData.data);
+      if (arRes.ok) setArRows(await arRes.json() as ArRow[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -133,6 +149,26 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
     );
   }
 
+  function exportAr() {
+    downloadCsv(
+      [
+        ['Name', 'Type', 'Phone', 'Orders', 'Total Billed', 'Total Paid', 'Balance Due', 'Overdue', 'Credit Limit'],
+        ...arRows.map((r) => [
+          r.name,
+          r.type,
+          r.phone ?? '',
+          String(r.orderCount),
+          formatCents(r.totalBilledCents),
+          formatCents(r.totalPaidCents),
+          formatCents(Math.max(0, r.balanceCents)),
+          formatCents(r.overdueCents),
+          r.creditLimitCents > 0 ? formatCents(r.creditLimitCents) : 'COD',
+        ]),
+      ],
+      `customers-ar-${dateRange.from}-${dateRange.to}.csv`,
+    );
+  }
+
   function exportInventory() {
     downloadCsv(
       [
@@ -153,6 +189,7 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
             <span><span className="font-semibold text-foreground">{orders.length}</span> orders</span>
             <span><span className="font-semibold text-foreground">{payments.length}</span> payments</span>
             <span><span className="font-semibold text-foreground">{inventory.length}</span> movements</span>
+            <span><span className="font-semibold text-foreground">{arRows.length}</span> contacts</span>
           </div>
         )}
       </div>
@@ -166,6 +203,7 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="customers">Customers</TabsTrigger>
         </TabsList>
 
         {/* ── Orders tab ── */}
@@ -282,6 +320,77 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
                     </tr>
                   ))}
                 </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+        {/* ── Customers / AR tab ── */}
+        <TabsContent value="customers" className="mt-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              Balances calculated from orders within the selected date range.
+              Outstanding balance = billed − verified payments.
+            </p>
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={exportAr} disabled={arRows.length === 0 || loading}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
+          </div>
+          {loading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+          ) : arRows.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">No contacts with orders in selected period.</div>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full min-w-[700px]">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    {['Name', 'Type', 'Orders', 'Total Billed', 'Total Paid', 'Balance Due', 'Overdue', 'Credit Limit'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {arRows.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/40">
+                      <td className="px-4 py-2.5">
+                        <div className="text-sm font-medium">{r.name}</div>
+                        {r.phone && <div className="text-xs text-muted-foreground">{r.phone}</div>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${r.type === 'DISTRIBUTOR' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'}`}>
+                          {r.type === 'DISTRIBUTOR' ? 'Distributor' : 'Customer'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-sm tabular-nums text-center">{r.orderCount}</td>
+                      <td className="px-4 py-2.5 text-sm tabular-nums">{formatCents(r.totalBilledCents)}</td>
+                      <td className="px-4 py-2.5 text-sm tabular-nums text-green-600 dark:text-green-400">{formatCents(r.totalPaidCents)}</td>
+                      <td className="px-4 py-2.5 text-sm tabular-nums">
+                        <span className={r.balanceCents > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
+                          {formatCents(Math.max(0, r.balanceCents))}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-sm tabular-nums">
+                        {r.overdueCents > 0
+                          ? <span className="font-semibold text-red-600 dark:text-red-400">{formatCents(r.overdueCents)}</span>
+                          : <span className="text-muted-foreground">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-2.5 text-sm tabular-nums text-muted-foreground">
+                        {r.creditLimitCents > 0 ? formatCents(r.creditLimitCents) : <span className="text-xs">COD</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t bg-muted/30">
+                  <tr>
+                    <td colSpan={3} className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Totals</td>
+                    <td className="px-4 py-2.5 text-sm font-semibold tabular-nums">{formatCents(arRows.reduce((s, r) => s + r.totalBilledCents, 0))}</td>
+                    <td className="px-4 py-2.5 text-sm font-semibold tabular-nums text-green-600 dark:text-green-400">{formatCents(arRows.reduce((s, r) => s + r.totalPaidCents, 0))}</td>
+                    <td className="px-4 py-2.5 text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400">{formatCents(Math.max(0, arRows.reduce((s, r) => s + r.balanceCents, 0)))}</td>
+                    <td className="px-4 py-2.5 text-sm font-semibold tabular-nums text-red-600 dark:text-red-400">{formatCents(arRows.reduce((s, r) => s + r.overdueCents, 0))}</td>
+                    <td />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
