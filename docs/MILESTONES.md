@@ -710,6 +710,25 @@ Contact model has `creditLimitCents` field for credit limit tracking. Full AR/AP
 | Fixed CSV modal | Better text formatting |
 | Hero dropzone in Create/Edit | Full-width image upload |
 
+#### Transfers & Feature Flags Fixes
+
+| Bug | Root Cause | Fix |
+|-----|------------|-----|
+| Transfer dropdown empty | Wrong URL `/catalog/skus` instead of `/skus` | Fixed in `transfers-panel.tsx` |
+| Admin toggle broken | `stockTransfers`/`paymentTerms` missing from DTO and service | Added to `UpdateTenantFlagsDto`, `TenantFeatures` type, and service |
+| Transfers in wrong place | Was temporarily added to Inventory tabs | Kept as standalone `/transfers` page (sidebar entry) |
+
+#### Transfer Architecture (Reference)
+
+| Scenario | Behavior |
+|----------|----------|
+| Branch-to-branch | Creates `TRANSFER_OUT` on source + `TRANSFER_IN` on destination; updates `Sku.stockOnHand` on both |
+| HQ/All branches | Empty `fromBranchId` → uses global `sku.stockOnHand`; only creates `TRANSFER_IN` (like receiving from warehouse) |
+| Tenant-wide history | Sees both `TRANSFER_OUT` and `TRANSFER_IN` movements |
+| Branch-scoped history | Each branch sees only its own side (IN or OUT) |
+
+**Note:** "HQ / All branches" is a UI convenience option, not a real branch record.
+
 ---
 
 ### MS16 — UI/UX Overhaul ✅ Complete

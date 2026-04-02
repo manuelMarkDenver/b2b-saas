@@ -13,6 +13,8 @@ type TenantFeatures = {
   payments: boolean;
   marketplace: boolean;
   reports: boolean;
+  stockTransfers: boolean;
+  paymentTerms: boolean;
 };
 
 const TENANT_SELECT = {
@@ -119,6 +121,8 @@ export class AdminService {
       payments: dto.payments ?? current.payments ?? true,
       marketplace: dto.marketplace ?? current.marketplace ?? false,
       reports: dto.reports ?? current.reports ?? false,
+      stockTransfers: dto.stockTransfers ?? current.stockTransfers ?? false,
+      paymentTerms: dto.paymentTerms ?? current.paymentTerms ?? false,
     };
 
     return this.prisma.tenant.update({

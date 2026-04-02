@@ -49,7 +49,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
     const [trRes, brRes, skuRes, memRes] = await Promise.all([
       apiFetch('/transfers', { tenantSlug }),
       apiFetch('/branches', { tenantSlug }),
-      apiFetch('/catalog/skus', { tenantSlug }),
+      apiFetch('/skus', { tenantSlug }),
       apiFetch('/memberships', { tenantSlug }),
     ]);
     if (trRes.ok) setTransfers(await trRes.json());

@@ -17,7 +17,6 @@ import { useToast } from '@/components/ui/toast';
 import { ProductThumb } from '@/components/product-thumb';
 import { ImageUpload } from '@/components/image-upload';
 import { CreateItemModal } from '@/components/create-item-modal';
-import { TransfersPanel } from '@/components/transfers-panel';
 
 type Category = { id: string; name: string; slug: string };
 
@@ -395,7 +394,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       <Tabs defaultValue="stock">
         <TabsList>
           <TabsTrigger value="stock">Stock Levels</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
           <TabsTrigger value="history" className="relative">
             History
             {!staffMode && pendingCount > 0 && (
@@ -509,11 +507,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               )}
             </div>
           </div>
-        </TabsContent>
-
-        {/* ── Transfers tab ── */}
-        <TabsContent value="transfers" className="mt-4">
-          <TransfersPanel tenantSlug={tenantSlug} />
         </TabsContent>
 
         {/* ── History tab ── */}
