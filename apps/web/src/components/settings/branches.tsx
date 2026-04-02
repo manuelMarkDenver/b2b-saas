@@ -141,7 +141,6 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
           <thead>
             <tr className="border-b border-border bg-muted/40">
               <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
-              <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Type</th>
               <th className="px-4 py-2.5 text-left font-medium text-muted-foreground hidden sm:table-cell">Address</th>
               <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Status</th>
               {canManage && <th className="px-4 py-2.5" />}
@@ -150,18 +149,18 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
           <tbody>
             {branches.map((branch) => (
               <tr key={branch.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 font-medium">
-                  {branch.name}
-                  {branch.isDefault && (
-                    <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                      Default
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium">{branch.name}</span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {BRANCH_TYPE_LABELS[branch.type] ?? branch.type}
                     </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 hidden md:table-cell">
-                  <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {BRANCH_TYPE_LABELS[branch.type] ?? branch.type}
-                  </span>
+                    {branch.isDefault && (
+                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        Default
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
                   {branch.address ?? <span className="italic text-muted-foreground/60">—</span>}
