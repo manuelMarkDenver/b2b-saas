@@ -49,7 +49,7 @@ describe('Stock Transfers (e2e)', () => {
 
   describe('POST /transfers', () => {
     it('creates transfer and updates stockOnHand (tenant-wide)', async () => {
-      if (!skuId || !branchAId || !branchBId || branchAId === branchBId || branches.length < 2) {
+      if (!skuId || !branchAId || !branchBId || branchAId === branchBId) {
         // Skip if not enough branches configured
         return;
       }

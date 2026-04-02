@@ -35,14 +35,14 @@ type SheetSide = 'right' | 'left' | 'top' | 'bottom';
 function sideClasses(side: SheetSide) {
   switch (side) {
     case 'left':
-      return 'left-0 top-0 h-dvh w-[420px] max-w-[92vw] data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0';
+      return 'left-0 top-0 h-dvh w-full data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0';
     case 'top':
       return 'left-0 top-0 w-full data-[state=closed]:-translate-y-full data-[state=open]:translate-y-0';
     case 'bottom':
       return 'left-0 bottom-0 w-full data-[state=closed]:translate-y-full data-[state=open]:translate-y-0';
     case 'right':
     default:
-      return 'right-0 top-0 h-dvh w-[420px] max-w-[92vw] data-[state=closed]:translate-x-full data-[state=open]:translate-x-0';
+      return 'right-0 top-0 h-dvh w-full data-[state=closed]:translate-x-full data-[state=open]:translate-x-0';
   }
 }
 

@@ -56,6 +56,12 @@ type Order = {
 
 type CartLine = { skuId: string; quantity: number };
 
+type Contact = {
+  id: string;
+  name: string;
+  type: "CUSTOMER" | "DISTRIBUTOR";
+};
+
 const STATUS_LABELS: Record<Order["status"], string> = {
   PENDING: "Pending",
   CONFIRMED: "Confirmed",
@@ -126,6 +132,14 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [sortKey, setSortKey] = React.useState<'createdAt' | 'totalCents' | 'status'>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [skus, setSkus] = React.useState<Sku[]>([]);
+  const [contacts, setContacts] = React.useState<Contact[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState<string>('');
+  const [customerType, setCustomerType] = React.useState<'walkin' | 'existing' | 'new'>('walkin');
+  const [customerSearch, setCustomerSearch] = React.useState('');
+  const [newCustomerName, setNewCustomerName] = React.useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = React.useState('');
+  const [newCustomerType, setNewCustomerType] = React.useState<'CUSTOMER' | 'DISTRIBUTOR'>('CUSTOMER');
+  const [newCustomerCreditLimit, setNewCustomerCreditLimit] = React.useState('');
   const [pageStatus, setPageStatus] = React.useState<{ kind: "info" | "error"; text: string } | null>(null);
 
   // New Order sheet
@@ -157,6 +171,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     else { setSortKey(key); setSortDir('desc'); }
   }
 
+  const filteredContacts = React.useMemo(() => {
+    if (!customerSearch.trim()) return contacts;
+    const q = customerSearch.toLowerCase();
+    return contacts.filter((c) => c.name.toLowerCase().includes(q));
+  }, [contacts, customerSearch]);
+
   async function loadData(p = page, f = filters, dr = dateRange) {
     setPageStatus({ kind: "info", text: "Loading orders..." });
     try {
@@ -167,20 +187,23 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       params.set('to', dr.to);
       if (f.minAmount) params.set('minCents', String(Math.round(parseFloat(f.minAmount as string) * 100)));
       if (f.maxAmount) params.set('maxCents', String(Math.round(parseFloat(f.maxAmount as string) * 100)));
-      const [ordersRes, skusRes] = await Promise.all([
+      const [ordersRes, skusRes, contactsRes] = await Promise.all([
         apiFetch(`/orders?${params}`, { tenantSlug }),
         apiFetch("/skus", { tenantSlug }),
+        apiFetch("/contacts", { tenantSlug }),
       ]);
       if (!ordersRes.ok) throw new Error(`Orders failed: ${ordersRes.status}`);
       if (!skusRes.ok) throw new Error(`SKUs failed: ${skusRes.status}`);
-      const [ordersData, skusData] = await Promise.all([
+      const [ordersData, skusData, contactsData] = await Promise.all([
         ordersRes.json() as Promise<unknown>,
         skusRes.json() as Promise<unknown>,
+        contactsRes.json() as Promise<unknown>,
       ]);
       const parsed = ordersData as { data?: Order[]; meta?: Meta };
       setOrders(parsed.data ?? unwrapList<Order>(ordersData));
       if (parsed.meta) setMeta(parsed.meta);
       setSkus(unwrapList<Sku>(skusData).filter((s) => s.priceCents !== null));
+      setContacts(unwrapList<Contact>(contactsData));
       setPageStatus(null);
     } catch (err) {
       setPageStatus({ kind: "error", text: err instanceof Error ? err.message : "Unable to load data" });
@@ -243,16 +266,69 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     setCart([]);
     setSearch("");
     setOrderView("products");
+    setSelectedCustomerId("");
+    setCustomerType('walkin');
+    setCustomerSearch('');
+    setNewCustomerName('');
+    setNewCustomerPhone('');
+    setNewCustomerType('CUSTOMER');
+    setNewCustomerCreditLimit('');
     setNewOrderOpen(true);
   }
 
   async function placeOrder() {
     if (cart.length === 0) return;
     setPageStatus({ kind: "info", text: "Creating order..." });
+
+    let contactId = selectedCustomerId;
+    let customerRef = '';
+
+    if (customerType === 'walkin') {
+      customerRef = 'Walk-in';
+    } else if (customerType === 'existing') {
+      if (!selectedCustomerId) {
+        setPageStatus({ kind: "error", text: "Please select a customer or choose Walk-in" });
+        return;
+      }
+      const contact = contacts.find((c) => c.id === selectedCustomerId);
+      customerRef = contact?.name ?? '';
+    } else if (customerType === 'new') {
+      if (!newCustomerName.trim()) {
+        setPageStatus({ kind: "error", text: "Customer name is required" });
+        return;
+      }
+      const contactBody: Record<string, unknown> = {
+        name: newCustomerName.trim(),
+        type: newCustomerType,
+      };
+      if (newCustomerPhone.trim()) contactBody.phone = newCustomerPhone.trim();
+      if (newCustomerCreditLimit) contactBody.creditLimitCents = Math.round(parseFloat(newCustomerCreditLimit) * 100);
+
+      const res = await apiFetch("/contacts", {
+        tenantSlug,
+        method: "POST",
+        body: JSON.stringify(contactBody),
+      });
+      if (!res.ok) {
+        const msg = await readApiError(res);
+        setPageStatus({ kind: "error", text: `Create customer failed: ${res.status}${msg ? ` (${msg})` : ""}` });
+        return;
+      }
+      const newContact = await res.json() as { id: string; name: string };
+      contactId = newContact.id;
+      customerRef = newContact.name;
+    }
+
+    const body: { items: { skuId: string; quantity: number }[]; contactId?: string; customerRef: string } = {
+      items: cart.map((l) => ({ skuId: l.skuId, quantity: l.quantity })),
+      customerRef,
+    };
+    if (contactId) body.contactId = contactId;
+
     const res = await apiFetch("/orders", {
       tenantSlug,
       method: "POST",
-      body: JSON.stringify({ items: cart.map((l) => ({ skuId: l.skuId, quantity: l.quantity })) }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const msg = await readApiError(res);
@@ -261,7 +337,13 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     }
     setNewOrderOpen(false);
     setCart([]);
-    pushToast({ variant: "success", title: "Order created", message: "" });
+    setCustomerType('walkin');
+    setSelectedCustomerId('');
+    setNewCustomerName('');
+    setNewCustomerPhone('');
+    setNewCustomerType('CUSTOMER');
+    setNewCustomerCreditLimit('');
+    pushToast({ variant: "success", title: "Order created", message: customerRef !== 'Walk-in' ? customerRef : "" });
     await loadData();
   }
 
@@ -682,6 +764,99 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
           ) : (
             /* ── CART VIEW ── */
             <>
+              <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-5 pt-4 pb-3 backdrop-blur">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Customer</label>
+                  <select
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    value={customerType}
+                    onChange={(e) => {
+                      setCustomerType(e.target.value as 'walkin' | 'existing' | 'new');
+                      if (e.target.value === 'walkin') {
+                        setSelectedCustomerId('');
+                        setCustomerSearch('');
+                      }
+                    }}
+                  >
+                    <option value="walkin">Walk-in</option>
+                    <option value="existing">Existing Customer</option>
+                    <option value="new">New Customer</option>
+                  </select>
+
+                  {customerType === 'existing' && (
+                    <>
+                      <input
+                        type="search"
+                        placeholder="Search customer..."
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                      />
+                      {customerSearch.trim() && (
+                        <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-background">
+                          {filteredContacts.length === 0 ? (
+                            <div className="px-3 py-2 text-xs text-muted-foreground">No customers found</div>
+                          ) : (
+                            filteredContacts.slice(0, 10).map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                                onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(c.name); }}
+                              >
+                                {c.name} ({c.type === 'DISTRIBUTOR' ? 'Distributor' : 'Customer'})
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {customerType === 'new' && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Name *"
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={newCustomerName}
+                        onChange={(e) => setNewCustomerName(e.target.value)}
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Phone (for collections)"
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={newCustomerPhone}
+                        onChange={(e) => setNewCustomerPhone(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <select
+                          className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                          value={newCustomerType}
+                          onChange={(e) => setNewCustomerType(e.target.value as 'CUSTOMER' | 'DISTRIBUTOR')}
+                        >
+                          <option value="CUSTOMER">Customer</option>
+                          <option value="DISTRIBUTOR">Distributor</option>
+                        </select>
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₱</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={100}
+                            placeholder="Credit limit"
+                            className="h-9 w-full rounded-md border border-input bg-background pl-6 pr-3 text-sm"
+                            value={newCustomerCreditLimit}
+                            onChange={(e) => setNewCustomerCreditLimit(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">Credit limit = 0 means COD only. Set a limit to allow terms orders.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto px-5 pb-36">
                 <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card">
                   {cart.map((line) => {

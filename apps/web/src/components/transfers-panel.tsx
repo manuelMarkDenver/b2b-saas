@@ -49,7 +49,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
     const [trRes, brRes, skuRes, memRes] = await Promise.all([
       apiFetch('/transfers', { tenantSlug }),
       apiFetch('/branches', { tenantSlug }),
-      apiFetch('/skus', { tenantSlug }),
+      apiFetch('/skus?limit=1000', { tenantSlug }),
       apiFetch('/memberships', { tenantSlug }),
     ]);
     if (trRes.ok) setTransfers(await trRes.json());
@@ -73,7 +73,9 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
   useEffect(() => { load(); }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function openDialog() {
-    setFromBranchId('');
+    // Pre-select default branch as source if available
+    const defaultBranch = branches.find((b) => b.isDefault) ?? branches[0];
+    setFromBranchId(defaultBranch?.id ?? '');
     setToBranchId('');
     setNote('');
     setLines([{ skuId: '', quantity: 1 }]);
@@ -94,8 +96,9 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
   }
 
   async function handleSubmit() {
+    if (!fromBranchId) { setFormError('Source branch is required'); return; }
     if (!toBranchId) { setFormError('Destination branch is required'); return; }
-    if (fromBranchId && fromBranchId === toBranchId) { setFormError('Source and destination must differ'); return; }
+    if (fromBranchId === toBranchId) { setFormError('Source and destination must differ'); return; }
     const validLines = lines.filter((l) => l.skuId && l.quantity > 0);
     if (validLines.length === 0) { setFormError('Add at least one item'); return; }
 
@@ -103,7 +106,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
     setFormError(null);
 
     const body = JSON.stringify({
-      fromBranchId: fromBranchId || undefined,
+      fromBranchId,
       toBranchId,
       note: note.trim() || undefined,
       items: validLines,
@@ -131,13 +134,17 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
           <p className="text-sm text-muted-foreground">Move inventory between branches.</p>
         </div>
         {canManage && (
-          <button
-            onClick={openDialog}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New transfer
-          </button>
+          branches.length < 2 ? (
+            <span className="text-xs text-muted-foreground">Add at least 2 branches to enable transfers</span>
+          ) : (
+            <button
+              onClick={openDialog}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New transfer
+            </button>
+          )
         )}
       </div>
 
@@ -151,7 +158,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
             <div key={t.id} className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium">
-                  <span className="truncate">{t.fromBranch?.name ?? 'HQ'}</span>
+                  <span className="truncate">{t.fromBranch?.name ?? '(legacy)'}</span>
                   <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{t.toBranch.name}</span>
                 </div>
@@ -182,15 +189,15 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">From branch</label>
+                <label className="mb-1 block text-sm font-medium">From branch *</label>
                 <select
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   value={fromBranchId}
                   onChange={(e) => setFromBranchId(e.target.value)}
                 >
-                  <option value="">HQ / All branches</option>
+                  <option value="" disabled>Select source branch…</option>
                   {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
+                    <option key={b.id} value={b.id}>{b.name}{b.isDefault ? ' (main)' : ''}</option>
                   ))}
                 </select>
               </div>
@@ -204,7 +211,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                 >
                   <option value="">Select destination…</option>
                   {branches
-                    .filter((b) => !fromBranchId || b.id !== fromBranchId)
+                    .filter((b) => b.id !== fromBranchId)
                     .map((b) => (
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}

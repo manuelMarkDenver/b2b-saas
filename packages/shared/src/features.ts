@@ -108,7 +108,9 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     description:
       'Move inventory between branches with a formal request and approval flow. Full audit trail of every transfer.',
     icon: 'ArrowLeftRight',
-    shipped: true,
+    shipped: false,
+    badge: 'Coming soon',
+    phase: 'MS21',
   },
   {
     key: 'paymentTerms',

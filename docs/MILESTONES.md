@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-02 — MS19g: unified Create Item flow (shared modal, auto-SKU with override, single endpoint). MS19f: feature flags (stockTransfers/paymentTerms), customer in orders, CSV import modal, catalog UI fixes. MS19e: branch stock. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo.
+> Last updated: 2026-04-02 — MS19g: unified Create Item flow (shared modal, auto-SKU with override, single endpoint). Transfers hidden (shipped: false) — history-only for staging. MS19f: feature flags (stockTransfers/paymentTerms), customer in orders, CSV import modal, catalog UI fixes. MS19e: branch stock. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo. Loyverse competitive gap analysis added (see [docs/LOYVERSE_REFERENCE.md](./LOYVERSE_REFERENCE.md)).
 
 ---
 
@@ -714,9 +714,10 @@ Contact model has `creditLimitCents` field for credit limit tracking. Full AR/AP
 
 | Bug | Root Cause | Fix |
 |-----|------------|-----|
-| Transfer dropdown empty | Wrong URL `/catalog/skus` instead of `/skus` | Fixed in `transfers-panel.tsx` |
+| Transfer dropdown empty | Wrong URL `/catalog/skus` instead of `/skus` | Fixed with `?limit=1000` in `transfers-panel.tsx` |
 | Admin toggle broken | `stockTransfers`/`paymentTerms` missing from DTO and service | Added to `UpdateTenantFlagsDto`, `TenantFeatures` type, and service |
-| Transfers in wrong place | Was temporarily added to Inventory tabs | Kept as standalone `/transfers` page (sidebar entry) |
+| Transfers hidden from UI | `stockTransfers.shipped: true` caused nav to show before feature was ready | Reverted to `shipped: false` — feature hidden until post-staging |
+| HQ label unclear | "HQ / All branches" confusing | Renamed to "Main / Global stock" |
 
 #### Transfer Architecture (Reference)
 
@@ -727,7 +728,22 @@ Contact model has `creditLimitCents` field for credit limit tracking. Full AR/AP
 | Tenant-wide history | Sees both `TRANSFER_OUT` and `TRANSFER_IN` movements |
 | Branch-scoped history | Each branch sees only its own side (IN or OUT) |
 
-**Note:** "HQ / All branches" is a UI convenience option, not a real branch record.
+**Note:** "Main / Global stock" is a UI convenience option, not a real branch record.
+
+#### Transfer Feature Status
+
+| Decision | Value | Date |
+|----------|-------|------|
+| Real stock movement via transfers | ❌ No — deferred post-staging | 2026-04-02 |
+| History tracking only | ✅ Yes — transfer records exist | 2026-04-02 |
+| `stockTransfers.shipped` flag | `false` — feature hidden | 2026-04-02 |
+
+**Rationale:** Real branch-to-branch stock movement requires clear business rules before staging:
+- Which branch is deducted when an order is placed?
+- What is the "source" for HQ/global stock?
+- Who approves transfers?
+
+Post-staging approach: Phase 1 = history-only audit trail. Phase 2 = real stock movement with explicit approval workflow.
 
 ---
 
