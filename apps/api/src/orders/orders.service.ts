@@ -68,6 +68,7 @@ export class OrdersService {
         contactId: dto.contactId ?? null,
         customerRef: dto.customerRef?.trim() || null,
         note: dto.note?.trim() || null,
+        paymentDueDate: dto.paymentDueDate ? new Date(dto.paymentDueDate) : null,
         items: { create: itemsData },
       },
       include: {

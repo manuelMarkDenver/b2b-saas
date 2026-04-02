@@ -12,11 +12,19 @@ export class TransfersController {
 
   @Get()
   list(@Req() req: RequestWithUser) {
+    const features = req.tenant!.features as Record<string, boolean> | null;
+    if (!features?.stockTransfers) {
+      throw new ForbiddenException("Feature 'stockTransfers' is not enabled for this tenant");
+    }
     return this.transfersService.list(req.tenant!.id);
   }
 
   @Post()
   create(@Req() req: RequestWithUser, @Body() dto: CreateTransferDto) {
+    const features = req.tenant!.features as Record<string, boolean> | null;
+    if (!features?.stockTransfers) {
+      throw new ForbiddenException("Feature 'stockTransfers' is not enabled for this tenant");
+    }
     const role = req.membership!.role;
     if (role !== 'OWNER' && role !== 'ADMIN') {
       throw new ForbiddenException('Only OWNER or ADMIN can create stock transfers');

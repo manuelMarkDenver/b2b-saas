@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsInt,
   IsOptional,
   IsString,
@@ -42,4 +43,8 @@ export class CreateOrderDto {
   @IsOptional()
   @MaxLength(500)
   note?: string;
+
+  @IsDateString()
+  @IsOptional()
+  paymentDueDate?: string;
 }

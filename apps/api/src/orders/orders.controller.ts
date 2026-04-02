@@ -21,6 +21,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { PaymentsService } from '../payments/payments.service';
 import { PaymentMethod } from '@prisma/client';
+import { ForbiddenException } from '@nestjs/common';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, TenantGuard, FeatureFlagGuard)
@@ -33,6 +34,12 @@ export class OrdersController {
 
   @Post()
   createOrder(@Req() req: RequestWithUser, @Body() body: CreateOrderDto) {
+    if (body.paymentDueDate) {
+      const features = req.tenant!.features as Record<string, boolean> | null;
+      if (!features?.paymentTerms) {
+        throw new ForbiddenException("Feature 'paymentTerms' is not enabled for this tenant");
+      }
+    }
     const branchId = req.headers['x-branch-id'] as string | undefined;
     return this.ordersService.createOrder(req.tenant!.id, body, branchId);
   }
