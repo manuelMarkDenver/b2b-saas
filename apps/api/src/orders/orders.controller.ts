@@ -54,6 +54,7 @@ export class OrdersController {
     @Query('to') to?: string,
     @Query('minCents') minCentsRaw?: string,
     @Query('maxCents') maxCentsRaw?: string,
+    @Query('hasTerms') hasTerms?: string,
   ) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
     const minCents = minCentsRaw ? parseInt(minCentsRaw, 10) : undefined;
@@ -63,7 +64,7 @@ export class OrdersController {
       pagination.page ?? 1,
       pagination.limit ?? 20,
       branchId,
-      { status, search, from, to, minCents, maxCents },
+      { status, search, from, to, minCents, maxCents, hasTerms },
     );
   }
 

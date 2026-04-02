@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Archive } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
@@ -103,6 +103,9 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [adjustReason, setAdjustReason] = useState('');
   const [adjustSaving, setAdjustSaving] = useState(false);
   const staffMode = isStaff(tenantSlug);
+
+  // Archive SKU
+  const [archivingId, setArchivingId] = useState<string | null>(null);
 
   // Edit product dialog
   const [editSku, setEditSku] = useState<Sku | null>(null);
@@ -249,6 +252,23 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       }
     } finally {
       setAdjustSaving(false);
+    }
+  }
+
+  async function handleArchiveSku(skuId: string, skuName: string) {
+    if (!confirm(`Archive "${skuName}"? It will be hidden from new orders. Inventory history is preserved.`)) return;
+    setArchivingId(skuId);
+    try {
+      const res = await apiFetch(`/catalog/skus/${skuId}/archive`, { tenantSlug, method: 'PATCH' });
+      if (res.ok) {
+        pushToast({ variant: 'success', title: 'SKU archived', message: skuName });
+        loadSkus();
+      } else {
+        const d = await res.json().catch(() => ({})) as { message?: string };
+        pushToast({ variant: 'error', title: 'Archive failed', message: d.message ?? 'Something went wrong' });
+      }
+    } finally {
+      setArchivingId(null);
     }
   }
 
@@ -486,6 +506,17 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                         >
                           <Minus className="h-3 w-3" />
                         </button>
+                        {!staffMode && (
+                          <button
+                            type="button"
+                            onClick={() => handleArchiveSku(sku.id, sku.name)}
+                            disabled={archivingId === sku.id}
+                            className="flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                            title="Archive SKU"
+                          >
+                            <Archive className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
