@@ -34,6 +34,10 @@ export class CreateOrderDto {
   @MaxLength(200)
   customerRef?: string;
 
+  @IsUUID()
+  @IsOptional()
+  contactId?: string;
+
   @IsString()
   @IsOptional()
   @MaxLength(500)

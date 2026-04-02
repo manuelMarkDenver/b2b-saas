@@ -7,6 +7,8 @@ import {
   ShoppingCart,
   CreditCard,
   Boxes,
+  Package,
+  Users,
   Settings,
   GitBranch,
   FileText,
@@ -30,6 +32,8 @@ type NavItem = {
   href: string;
   icon: React.ElementType;
   featureKey?: string;
+  /** If set, only these roles can see this item */
+  roles?: string[];
 };
 
 type NavSection = {
@@ -50,6 +54,13 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Orders', href: '/orders', icon: ShoppingCart, featureKey: 'orders' },
       { label: 'Inventory', href: '/inventory', icon: Boxes, featureKey: 'inventory' },
       { label: 'Payments', href: '/payments', icon: CreditCard, featureKey: 'payments' },
+      { label: 'Customers', href: '/customers', icon: Users, roles: ['OWNER', 'ADMIN'] },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
+      { label: 'Products', href: '/products', icon: Package, featureKey: 'inventory', roles: ['OWNER', 'ADMIN'] },
     ],
   },
   {
@@ -95,6 +106,7 @@ export function Sidebar({
   const canEditLogo = userRole === 'OWNER' || userRole === 'ADMIN';
 
   function isItemVisible(item: NavItem) {
+    if (item.roles && !item.roles.includes(userRole ?? '')) return false;
     if (!item.featureKey) return true;
     return isFeatureActive(item.featureKey, features);
   }

@@ -25,7 +25,7 @@ export class OrdersService {
 
     const skus = await this.prisma.sku.findMany({
       where: { id: { in: skuIds }, tenantId },
-      select: { id: true, priceCents: true, isActive: true },
+      select: { id: true, priceCents: true, costCents: true, isActive: true },
     });
 
     if (skus.length !== skuIds.length) {
@@ -48,6 +48,7 @@ export class OrdersService {
         skuId: item.skuId,
         quantity: item.quantity,
         priceAtTime,
+        costAtTime: sku.costCents ?? 0,
       };
     });
 
@@ -64,6 +65,7 @@ export class OrdersService {
         tenantId,
         totalCents,
         branchId: branchId ?? null,
+        contactId: dto.contactId ?? null,
         customerRef: dto.customerRef?.trim() || null,
         note: dto.note?.trim() || null,
         items: { create: itemsData },
@@ -158,7 +160,7 @@ export class OrdersService {
     const skuIds = dto.items.map((i) => i.skuId);
     const skus = await this.prisma.sku.findMany({
       where: { id: { in: skuIds }, tenantId },
-      select: { id: true, priceCents: true, isActive: true },
+      select: { id: true, priceCents: true, costCents: true, isActive: true },
     });
 
     if (skus.length !== skuIds.length) {
@@ -177,7 +179,7 @@ export class OrdersService {
       const sku = skuMap.get(item.skuId)!;
       const priceAtTime = sku.priceCents ?? 0;
       totalCents += priceAtTime * item.quantity;
-      return { skuId: item.skuId, quantity: item.quantity, priceAtTime };
+      return { skuId: item.skuId, quantity: item.quantity, priceAtTime, costAtTime: sku.costCents ?? 0 };
     });
 
     const INT_MAX = 2_147_483_647;
@@ -193,6 +195,7 @@ export class OrdersService {
         where: { id: orderId },
         data: {
           totalCents,
+          contactId: dto.contactId ?? null,
           customerRef: dto.customerRef?.trim() || null,
           note: dto.note?.trim() || null,
           items: { create: itemsData },
