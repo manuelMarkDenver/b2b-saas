@@ -131,6 +131,19 @@ export function CreateItemModal({
           <DialogTitle>Create Item</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Hero Image */}
+          <div className="w-full rounded-lg border border-border/60 bg-muted/30 p-4 flex items-center justify-center">
+            <ImageUpload
+              currentUrl={form.imageUrl || null}
+              tenantSlug={tenantSlug}
+              size={180}
+              onUploaded={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+              onRemoved={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border/60" />
           <div className="space-y-1.5">
             <Label>Category</Label>
             <Select value={form.categoryId} onValueChange={onCategoryChange}>
@@ -235,17 +248,6 @@ export function CreateItemModal({
                 onChange={(e) => setForm((f) => ({ ...f, initialQty: e.target.value }))}
               />
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Photo</Label>
-            <ImageUpload
-              currentUrl={form.imageUrl || null}
-              tenantSlug={tenantSlug}
-              size={64}
-              onUploaded={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
-              onRemoved={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-            />
           </div>
 
           <DialogFooter>
