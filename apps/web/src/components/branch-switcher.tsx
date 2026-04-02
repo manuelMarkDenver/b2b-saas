@@ -19,6 +19,15 @@ type Branch = {
   name: string;
   isDefault: boolean;
   status: string;
+  type: string;
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  STANDARD: 'Standard',
+  PRODUCTION: 'Production',
+  DISTRIBUTION: 'Distribution',
+  RETAIL: 'Retail',
+  WAREHOUSE: 'Warehouse',
 };
 
 interface BranchSwitcherProps {
@@ -102,6 +111,11 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
         <span className={cn('truncate', compact ? 'flex-1 text-left' : 'max-w-[120px] hidden sm:block')}>
           {activeBranch?.name ?? 'All branches'}
         </span>
+        {activeBranch && (
+          <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground dark:bg-muted/80">
+            {TYPE_LABELS[activeBranch.type] ?? activeBranch.type}
+          </span>
+        )}
         <ChevronDown className="h-3 w-3 shrink-0" />
       </DropdownMenuTrigger>
 
@@ -164,16 +178,19 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
               <DropdownMenuItem
                 key={branch.id}
                 onClick={() => switchBranch(branch.id)}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between gap-2"
               >
-                <span className="truncate">
-                  {branch.name}
+                <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+                  <span className="truncate">{branch.name}</span>
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground dark:bg-muted/80">
+                    {TYPE_LABELS[branch.type] ?? branch.type}
+                  </span>
                   {branch.isDefault && (
-                    <span className="ml-1.5 text-[10px] text-muted-foreground">(default)</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">(default)</span>
                   )}
                 </span>
                 {branch.id === activeBranchId && (
-                  <Check className="h-3.5 w-3.5 shrink-0 text-primary ml-2" />
+                  <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
                 )}
               </DropdownMenuItem>
             ))

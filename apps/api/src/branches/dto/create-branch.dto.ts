@@ -1,4 +1,5 @@
-import { IsString, IsOptional, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { BranchType } from '@prisma/client';
 
 export class CreateBranchDto {
   @IsString()
@@ -10,4 +11,8 @@ export class CreateBranchDto {
   @IsOptional()
   @MaxLength(300)
   address?: string;
+
+  @IsEnum(BranchType)
+  @IsOptional()
+  type?: BranchType;
 }

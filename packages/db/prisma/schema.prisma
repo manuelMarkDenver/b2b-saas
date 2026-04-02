@@ -58,6 +58,17 @@ enum BranchStatus {
   INACTIVE
 }
 
+/// Describes the operational role of a branch.
+/// Generic — any multi-location business can use these labels.
+/// Has no effect on core logic; used for display, reporting, and transfer context.
+enum BranchType {
+  STANDARD      // default — general purpose branch
+  PRODUCTION    // source of goods (factory, central kitchen, manufacturing)
+  DISTRIBUTION  // hub that receives from production and dispatches to retail
+  RETAIL        // end-point selling location
+  WAREHOUSE     // pure storage, no direct sales
+}
+
 enum BusinessType {
   general_retail
   hardware
@@ -76,7 +87,7 @@ model Tenant {
   slug               String              @unique
   status             TenantStatus        @default(ACTIVE)
   businessType       BusinessType        @default(general_retail)
-  features           Json                @default("{\"inventory\":true,\"orders\":true,\"payments\":true,\"marketplace\":false}")
+  features           Json                @default("{\"inventory\":true,\"orders\":true,\"payments\":true,\"marketplace\":false,\"stockTransfers\":false,\"paymentTerms\":false}")
   logoUrl            String?
   createdByUserId    String              @db.Uuid
   createdAt          DateTime            @default(now())
@@ -101,6 +112,7 @@ model Branch {
   address   String?
   isDefault Boolean      @default(false)
   status    BranchStatus @default(ACTIVE)
+  type      BranchType   @default(STANDARD)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 

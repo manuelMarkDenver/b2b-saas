@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-01 — MS16 complete (11 phases + round-2 UX polish). MS17 drafted: payment method (PH), accounting filters, BOM backlog. Product strategy updated: Ascendex (SaaS/subscription) vs MGN (MSME Growth Network International, franchise/one-time fee), PayMongo replaces Stripe, three-surface architecture + isolation model documented.
+> Last updated: 2026-04-02 — MS19d complete: partial payments, BranchType, stockTransfers/paymentTerms flags. MS17: payment method (PH), accounting filters. Product strategy: Ascendex (SaaS) vs MGN (franchise), PayMongo, three-surface architecture.
 
 ---
 
@@ -40,7 +40,9 @@
 | 5 | Basic reports (orders CSV export, date filter) | ✅ Done | MS13 — GET /reports/orders + CSV export, sidebar nav, date picker. |
 | 6 | **Mobile responsive + PWA** | ✅ Done | MS14 — manifest, service worker, mobile drawer, horizontal-scroll tables, responsive sheets. |
 | 7 | MS16 — UI/UX overhaul (inventory, filters, stock approvals, reports, dashboard widgets) | ✅ Done | Branch `milestone-16/ui-ux-overhaul` — 11 phases |
-| 8 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 8 | Partial payments (MS19) | ✅ Done | `POST /orders/:id/pay`, overpayment guard, paid/balance computed, UI shows payment history |
+| 9 | BranchType UI (MS19c) | ✅ Done | BranchType enum in schema, badge in page header + branch switcher |
+| 10 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
@@ -108,11 +110,12 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 7 | ₱ hardcoded in `payments.service.ts` notification body | ✅ Done | `payments.service.ts` — uses `toLocaleString('en-PH', { style: 'currency' })` |
 | 8 | Duplicate `formatCents()` in `orders-panel.tsx` + `payments-panel.tsx`, both hardcode ₱ | ✅ Done | Extracted to `apps/web/src/lib/format.ts`; 4 local copies removed |
 | 9 | Missing `@@index([status])` on `Order`, `Payment`, `TenantMembership`; missing `@@index([createdAt])` on `Order` | ✅ Done | Migration `20260330135249_add_status_createdat_indexes` |
-| 10 | No basic reports or exports | ⏳ Pre-staging | CSV export on orders, date range filter |
+| 10 | No basic reports or exports | ✅ MS13 | CSV export on orders, date range filter |
 | 11 | 7-day JWT — deactivating User (not membership) doesn't revoke access immediately | ❌ Open | Low risk now. TenantGuard checks membership status. Revisit at staging. |
 | 12 | SMTP unconfigured locally — invites silently dropped | ❌ Open | Add Mailhog to local dev setup docs + `.env` warning |
 | 27 | `uploads` controller missing `TenantGuard` | ❌ Open | `uploads.controller.ts:23` — any authenticated user can upload regardless of tenant. Add `TenantGuard` and scope files under `tenantId/`. |
 | 28 | Hardcoded tenant slugs in `tenant-theme.ts` | ❌ Open | `tenant-theme.ts:46,62` — `peak-hardware` and `corner-general` baked into frontend theming. Move to a `theme` JSON column on `Tenant` before real clients onboard. |
+| 33 | No partial payments / AR tracking | ✅ MS19 | `POST /orders/:id/pay`, computed balance, payment history UI |
 
 ### 🟢 Advisory — log and revisit
 
@@ -505,6 +508,71 @@ pnpm --filter web test:e2e:report     # view last run HTML report
 | FilterBar `type: 'number'` field | ✅ | Compact number input with clear button, reusable |
 | Seeder updated with PH payment methods | ✅ | Rotates GCASH/MAYA/BANK_TRANSFER/CASH/CARD |
 | CSV export includes Method column | ✅ | |
+
+---
+
+### MS19 — Partial Payments (Accounts Receivable) ✅ Done
+
+> Branch: `milestone-19d/stock-transfers-partial-payments`
+> Goal: Track partial payments on orders, compute balance automatically, prevent overpayment.
+
+#### What's Implemented
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `POST /orders/:id/pay` endpoint | ✅ | Records payment directly as VERIFIED (cash/on-hand) |
+| Overpayment guard | ✅ | Blocks payment if amount > remaining balance |
+| Computed paidCents / balanceCents | ✅ | Derived from payments table, no stored fields |
+| Multiple payments support | ✅ | Each payment creates new record; aggregate on read |
+| Order detail UI | ✅ | Payments card with history, add payment form, paid/balance display |
+
+#### How It Works
+
+1. **Order created** — starts with 0 paid, full balance
+2. **Payment recorded** — `POST /orders/:id/pay` with `amountCents` + `method`
+3. **Balance computed** — `totalCents - SUM(payments.amountCents)` where status=VERIFIED
+4. **Status unchanged** — Order status (PENDING/CONFLICTED/COMPLETED/CANCELLED) is separate from payment status
+5. **UI shows** — Total, Paid, Balance, Payment History, "+ Record payment" button
+
+#### API Response
+
+```json
+{
+  "payment": { "id": "...", "amountCents": 5000, "method": "CASH", "createdAt": "..." },
+  "totalCents": 10000,
+  "paidCents": 5000,
+  "balanceCents": 5000
+}
+```
+
+---
+
+### MS19b — Customers / AR Tab ✅ Done
+
+> Branch: `milestone-19b/reports-customers-tab`
+> Goal: AR overview per customer for B2B accounts receivable tracking.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| GET /contacts/ar-overview | ✅ | Lists contacts with unpaid orders, totals |
+| Customers tab in Reports | ✅ | AR table with customer, total ordered, paid, balance |
+| Payment status per row | ✅ | Shows balance, highlights overdue |
+
+---
+
+### MS19c — BranchType + Feature Flags ✅ Done
+
+> Branch: `milestone-19c/branch-type-feature-flags`
+> Goal: Branch type for display/reporting, feature flags for stock transfers and payment terms.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| BranchType enum | ✅ | STANDARD, PRODUCTION, DISTRIBUTION, RETAIL, WAREHOUSE |
+| `Branch.type` field | ✅ | Migration `20260402004622_add_branch_type` |
+| BranchType in API | ✅ | Included in GET /branches response |
+| BranchType badge in UI | ✅ | Page header + branch switcher dropdown |
+| Feature flags | ✅ | `stockTransfers`, `paymentTerms` added to Tenant.features |
+| Stock Transfers nav | ✅ | Sidebar item (feature-gated, OWNER/ADMIN only) |
 
 ---
 

@@ -25,6 +25,7 @@ export class BranchesService {
     return this.prisma.branch.findMany({
       where: { tenantId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true, name: true, isDefault: true, status: true, type: true },
     });
   }
 
@@ -40,7 +41,12 @@ export class BranchesService {
     }
 
     return this.prisma.branch.create({
-      data: { tenantId, name: dto.name.trim(), address: dto.address?.trim() },
+      data: {
+        tenantId,
+        name: dto.name.trim(),
+        address: dto.address?.trim(),
+        ...(dto.type !== undefined && { type: dto.type }),
+      },
     });
   }
 
@@ -76,6 +82,7 @@ export class BranchesService {
         ...(dto.name !== undefined && { name: dto.name.trim() }),
         ...(dto.address !== undefined && { address: dto.address?.trim() }),
         ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.type !== undefined && { type: dto.type }),
       },
     });
   }

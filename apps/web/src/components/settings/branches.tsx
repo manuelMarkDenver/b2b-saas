@@ -4,12 +4,31 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, CheckCircle, XCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
+type BranchType = 'STANDARD' | 'PRODUCTION' | 'DISTRIBUTION' | 'RETAIL' | 'WAREHOUSE';
+
+const BRANCH_TYPE_LABELS: Record<BranchType, string> = {
+  STANDARD: 'Standard',
+  PRODUCTION: 'Production',
+  DISTRIBUTION: 'Distribution Hub',
+  RETAIL: 'Retail',
+  WAREHOUSE: 'Warehouse',
+};
+
+const BRANCH_TYPE_DESCRIPTIONS: Record<BranchType, string> = {
+  STANDARD: 'General purpose branch',
+  PRODUCTION: 'Source of goods — factory, central kitchen, manufacturing',
+  DISTRIBUTION: 'Receives from production, dispatches to retail branches',
+  RETAIL: 'End-point selling location',
+  WAREHOUSE: 'Storage only — no direct sales',
+};
+
 type Branch = {
   id: string;
   name: string;
   address: string | null;
   isDefault: boolean;
   status: 'ACTIVE' | 'INACTIVE';
+  type: BranchType;
 };
 
 interface BranchesProps {
@@ -22,10 +41,9 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
-  const [form, setForm] = useState({ name: '', address: '' });
+  const [form, setForm] = useState({ name: '', address: '', type: 'STANDARD' as BranchType });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -46,14 +64,14 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: '', address: '' });
+    setForm({ name: '', address: '', type: 'STANDARD' });
     setFormError(null);
     setDialogOpen(true);
   }
 
   function openEdit(branch: Branch) {
     setEditing(branch);
-    setForm({ name: branch.name, address: branch.address ?? '' });
+    setForm({ name: branch.name, address: branch.address ?? '', type: branch.type });
     setFormError(null);
     setDialogOpen(true);
   }
@@ -69,6 +87,7 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
     const body = JSON.stringify({
       name: form.name.trim(),
       address: form.address.trim() || undefined,
+      type: form.type,
     });
 
     const res = editing
@@ -86,7 +105,7 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
   }
 
   async function toggleStatus(branch: Branch) {
-    if (branch.isDefault) return; // protected by API too
+    if (branch.isDefault) return;
     const status = branch.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     await apiFetch(`/branches/${branch.id}`, {
       tenantSlug,
@@ -130,13 +149,18 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
           <tbody>
             {branches.map((branch) => (
               <tr key={branch.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 font-medium">
-                  {branch.name}
-                  {branch.isDefault && (
-                    <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                      Default
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium">{branch.name}</span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {BRANCH_TYPE_LABELS[branch.type] ?? branch.type}
                     </span>
-                  )}
+                    {branch.isDefault && (
+                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        Default
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
                   {branch.address ?? <span className="italic text-muted-foreground/60">—</span>}
@@ -199,8 +223,23 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Main Warehouse"
+                  placeholder="e.g. Pampanga Production"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Branch type</label>
+                <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={form.type}
+                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as BranchType }))}
+                >
+                  {(Object.keys(BRANCH_TYPE_LABELS) as BranchType[]).map((t) => (
+                    <option key={t} value={t}>{BRANCH_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {BRANCH_TYPE_DESCRIPTIONS[form.type]}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Address</label>

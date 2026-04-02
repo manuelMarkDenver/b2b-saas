@@ -103,10 +103,30 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     phase: 'MS10',
   },
   {
+    key: 'stockTransfers',
+    label: 'Stock Transfers',
+    description:
+      'Move inventory between branches with a formal request and approval flow. Full audit trail of every transfer.',
+    icon: 'ArrowLeftRight',
+    shipped: false,
+    badge: 'Coming soon',
+    phase: 'MS20',
+  },
+  {
+    key: 'paymentTerms',
+    label: 'Payment Terms & AR',
+    description:
+      'Extend credit to distributors and key accounts. Track balances, set due dates, and monitor outstanding AR across all contacts.',
+    icon: 'Receipt',
+    shipped: false,
+    badge: 'Coming soon',
+    phase: 'MS20',
+  },
+  {
     key: 'marketplace',
     label: 'Marketplace',
     description:
-      'List your products on the Operix marketplace and reach customers across the platform.',
+      'List your products on the Zentral marketplace and reach customers across the platform.',
     icon: 'Store',
     shipped: false,
     phase: 'Phase 7',

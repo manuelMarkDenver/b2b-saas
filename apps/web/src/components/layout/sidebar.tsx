@@ -9,6 +9,7 @@ import {
   Boxes,
   Package,
   Users,
+  ArrowLeftRight,
   Settings,
   GitBranch,
   FileText,
@@ -55,6 +56,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Inventory', href: '/inventory', icon: Boxes, featureKey: 'inventory' },
       { label: 'Payments', href: '/payments', icon: CreditCard, featureKey: 'payments' },
       { label: 'Customers', href: '/customers', icon: Users, roles: ['OWNER', 'ADMIN'] },
+      { label: 'Stock Transfers', href: '/transfers', icon: ArrowLeftRight, featureKey: 'stockTransfers', roles: ['OWNER', 'ADMIN'] },
     ],
   },
   {
