@@ -5,7 +5,6 @@ import * as React from "react";
 import { apiFetch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
-import { ProductThumb } from "@/components/product-thumb";
 import { ImageUpload } from "@/components/image-upload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CreateItemModal } from "@/components/create-item-modal";
@@ -74,7 +73,7 @@ type Sku = {
   lowStockThreshold: number;
   priceCents?: number | null;
   costCents?: number | null;
-  product: { id: string; name: string };
+  product: { id: string; name: string; category: { id: string; name: string; slug: string } };
 };
 
 type ImportResult = {
@@ -282,7 +281,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         <div>
           <div className="text-sm font-medium">Catalog</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Categories are platform-managed. Products/SKUs are tenant-scoped.
+            Categories are platform-managed. Items are tenant-scoped.
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -333,57 +332,12 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         </button>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className="mt-6">
         <div className="rounded-md border border-border/60 p-4">
-          <div className="text-sm font-medium">Products</div>
-          <div className="mt-3 space-y-2 text-sm">
-            {products.length === 0 ? (
-              <div className="text-muted-foreground">No products yet.</div>
-            ) : null}
-            {products.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 ${p.isArchived ? "opacity-50" : ""}`}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <ProductThumb label={p.name} size={26} />
-                  <div>
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.category.name}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {p.isArchived ? (
-                    <span className="text-xs text-muted-foreground">Archived</span>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => openEditProduct(p)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs text-destructive hover:underline"
-                        onClick={() => archiveProduct(p.id, p.name)}
-                      >
-                        Archive
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-md border border-border/60 p-4">
-          <div className="text-sm font-medium">SKUs</div>
+          <div className="text-sm font-medium">Items</div>
           <div className="mt-3 space-y-2 text-sm">
             {skus.length === 0 ? (
-              <div className="text-muted-foreground">No SKUs yet.</div>
+              <div className="text-muted-foreground">No items yet.</div>
             ) : null}
             {skus.map((s) => (
               <div
@@ -400,7 +354,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                   />
                   <div>
                     <div className="font-medium">{s.code} · {s.name}</div>
-                    <div className="text-xs text-muted-foreground">{s.product.name}</div>
+                    <div className="text-xs text-muted-foreground">{s.product.category.name}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
