@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-02 — MS19e: branch stock transfer fix. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo.
+> Last updated: 2026-04-02 — MS19g: unified Create Item flow (shared modal, auto-SKU with override, single endpoint). Transfers hidden (shipped: false) — history-only for staging. MS19f: feature flags (stockTransfers/paymentTerms), customer in orders, CSV import modal, catalog UI fixes. MS19e: branch stock. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo. Loyverse competitive gap analysis added (see [docs/LOYVERSE_REFERENCE.md](./LOYVERSE_REFERENCE.md)).
 
 ---
 
@@ -43,7 +43,9 @@
 | 8 | Partial payments (MS19) | ✅ Done | `POST /orders/:id/pay`, overpayment guard, paid/balance computed, UI shows payment history |
 | 9 | BranchType UI (MS19c) | ✅ Done | BranchType enum in schema, badge in page header + branch switcher |
 | 10 | Branch stock transfer fix (MS19e) | ✅ Done | Derived branch stock from movements, transfer updates tenant-wide stock |
-| 11 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 11 | Feature flags + Catalog UI fixes (MS19f) | ✅ Done | stockTransfers/paymentTerms in Super Admin, CSV import modal, catalog width, edit sheet with 100% image |
+| 12 | Unified Create Item flow (MS19g) | ✅ Done | Single modal for Product+SKU creation, auto-SKU with override toggle, shared component across Products and Inventory tabs, backend `code` and `lowStockThreshold` support in `/products/with-stock` |
+| 13 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
@@ -617,6 +619,131 @@ branchStock(sku, branch) =
 #### Validation
 
 Transfer now checks source branch stock (derived from movements) before allowing transfer.
+
+---
+
+### MS19f — Feature Flags + Catalog UI Fixes ✅ Done
+
+> Branch: `fix/feature-flags-products-ui`
+> Goal: Add missing feature flags, improve catalog UX, add customer to orders.
+
+#### Feature Flags (Super Admin)
+
+| Flag | Status | Notes |
+|------|--------|-------|
+| stockTransfers | ✅ | Enable/disable stock transfer feature |
+| paymentTerms | ✅ | Enable/disable payment terms feature |
+
+#### Orders - Customer Selection
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Customer required | ✅ | Walk-in default, searchable existing, quick create new |
+| Customer at top of sheet | ✅ | Sticky, always visible |
+
+#### Catalog UI Fixes
+
+| Fix | Status | Notes |
+|-----|--------|-------|
+| CSV Import modal | ✅ | Import UI now in modal/sheet |
+| Catalog width increased | ✅ | 2-column grid wider |
+| Edit sheet image | ✅ | 100% width, centered |
+| Remove edit from Inventory | ✅ | Inventory panel no longer has edit (movements only) |
+
+#### Customer/AR Schema (For Reference)
+
+Contact model has `creditLimitCents` field for credit limit tracking. Full AR/AP models not yet implemented (scope creep - tracking done via Contact + Order balance).
+
+---
+
+### MS19g — Unified Create Item Flow ✅ Done
+
+> Branch: `feat/create-item-modal`
+> Goal: Simplify catalog creation UX by merging separate "Create Product" + "Create SKU" forms into a single "Create Item" flow with automatic SKU generation.
+
+#### Backend Changes
+
+| Change | File | Details |
+|--------|------|---------|
+| Add `code` param | `catalog.controller.ts` | Optional SKU code override in `POST /products/with-stock` body |
+| Add `lowStockThreshold` param | `catalog.controller.ts` | Optional threshold in `POST /products/with-stock` body |
+| Handle code override | `catalog.service.ts` | If `code` provided, use it (with uniqueness check); otherwise auto-generate via `generateNextSkuCode` |
+| Handle lowStockThreshold | `catalog.service.ts` | Pass `lowStockThreshold` to SKU create (was hardcoded to 0) |
+
+#### Frontend Changes
+
+| Component | Change | Details |
+|-----------|--------|---------|
+| `CreateItemModal` | **New file** | Shared modal: Category, Product Name, SKU Code (auto-generated + "Override" toggle), Cost/Price, Low Stock Threshold, Initial Stock, Photo |
+| `CatalogPanel` | Replaced forms | Two side-by-side forms → single "+ Create Item" button → opens `CreateItemModal` |
+| `InventoryPanel` | Replaced dialog | Inline "New Product" dialog → shared `CreateItemModal` |
+| `CatalogPanel` | Cleanup | Removed unused `createProduct`, `createSku` functions and related state |
+
+#### UX Flow
+
+1. User clicks "+ Create Item" (Products tab) or "New Product" (Inventory tab)
+2. Modal opens with Category dropdown auto-selected
+3. Auto-SKU code fetched and displayed (e.g., `FOO-0001`)
+4. User fills Product Name (required), optional Cost/Price, Low Stock Threshold, Initial Qty, Photo
+5. If user wants custom SKU: check "Override" → enter custom code
+6. Click "Create Item" → single API call → Product + SKU created atomically
+7. Modal closes, lists refresh
+
+#### Architecture Decision
+
+- Used existing `POST /products/with-stock` endpoint (already a transaction)
+- Added `code` and `lowStockThreshold` params to extend functionality
+- Zero new endpoints, zero new tables, zero new services
+- Single `CreateItemModal` component shared between Products and Inventory tabs
+
+#### Products Page Refinement
+
+| Change | Details |
+|--------|---------|
+| Removed 2-column layout | Single "Items" list (SKU-driven) |
+| Removed Stock/Low columns | Inventory concern, not catalog |
+| Removed lowStock filter | Inventory concern |
+| Added FilterBar | Search + Category filter |
+| Added sortable columns | Name, Cost, Price |
+| Added pagination | Page info + prev/next |
+| ProductThumb in table | Display-only, no inline editing |
+| Fixed CSV modal | Better text formatting |
+| Hero dropzone in Create/Edit | Full-width image upload |
+
+#### Transfers & Feature Flags Fixes
+
+| Bug | Root Cause | Fix |
+|-----|------------|-----|
+| Transfer dropdown empty | Wrong URL `/catalog/skus` instead of `/skus` | Fixed with `?limit=1000` in `transfers-panel.tsx` |
+| Admin toggle broken | `stockTransfers`/`paymentTerms` missing from DTO and service | Added to `UpdateTenantFlagsDto`, `TenantFeatures` type, and service |
+| Transfers hidden from UI | `stockTransfers.shipped: true` caused nav to show before feature was ready | Reverted to `shipped: false` — feature hidden until post-staging |
+| HQ label unclear | "HQ / All branches" confusing | Renamed to "Main / Global stock" |
+
+#### Transfer Architecture (Reference)
+
+| Scenario | Behavior |
+|----------|----------|
+| Branch-to-branch | Creates `TRANSFER_OUT` on source + `TRANSFER_IN` on destination; updates `Sku.stockOnHand` on both |
+| HQ/All branches | Empty `fromBranchId` → uses global `sku.stockOnHand`; only creates `TRANSFER_IN` (like receiving from warehouse) |
+| Tenant-wide history | Sees both `TRANSFER_OUT` and `TRANSFER_IN` movements |
+| Branch-scoped history | Each branch sees only its own side (IN or OUT) |
+
+**Note:** "Main / Global stock" is a UI convenience option, not a real branch record.
+
+#### Transfer Feature Status
+
+| Decision | Value | Date |
+|----------|-------|------|
+| Real stock movement via transfers | ❌ No — deferred post-staging | 2026-04-02 |
+| History tracking only | ✅ Yes — transfer records exist | 2026-04-02 |
+| `stockTransfers.shipped` flag | `false` — feature hidden | 2026-04-02 |
+
+**Rationale:** Real branch-to-branch stock movement requires clear business rules before staging:
+- Which branch is deducted when an order is placed?
+- What is the "source" for HQ/global stock?
+- Who approves transfers?
+
+Post-staging approach: Phase 1 = history-only audit trail. Phase 2 = real stock movement with explicit approval workflow.
 
 ---
 

@@ -110,7 +110,7 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     icon: 'ArrowLeftRight',
     shipped: false,
     badge: 'Coming soon',
-    phase: 'MS20',
+    phase: 'MS21',
   },
   {
     key: 'paymentTerms',

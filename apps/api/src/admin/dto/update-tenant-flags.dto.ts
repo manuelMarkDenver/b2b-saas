@@ -20,4 +20,12 @@ export class UpdateTenantFlagsDto {
   @IsOptional()
   @IsBoolean()
   reports?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  stockTransfers?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  paymentTerms?: boolean;
 }
