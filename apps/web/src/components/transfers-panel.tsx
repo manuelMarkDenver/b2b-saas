@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, ArrowRight, Package } from 'lucide-react';
+import { Plus, ArrowRight, Package, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { DateRangePicker, presetToRange, type DateRange } from '@/components/dashboard/date-range-picker';
 
 type Branch = { id: string; name: string; isDefault: boolean; status: string };
 type Sku = { id: string; code: string; name: string; stockOnHand: number };
@@ -12,9 +13,12 @@ type Transfer = {
   createdAt: string;
   fromBranch: { id: string; name: string } | null;
   toBranch: { id: string; name: string };
+  requestedBy: { id: string; email: string };
   note: string | null;
   items: TransferItem[];
 };
+
+type Meta = { total: number; page: number; limit: number; totalPages: number };
 
 type LineItem = { skuId: string; quantity: number };
 
@@ -28,12 +32,21 @@ function formatDate(iso: string) {
 
 export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [meta, setMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
   const [branches, setBranches] = useState<Branch[]>([]);
   const [skus, setSkus] = useState<Sku[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
 
+  // Filters
+  const [dateRange, setDateRange] = useState<DateRange>(() => presetToRange('30d'));
+  const [fromBranchFilter, setFromBranchFilter] = useState('');
+  const [toBranchFilter, setToBranchFilter] = useState('');
+  const [skuSearch, setSkuSearch] = useState('');
+  const [page, setPage] = useState(1);
+
+  // New transfer dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fromBranchId, setFromBranchId] = useState('');
   const [toBranchId, setToBranchId] = useState('');
@@ -44,16 +57,24 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
 
   const canManage = userRole === 'OWNER' || userRole === 'ADMIN';
 
-  async function load() {
+  async function load(p = page, dr = dateRange, fbf = fromBranchFilter, tbf = toBranchFilter, ss = skuSearch) {
     setLoading(true);
+    const params = new URLSearchParams({ page: String(p), from: dr.from, to: dr.to });
+    if (fbf) params.set('fromBranchId', fbf);
+    if (tbf) params.set('toBranchId', tbf);
+    if (ss.trim()) params.set('skuSearch', ss.trim());
+
     const [trRes, brRes, skuRes, memRes] = await Promise.all([
-      apiFetch('/transfers', { tenantSlug }),
+      apiFetch(`/transfers?${params}`, { tenantSlug }),
       apiFetch('/branches', { tenantSlug }),
       apiFetch('/skus?limit=1000', { tenantSlug }),
       apiFetch('/memberships', { tenantSlug }),
     ]);
-    if (trRes.ok) setTransfers(await trRes.json());
-    else setError('Failed to load transfers');
+    if (trRes.ok) {
+      const d = await trRes.json() as { data: Transfer[]; meta: Meta };
+      setTransfers(d.data ?? []);
+      if (d.meta) setMeta(d.meta);
+    } else setError('Failed to load transfers');
     if (brRes.ok) {
       const all: Branch[] = await brRes.json();
       setBranches(all.filter((b) => b.status === 'ACTIVE'));
@@ -70,7 +91,17 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(page, dateRange, fromBranchFilter, toBranchFilter, skuSearch); }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyFilters() {
+    setPage(1);
+    void load(1, dateRange, fromBranchFilter, toBranchFilter, skuSearch);
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    void load(p, dateRange, fromBranchFilter, toBranchFilter, skuSearch);
+  }
 
   function openDialog() {
     // Pre-select default branch as source if available
@@ -123,7 +154,6 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
     setSaving(false);
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading transfers…</p>;
   if (error) return <p className="text-sm text-destructive">{error}</p>;
 
   return (
@@ -148,9 +178,47 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
         )}
       </div>
 
-      {transfers.length === 0 ? (
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-end gap-2">
+        <DateRangePicker value={dateRange} onChange={(r) => setDateRange(r)} />
+        <select
+          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+          value={fromBranchFilter}
+          onChange={(e) => setFromBranchFilter(e.target.value)}
+        >
+          <option value="">From: any</option>
+          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <select
+          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+          value={toBranchFilter}
+          onChange={(e) => setToBranchFilter(e.target.value)}
+        >
+          <option value="">To: any</option>
+          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <input
+          type="search"
+          placeholder="Search item (code or name)…"
+          className="h-8 rounded-md border border-input bg-background px-3 text-sm w-52"
+          value={skuSearch}
+          onChange={(e) => setSkuSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }}
+        />
+        <button
+          type="button"
+          className="h-8 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+          onClick={applyFilters}
+        >
+          Apply
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">Loading transfers…</div>
+      ) : transfers.length === 0 ? (
         <div className="rounded-lg border border-border py-12 text-center text-sm text-muted-foreground">
-          No transfers yet.
+          No transfers match your filters.
         </div>
       ) : (
         <div className="space-y-3">
@@ -162,7 +230,13 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                   <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{t.toBranch.name}</span>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground">{formatDate(t.createdAt)}</span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <User className="h-3 w-3" />
+                    {t.requestedBy.email.split('@')[0]}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{formatDate(t.createdAt)}</span>
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {t.items.map((item) => (
@@ -178,6 +252,32 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
               {t.note && <p className="mt-2 text-xs text-muted-foreground">{t.note}</p>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {meta.totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{meta.total} transfers</span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-input hover:bg-accent disabled:opacity-40"
+              disabled={page <= 1}
+              onClick={() => handlePageChange(page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="px-2">{page} / {meta.totalPages}</span>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-input hover:bg-accent disabled:opacity-40"
+              disabled={page >= meta.totalPages}
+              onClick={() => handlePageChange(page + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 

@@ -108,9 +108,7 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     description:
       'Move inventory between branches with a formal request and approval flow. Full audit trail of every transfer.',
     icon: 'ArrowLeftRight',
-    shipped: false,
-    badge: 'Coming soon',
-    phase: 'MS21',
+    shipped: true,
   },
   {
     key: 'paymentTerms',
@@ -118,9 +116,7 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     description:
       'Extend credit to distributors and key accounts. Track balances, set due dates, and monitor outstanding AR across all contacts.',
     icon: 'Receipt',
-    shipped: false,
-    badge: 'Coming soon',
-    phase: 'MS20',
+    shipped: true,
   },
   {
     key: 'marketplace',

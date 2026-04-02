@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { ShoppingCart, CreditCard, AlertTriangle, Settings2 } from 'lucide-react';
+import { ShoppingCart, CreditCard, AlertTriangle, Settings2, Users, TrendingDown, AlertCircle, MapPin } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
 import { getActiveBranchId, setActiveBranchId } from '@/lib/branch';
@@ -15,6 +15,16 @@ import { DateRangePicker, presetToRange, type DateRange } from './date-range-pic
 import { BranchBreakdown } from './branch-breakdown';
 
 // ── types ──────────────────────────────────────────────────────────────────
+
+type ArOverviewRow = {
+  balanceCents: number;
+  overdueCents: number;
+};
+
+type Branch = {
+  id: string;
+  name: string;
+};
 
 type Summary = {
   ordersToday: number;
@@ -118,12 +128,14 @@ function EmptyChart({ message }: { message: string }) {
 
 // ── main component ─────────────────────────────────────────────────────────
 
-export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
+export function DashboardStats({ tenantSlug, brandName }: { tenantSlug: string; brandName?: string }) {
   const [range, setRange] = useState<DateRange>(presetToRange('7d'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCustomize, setShowCustomize] = useState(false);
   const [widgets, setWidgets] = useState<DashboardWidgets>(() => getDashboardWidgets(tenantSlug));
+  const [arRows, setArRows] = useState<ArOverviewRow[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   // Read active branch from global sidebar state (localStorage)
   const activeBranchId = getActiveBranchId(tenantSlug);
   const staffOnly = isStaff(tenantSlug);
@@ -144,6 +156,20 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   }, [tenantSlug]);
 
   useEffect(() => { load(range); }, [range, load]);
+
+  useEffect(() => {
+    apiFetch('/branches', { tenantSlug })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (Array.isArray(d)) setBranches(d); else if (d?.data) setBranches(d.data as Branch[]); })
+      .catch(() => {});
+    if (!staffOnly) {
+      apiFetch('/contacts/ar-overview', { tenantSlug })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => { if (Array.isArray(d)) setArRows(d as ArOverviewRow[]); })
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantSlug]);
 
   function handleRangeChange(r: DateRange) {
     setRange(r);
@@ -175,6 +201,14 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
   const s = data?.summary;
   const c = data?.charts;
 
+  const activeBranchName = activeBranchId
+    ? (branches.find((b) => b.id === activeBranchId)?.name ?? null)
+    : null;
+
+  const totalCustomers = arRows.length;
+  const outstandingAr = arRows.reduce((sum, r) => sum + Math.max(0, r.balanceCents), 0);
+  const overdueAr = arRows.reduce((sum, r) => sum + r.overdueCents, 0);
+
   const statusData = c
     ? Object.entries(c.ordersByStatus).map(([status, count]) => ({ name: status, value: count }))
     : [];
@@ -200,6 +234,16 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
 
   return (
     <div className="space-y-6">
+      {/* Branch context banner */}
+      <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-2.5">
+        <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span className="text-xs text-muted-foreground">Viewing:</span>
+        <span className="text-sm font-semibold">
+          {brandName && <span className="text-muted-foreground font-normal">{brandName} / </span>}
+          {activeBranchName ?? 'All Branches'}
+        </span>
+      </div>
+
       {/* Date range control + Customize */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
@@ -226,7 +270,7 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(Object.keys(WIDGET_LABELS) as Array<keyof DashboardWidgets>)
               .filter((k) => {
-                if (staffOnly && (k === 'lowStock' || k === 'revenue' || k === 'revenueChart' || k === 'lowStockChart')) return false;
+                if (staffOnly && (k === 'lowStock' || k === 'revenue' || k === 'revenueChart' || k === 'lowStockChart' || k === 'outstandingAr' || k === 'overdueAr')) return false;
                 return true;
               })
               .map((k) => (
@@ -291,6 +335,38 @@ export function DashboardStats({ tenantSlug }: { tenantSlug: string }) {
           />
         )}
       </div>
+
+      {/* AR stat cards */}
+      {(widgets.totalCustomers || (!staffOnly && (widgets.outstandingAr || widgets.overdueAr))) && (
+        <div className={`grid gap-4 sm:grid-cols-2 ${!staffOnly ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+          {widgets.totalCustomers && (
+            <StatCard
+              label="Total Customers"
+              value={totalCustomers}
+              description="Active contacts with orders"
+              icon={Users}
+            />
+          )}
+          {!staffOnly && widgets.outstandingAr && (
+            <StatCard
+              label="Outstanding AR"
+              value={formatCents(outstandingAr)}
+              description="Total unpaid balance across all customers"
+              icon={TrendingDown}
+              highlight={outstandingAr > 0}
+            />
+          )}
+          {!staffOnly && widgets.overdueAr && (
+            <StatCard
+              label="Overdue Amount"
+              value={formatCents(overdueAr)}
+              description="Past payment due date"
+              icon={AlertCircle}
+              highlight={overdueAr > 0}
+            />
+          )}
+        </div>
+      )}
 
       {/* Low stock alert badge for staff */}
       {staffOnly && (s?.lowStockSkus ?? 0) > 0 && (

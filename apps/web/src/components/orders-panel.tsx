@@ -60,6 +60,12 @@ type Contact = {
   id: string;
   name: string;
   type: "CUSTOMER" | "DISTRIBUTOR";
+  creditLimitCents: number;
+};
+
+type ContactAr = {
+  balanceCents: number;
+  creditLimitCents: number;
 };
 
 const STATUS_LABELS: Record<Order["status"], string> = {
@@ -136,6 +142,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [selectedCustomerId, setSelectedCustomerId] = React.useState<string>('');
   const [customerType, setCustomerType] = React.useState<'walkin' | 'existing' | 'new'>('walkin');
   const [customerSearch, setCustomerSearch] = React.useState('');
+  const [customerSearchFocused, setCustomerSearchFocused] = React.useState(false);
   const [newCustomerName, setNewCustomerName] = React.useState('');
   const [newCustomerPhone, setNewCustomerPhone] = React.useState('');
   const [newCustomerType, setNewCustomerType] = React.useState<'CUSTOMER' | 'DISTRIBUTOR'>('CUSTOMER');
@@ -162,6 +169,49 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [editMode, setEditMode] = React.useState(false);
   const [editCart, setEditCart] = React.useState<CartLine[]>([]);
   const [editView, setEditView] = React.useState<"products" | "cart">("products");
+
+  // Payment terms feature flag
+  const [hasPaymentTerms, setHasPaymentTerms] = React.useState(false);
+  const [paymentDueDate, setPaymentDueDate] = React.useState('');
+
+  // Credit limit check for existing customer
+  const [contactAr, setContactAr] = React.useState<ContactAr | null>(null);
+  const [contactArLoading, setContactArLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    apiFetch(`/auth/me`, { tenantSlug })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.tenant) {
+          const features = (data.tenant as { features?: Record<string, boolean> }).features;
+          setHasPaymentTerms(features?.paymentTerms === true);
+        }
+      })
+      .catch(() => {});
+  }, [tenantSlug]);
+
+  React.useEffect(() => {
+    if (customerType !== 'existing' || !selectedCustomerId) {
+      setContactAr(null);
+      return;
+    }
+    setContactArLoading(true);
+    apiFetch(`/contacts/${selectedCustomerId}/ar`, { tenantSlug })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          const contact = data.contact as { creditLimitCents?: number };
+          setContactAr({
+            balanceCents: data.balanceCents as number,
+            creditLimitCents: contact.creditLimitCents ?? 0,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setContactArLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomerId, customerType, tenantSlug]);
+
   const [editSearch, setEditSearch] = React.useState("");
 
   const { pushToast } = useToast();
@@ -269,10 +319,13 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     setSelectedCustomerId("");
     setCustomerType('walkin');
     setCustomerSearch('');
+    setCustomerSearchFocused(false);
     setNewCustomerName('');
     setNewCustomerPhone('');
     setNewCustomerType('CUSTOMER');
     setNewCustomerCreditLimit('');
+    setPaymentDueDate('');
+    setContactAr(null);
     setNewOrderOpen(true);
   }
 
@@ -319,11 +372,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       customerRef = newContact.name;
     }
 
-    const body: { items: { skuId: string; quantity: number }[]; contactId?: string; customerRef: string } = {
+    const body: { items: { skuId: string; quantity: number }[]; contactId?: string; customerRef: string; paymentDueDate?: string } = {
       items: cart.map((l) => ({ skuId: l.skuId, quantity: l.quantity })),
       customerRef,
     };
     if (contactId) body.contactId = contactId;
+    if (paymentDueDate && hasPaymentTerms) body.paymentDueDate = paymentDueDate;
 
     const res = await apiFetch("/orders", {
       tenantSlug,
@@ -790,9 +844,11 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                         placeholder="Search customer..."
                         className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                         value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        onChange={(e) => { setCustomerSearch(e.target.value); setSelectedCustomerId(''); setContactAr(null); }}
+                        onFocus={() => setCustomerSearchFocused(true)}
+                        onBlur={() => setTimeout(() => setCustomerSearchFocused(false), 150)}
                       />
-                      {customerSearch.trim() && (
+                      {(customerSearchFocused || customerSearch.trim()) && (
                         <div className="max-h-40 overflow-y-auto rounded-md border border-border/60 bg-background">
                           {filteredContacts.length === 0 ? (
                             <div className="px-3 py-2 text-xs text-muted-foreground">No customers found</div>
@@ -802,9 +858,9 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                                 key={c.id}
                                 type="button"
                                 className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                                onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(c.name); }}
+                                onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(c.name); setCustomerSearchFocused(false); }}
                               >
-                                {c.name} ({c.type === 'DISTRIBUTOR' ? 'Distributor' : 'Customer'})
+                                {c.name} <span className="text-xs text-muted-foreground">({c.type === 'DISTRIBUTOR' ? 'Distributor' : 'Customer'})</span>
                               </button>
                             ))
                           )}
@@ -855,6 +911,18 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                     </div>
                   )}
                 </div>
+
+                {hasPaymentTerms && customerType !== 'walkin' && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Payment Due Date <span className="text-muted-foreground/60">(terms)</span></label>
+                    <input
+                      type="date"
+                      className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                      value={paymentDueDate}
+                      onChange={(e) => setPaymentDueDate(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto px-5 pb-36">
@@ -884,7 +952,13 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                             >
                               <Minus className="h-3.5 w-3.5" />
                             </button>
-                            <span className="w-10 text-center text-base font-bold tabular-nums">{line.quantity}</span>
+                            <input
+                              type="number"
+                              min={1}
+                              className="w-14 rounded-md border border-input bg-background px-1 py-1 text-center text-base font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                              value={line.quantity}
+                              onChange={(e) => setLineQty(line.skuId, Math.max(1, parseInt(e.target.value) || 1))}
+                            />
                             <button
                               type="button"
                               className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background"
@@ -914,6 +988,26 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
               {/* Cart footer */}
               <div className="border-t border-border/60 bg-background/95 px-5 py-5 backdrop-blur">
+                {/* Credit limit indicator */}
+                {contactAr && contactAr.creditLimitCents > 0 && (() => {
+                  const remaining = contactAr.creditLimitCents - contactAr.balanceCents;
+                  const wouldExceed = cartTotalCents > remaining;
+                  return (
+                    <div className={`mb-3 rounded-lg px-3 py-2 text-xs ${wouldExceed ? 'bg-destructive/10 text-destructive' : 'bg-muted/60 text-muted-foreground'}`}>
+                      {wouldExceed ? (
+                        <>
+                          <span className="font-semibold">Credit limit exceeded.</span>{' '}
+                          Remaining: {formatCents(remaining)} · This order: {formatCents(cartTotalCents)} · Over by {formatCents(cartTotalCents - remaining)}
+                        </>
+                      ) : (
+                        <>Credit remaining: <span className="font-semibold">{formatCents(remaining)}</span> of {formatCents(contactAr.creditLimitCents)}</>
+                      )}
+                    </div>
+                  );
+                })()}
+                {contactArLoading && (
+                  <div className="mb-3 text-xs text-muted-foreground">Checking credit...</div>
+                )}
                 <div className="flex items-center justify-between gap-4">
                   <button
                     type="button"
@@ -1213,7 +1307,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                               <div className="mt-0.5 text-xs text-muted-foreground">{formatCents(sku.priceCents ?? 0)} ea</div>
                               <div className="mt-2 flex items-center gap-2">
                                 <button type="button" className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background" onClick={() => setEditLineQty(line.skuId, line.quantity - 1)}><Minus className="h-3.5 w-3.5" /></button>
-                                <span className="w-10 text-center text-base font-bold tabular-nums">{line.quantity}</span>
+                                <input type="number" min={1} className="w-14 rounded-md border border-input bg-background px-1 py-1 text-center text-base font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-ring" value={line.quantity} onChange={(e) => setEditLineQty(line.skuId, Math.max(1, parseInt(e.target.value) || 1))} />
                                 <button type="button" className="flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background" onClick={() => setEditLineQty(line.skuId, line.quantity + 1)}><Plus className="h-3.5 w-3.5" /></button>
                               </div>
                             </div>

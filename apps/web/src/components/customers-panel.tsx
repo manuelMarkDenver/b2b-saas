@@ -54,6 +54,7 @@ type ArSummaryOrder = {
   status: string;
   createdAt: string;
   paymentDueDate: string | null;
+  branch: { name: string } | null;
   payments: Array<{ amountCents: number }>;
 };
 
@@ -250,6 +251,7 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Orders</th>
                 <th className="text-right px-4 py-3 font-medium text-muted-foreground">Billed</th>
                 <th className="text-right px-4 py-3 font-medium text-muted-foreground">Paid</th>
                 <th className="text-right px-4 py-3 font-medium text-muted-foreground">Balance</th>
@@ -267,6 +269,7 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{row.phone ?? '—'}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground hidden md:table-cell">{row.orderCount}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatCents(row.totalBilledCents)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatCents(row.totalPaidCents)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
@@ -280,7 +283,7 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-muted-foreground hidden md:table-cell">
-                    {row.creditLimitCents > 0 ? formatCents(row.creditLimitCents) : <span className="text-xs">COD</span>}
+                    {row.creditLimitCents > 0 ? formatCents(row.creditLimitCents) : <span className="text-xs text-muted-foreground">COD (no credit)</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
@@ -373,13 +376,14 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
       {/* AR detail sheet */}
       <Sheet open={!!detailId} onOpenChange={(open) => { if (!open) { setDetailId(null); setSummary(null); } }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>{summaryLoading ? 'Loading…' : summary?.contact?.name ?? 'Contact'}</SheetTitle>
+          </SheetHeader>
           {summaryLoading || !summary ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">{summaryLoading ? 'Loading…' : ''}</div>
+            <div className="py-16 text-center text-muted-foreground text-sm">{summaryLoading ? '' : ''}</div>
           ) : (
             <>
-              <SheetHeader className="mb-4">
-                <SheetTitle>{summary.contact.name}</SheetTitle>
-                <SheetDescription>
+              <SheetDescription>
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[summary.contact.type]}`}>
                     {TYPE_LABELS[summary.contact.type]}
                   </span>
@@ -387,8 +391,6 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                     <span className="ml-2 text-muted-foreground">{summary.contact.phone}</span>
                   )}
                 </SheetDescription>
-              </SheetHeader>
-
               {/* AR totals */}
               <div className="grid grid-cols-3 gap-3 mb-6">
                 <div className="rounded-lg border p-3 text-center">
@@ -407,14 +409,30 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                 </div>
               </div>
 
-              {summary.contact.creditLimitCents > 0 && (
+              {summary.contact.creditLimitCents > 0 ? (() => {
+                const remaining = summary.contact.creditLimitCents - summary.balanceCents;
+                const isAtLimit = remaining <= 0;
+                return (
+                  <div className={`rounded-md border px-3 py-2 mb-6 text-sm ${isAtLimit ? 'border-destructive/40 bg-destructive/5' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">Credit limit:</span>
+                      <span className="font-medium">{formatCents(summary.contact.creditLimitCents)}</span>
+                      <span className="ml-auto text-muted-foreground">
+                        Remaining: <span className={`font-semibold ${isAtLimit ? 'text-destructive' : 'text-foreground'}`}>{formatCents(Math.max(0, remaining))}</span>
+                      </span>
+                    </div>
+                    {isAtLimit && (
+                      <p className="mt-1.5 text-xs text-destructive">
+                        Credit limit reached — new credit orders will be blocked until balance is reduced.
+                      </p>
+                    )}
+                  </div>
+                );
+              })() : (
                 <div className="flex items-center gap-2 rounded-md border px-3 py-2 mb-6 text-sm">
                   <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Credit limit:</span>
-                  <span className="font-medium">{formatCents(summary.contact.creditLimitCents)}</span>
-                  {summary.balanceCents >= summary.contact.creditLimitCents && (
-                    <Badge variant="destructive" className="ml-auto text-xs">Limit reached</Badge>
-                  )}
+                  <span className="text-muted-foreground">COD (no credit) — payment required at time of order.</span>
                 </div>
               )}
 
@@ -432,16 +450,23 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                       <div key={o.id} className="rounded-md border px-3 py-2.5 text-sm">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-mono text-xs text-muted-foreground">{o.id.slice(0, 8)}</span>
-                          <Badge variant={o.status === 'COMPLETED' ? 'default' : o.status === 'CANCELLED' ? 'secondary' : 'outline'} className="text-[10px]">
-                            {o.status}
-                          </Badge>
+                          <div className="flex items-center gap-1.5">
+                            {o.branch && (
+                              <span className="text-[10px] rounded-full px-2 py-0.5 bg-muted text-muted-foreground">
+                                {o.branch.name}
+                              </span>
+                            )}
+                            <Badge variant={o.status === 'COMPLETED' ? 'default' : o.status === 'CANCELLED' ? 'secondary' : 'outline'} className="text-[10px]">
+                              {o.status}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between mt-1.5">
                           <span className="text-muted-foreground">
-                            {new Date(o.createdAt).toLocaleDateString('en-PH')}
+                            {new Date(o.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
                             {o.paymentDueDate && (
                               <span className={`ml-2 text-xs ${isOverdue ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                due {new Date(o.paymentDueDate).toLocaleDateString('en-PH')}
+                                due {new Date(o.paymentDueDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
                                 {isOverdue && ' ⚠'}
                               </span>
                             )}

@@ -8,6 +8,7 @@ export type AuthUser = {
   isPlatformAdmin: boolean;
   status: 'ACTIVE' | 'DISABLED';
   avatarUrl?: string | null;
+  activeTenantId?: string | null;
 };
 
 export type RequestWithUser = Request & {

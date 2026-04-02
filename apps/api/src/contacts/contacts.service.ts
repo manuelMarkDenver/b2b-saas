@@ -104,6 +104,7 @@ export class ContactsService {
         status: true,
         createdAt: true,
         paymentDueDate: true,
+        branch: { select: { name: true } },
         payments: {
           where: { status: 'VERIFIED' },
           select: { amountCents: true },

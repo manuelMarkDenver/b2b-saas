@@ -53,8 +53,15 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@CurrentUser() user: AuthUser) {
-    return { user };
+  async me(@CurrentUser() user: AuthUser) {
+    let tenant = null;
+    if (user.activeTenantId) {
+      tenant = await this.prisma.tenant.findUnique({
+        where: { id: user.activeTenantId },
+        select: { id: true, slug: true, name: true, features: true, logoUrl: true },
+      });
+    }
+    return { user, tenant };
   }
 
   @UseGuards(JwtAuthGuard)

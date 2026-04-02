@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-02 — MS19g: unified Create Item flow (shared modal, auto-SKU with override, single endpoint). Transfers hidden (shipped: false) — history-only for staging. MS19f: feature flags (stockTransfers/paymentTerms), customer in orders, CSV import modal, catalog UI fixes. MS19e: branch stock. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo. Loyverse competitive gap analysis added (see [docs/LOYVERSE_REFERENCE.md](./LOYVERSE_REFERENCE.md)).
+> Last updated: 2026-04-02 — MS19g: unified Create Item flow (shared modal, auto-SKU with override, single endpoint). Transfers hidden (shipped: false) — history-only for staging. MS19f: feature flags (stockTransfers/paymentTerms), customer in orders, CSV import modal, catalog UI fixes. MS19e: branch stock. MS19d: partial payments, BranchType. MS17: payment method. Product strategy: Ascendex vs MGN, PayMongo. Feature flag system documented at [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
 
 ---
 

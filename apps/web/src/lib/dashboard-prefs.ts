@@ -8,6 +8,9 @@ export type DashboardWidgets = {
   ordersStatusChart: boolean;
   lowStockChart: boolean;
   branchBreakdown: boolean;
+  totalCustomers: boolean;
+  outstandingAr: boolean;
+  overdueAr: boolean;
 };
 
 const DEFAULTS: DashboardWidgets = {
@@ -20,6 +23,9 @@ const DEFAULTS: DashboardWidgets = {
   ordersStatusChart: true,
   lowStockChart: true,
   branchBreakdown: true,
+  totalCustomers: true,
+  outstandingAr: true,
+  overdueAr: true,
 };
 
 function key(tenantSlug: string) {
@@ -52,4 +58,7 @@ export const WIDGET_LABELS: Record<keyof DashboardWidgets, string> = {
   ordersStatusChart: 'Orders by status chart',
   lowStockChart: 'Low stock chart',
   branchBreakdown: 'Branch breakdown',
+  totalCustomers: 'Total Customers',
+  outstandingAr: 'Outstanding AR',
+  overdueAr: 'Overdue Amount',
 };
