@@ -8,10 +8,11 @@ import { formatCents } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { ImageUpload } from "@/components/image-upload";
+import { ProductThumb } from "@/components/product-thumb";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CreateItemModal } from "@/components/create-item-modal";
 import { FilterBar, FilterField, FilterValues } from "@/components/ui/filter-bar";
+import { ImageUpload } from "@/components/image-upload";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -116,7 +117,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   );
 
   // Sort state
-  const [skuSortKey, setSkuSortKey] = React.useState<'name' | 'stockOnHand' | 'priceCents' | 'costCents'>('name');
+  const [skuSortKey, setSkuSortKey] = React.useState<'name' | 'priceCents' | 'costCents'>('name');
   const [skuSortDir, setSkuSortDir] = React.useState<'asc' | 'desc'>('asc');
 
   // Create Item modal
@@ -179,7 +180,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       const params = new URLSearchParams({ page: String(skuPage), limit: '20' });
       if (filters.search) params.set('search', filters.search as string);
       if (filters.categoryId) params.set('categoryId', filters.categoryId as string);
-      if (filters.lowStock === true) params.set('lowStock', 'true');
 
       const [catsRes, skusRes] = await Promise.all([
         apiFetch("/categories"),
@@ -224,15 +224,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     await loadSkus();
   }
 
-  async function updateSkuImage(skuId: string, imageUrl: string | null) {
-    await apiFetch(`/skus/${skuId}`, {
-      tenantSlug,
-      method: 'PATCH',
-      body: JSON.stringify({ imageUrl }),
-    });
-    await loadSkus();
-  }
-
   async function archiveSku(id: string, code: string) {
     const res = await apiFetch(`/skus/${id}/archive`, { tenantSlug, method: 'PATCH' });
     if (!res.ok) {
@@ -254,7 +245,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const sortedSkus = React.useMemo(() => {
     return [...skus].sort((a, b) => {
       const dir = skuSortDir === 'asc' ? 1 : -1;
-      if (skuSortKey === 'stockOnHand') return dir * (a.stockOnHand - b.stockOnHand);
       if (skuSortKey === 'priceCents') return dir * ((a.priceCents ?? 0) - (b.priceCents ?? 0));
       if (skuSortKey === 'costCents') return dir * ((a.costCents ?? 0) - (b.costCents ?? 0));
       return dir * a.name.localeCompare(b.name);
@@ -265,14 +255,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const filterFields: FilterField[] = React.useMemo(() => [
     { type: 'search', key: 'search', placeholder: 'Search items...' },
     { type: 'select', key: 'categoryId', label: 'All categories', options: categories.map(c => ({ value: c.id, label: c.name })) },
-    { type: 'toggle', key: 'lowStock', label: 'Low stock' },
   ], [categories]);
-
-  function openEditProduct(product: Product) {
-    setEditProduct(product);
-    setEditSku(null);
-    setEditOpen(true);
-  }
 
   function openEditSku(sku: Sku) {
     setEditSku(sku);
@@ -380,23 +363,19 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         />
 
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
-          <div className="min-w-[500px]">
+          <div className="min-w-[420px]">
             <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <div className="grid grid-cols-[1fr_100px_80px_80px_80px_80px_auto] items-center gap-2">
+              <div className="grid grid-cols-[1fr_100px_90px_90px_auto] items-center gap-2">
                 <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
                   Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
                 </button>
                 <span>Category</span>
-                <button type="button" onClick={() => toggleSkuSort('stockOnHand')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                  {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Stock
-                </button>
                 <button type="button" onClick={() => toggleSkuSort('costCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                   {skuSortKey === 'costCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Cost
                 </button>
                 <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                   {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
                 </button>
-                <span className="text-right">Low</span>
                 <span />
               </div>
             </div>
@@ -410,35 +389,23 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 {sortedSkus.map((s) => (
                   <div
                     key={s.id}
-                    className={`grid grid-cols-[1fr_100px_80px_80px_80px_80px_auto] items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
+                    className={`grid grid-cols-[1fr_100px_90px_90px_auto] items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <ImageUpload
-                        currentUrl={s.imageUrl}
-                        tenantSlug={tenantSlug}
-                        size={36}
-                        onUploaded={(url) => void updateSkuImage(s.id, url)}
-                        onRemoved={() => void updateSkuImage(s.id, null)}
-                      />
+                      <ProductThumb src={s.imageUrl} label={`${s.code} ${s.name}`} size={36} className="rounded-lg shrink-0" />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{s.name}</div>
                         <div className="truncate font-mono text-xs text-muted-foreground">{s.code}</div>
                       </div>
                     </div>
                     <span className="truncate text-xs text-muted-foreground">{s.product.category.name}</span>
-                    <div className={`text-right text-sm font-bold tabular-nums ${s.lowStockThreshold > 0 && s.stockOnHand <= s.lowStockThreshold ? 'text-red-500 dark:text-red-400' : s.stockOnHand <= 10 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
-                      {s.stockOnHand}
-                    </div>
-                    <div className="text-right text-xs text-muted-foreground tabular-nums">
+                    <div className="text-right text-xs tabular-nums text-muted-foreground">
                       {s.costCents != null ? formatCents(s.costCents) : '—'}
                     </div>
-                    <div className="text-right text-xs text-muted-foreground tabular-nums">
+                    <div className="text-right text-xs tabular-nums text-muted-foreground">
                       {s.priceCents != null ? formatCents(s.priceCents) : '—'}
                     </div>
-                    <div className="text-right text-xs text-muted-foreground tabular-nums">
-                      {s.lowStockThreshold}
-                    </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-end gap-2">
                       {s.isArchived ? (
                         <span className="text-xs text-muted-foreground">Archived</span>
                       ) : (
@@ -488,8 +455,11 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
           <DialogHeader>
             <DialogTitle>Import from CSV</DialogTitle>
             <div className="mt-1 text-xs text-muted-foreground">
-              Upserts products and SKUs.<br />Required headers:
-              <code className="ml-1 break-all rounded bg-muted px-1 py-0.5 text-[11px]">
+              Upserts products and SKUs.
+            </div>
+            <div className="mt-2 rounded-md bg-muted/50 p-3">
+              <div className="mb-1 text-[11px] font-medium text-muted-foreground">Required headers:</div>
+              <code className="block text-[11px] leading-relaxed text-foreground">
                 {CSV_TEMPLATE_HEADERS}
               </code>
             </div>

@@ -696,6 +696,20 @@ Contact model has `creditLimitCents` field for credit limit tracking. Full AR/AP
 - Zero new endpoints, zero new tables, zero new services
 - Single `CreateItemModal` component shared between Products and Inventory tabs
 
+#### Products Page Refinement
+
+| Change | Details |
+|--------|---------|
+| Removed 2-column layout | Single "Items" list (SKU-driven) |
+| Removed Stock/Low columns | Inventory concern, not catalog |
+| Removed lowStock filter | Inventory concern |
+| Added FilterBar | Search + Category filter |
+| Added sortable columns | Name, Cost, Price |
+| Added pagination | Page info + prev/next |
+| ProductThumb in table | Display-only, no inline editing |
+| Fixed CSV modal | Better text formatting |
+| Hero dropzone in Create/Edit | Full-width image upload |
+
 ---
 
 ### MS16 — UI/UX Overhaul ✅ Complete
