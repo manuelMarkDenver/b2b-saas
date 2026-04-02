@@ -117,7 +117,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   );
 
   // Sort state
-  const [skuSortKey, setSkuSortKey] = React.useState<'name' | 'priceCents' | 'costCents'>('name');
+  const [skuSortKey, setSkuSortKey] = React.useState<'name' | 'priceCents' | 'costCents' | 'lowStockThreshold'>('name');
   const [skuSortDir, setSkuSortDir] = React.useState<'asc' | 'desc'>('asc');
 
   // Create Item modal
@@ -175,7 +175,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   const loadSkus = React.useCallback(async () => {
-    setStatus({ kind: "info", text: "Loading items..." });
     try {
       const params = new URLSearchParams({ page: String(skuPage), limit: '20' });
       if (filters.search) params.set('search', filters.search as string);
@@ -247,6 +246,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
       const dir = skuSortDir === 'asc' ? 1 : -1;
       if (skuSortKey === 'priceCents') return dir * ((a.priceCents ?? 0) - (b.priceCents ?? 0));
       if (skuSortKey === 'costCents') return dir * ((a.costCents ?? 0) - (b.costCents ?? 0));
+      if (skuSortKey === 'lowStockThreshold') return dir * (a.lowStockThreshold - b.lowStockThreshold);
       return dir * a.name.localeCompare(b.name);
     });
   }, [skus, skuSortKey, skuSortDir]);
@@ -256,6 +256,29 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     { type: 'search', key: 'search', placeholder: 'Search items...' },
     { type: 'select', key: 'categoryId', label: 'All categories', options: categories.map(c => ({ value: c.id, label: c.name })) },
   ], [categories]);
+
+  // Export CSV
+  function handleExport() {
+    const rows: string[][] = [['Name', 'SKU Code', 'Category', 'Cost', 'Price', 'Low Stock']];
+    sortedSkus.forEach((s) => {
+      rows.push([
+        s.name,
+        s.code,
+        s.product.category.name,
+        s.costCents != null ? formatCents(s.costCents) : '',
+        s.priceCents != null ? formatCents(s.priceCents) : '',
+        String(s.lowStockThreshold),
+      ]);
+    });
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'items.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function openEditSku(sku: Sku) {
     setEditSku(sku);
@@ -360,12 +383,14 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
           filters={filterFields}
           values={filters}
           onChange={setFilters}
+          onExport={handleExport}
+          exportLabel="Export CSV"
         />
 
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
-          <div className="min-w-[420px]">
+          <div className="min-w-[440px]">
             <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <div className="grid grid-cols-[1fr_100px_90px_90px_auto] items-center gap-2">
+              <div className="grid grid-cols-[2fr_1fr_80px_80px_70px_auto] items-center gap-3">
                 <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
                   Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
                 </button>
@@ -375,6 +400,9 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 </button>
                 <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                   {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
+                </button>
+                <button type="button" onClick={() => toggleSkuSort('lowStockThreshold')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                  {skuSortKey === 'lowStockThreshold' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Low
                 </button>
                 <span />
               </div>
@@ -389,14 +417,11 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 {sortedSkus.map((s) => (
                   <div
                     key={s.id}
-                    className={`grid grid-cols-[1fr_100px_90px_90px_auto] items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
+                    className={`grid grid-cols-[2fr_1fr_80px_80px_70px_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <ProductThumb src={s.imageUrl} label={`${s.code} ${s.name}`} size={36} className="rounded-lg shrink-0" />
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{s.name}</div>
-                        <div className="truncate font-mono text-xs text-muted-foreground">{s.code}</div>
-                      </div>
+                      <span className="truncate text-sm font-medium">{s.name}</span>
                     </div>
                     <span className="truncate text-xs text-muted-foreground">{s.product.category.name}</span>
                     <div className="text-right text-xs tabular-nums text-muted-foreground">
@@ -404,6 +429,9 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                     </div>
                     <div className="text-right text-xs tabular-nums text-muted-foreground">
                       {s.priceCents != null ? formatCents(s.priceCents) : '—'}
+                    </div>
+                    <div className="text-right text-xs tabular-nums text-muted-foreground">
+                      {s.lowStockThreshold}
                     </div>
                     <div className="flex items-center justify-end gap-2">
                       {s.isArchived ? (
