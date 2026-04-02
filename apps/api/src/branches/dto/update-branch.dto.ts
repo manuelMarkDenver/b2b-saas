@@ -1,5 +1,5 @@
-import { IsString, IsOptional, MaxLength, MinLength, IsEnum } from 'class-validator';
-import { BranchStatus } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { BranchStatus, BranchType } from '@prisma/client';
 
 export class UpdateBranchDto {
   @IsString()
@@ -16,4 +16,8 @@ export class UpdateBranchDto {
   @IsEnum(BranchStatus)
   @IsOptional()
   status?: BranchStatus;
+
+  @IsEnum(BranchType)
+  @IsOptional()
+  type?: BranchType;
 }
