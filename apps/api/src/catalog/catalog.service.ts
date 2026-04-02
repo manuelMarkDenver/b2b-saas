@@ -267,8 +267,10 @@ export class CatalogService {
     data: {
       categoryId: string;
       name: string;
+      code?: string;
       priceCents?: number;
       costCents?: number;
+      lowStockThreshold?: number;
       initialQty?: number;
       note?: string;
       imageUrl?: string;
@@ -281,7 +283,19 @@ export class CatalogService {
     });
     if (!category) throw new NotFoundException('Category not found');
 
-    const code = await this.generateNextSkuCode(tenantId, data.categoryId);
+    // Use custom code if provided, otherwise auto-generate
+    let code: string;
+    if (data.code?.trim()) {
+      code = data.code.trim();
+      // Check for uniqueness
+      const existing = await this.prisma.sku.findFirst({
+        where: { tenantId, code },
+        select: { id: true },
+      });
+      if (existing) throw new ConflictException('SKU code already exists for tenant');
+    } else {
+      code = await this.generateNextSkuCode(tenantId, data.categoryId);
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
@@ -298,6 +312,7 @@ export class CatalogService {
           costCents: data.costCents ?? null,
           imageUrl: data.imageUrl ?? null,
           stockOnHand: 0,
+          lowStockThreshold: data.lowStockThreshold ?? 0,
         },
       });
 

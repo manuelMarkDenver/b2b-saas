@@ -79,8 +79,10 @@ export class CatalogController {
   createProductWithStock(@Req() req: RequestWithUser, @Body() body: {
     categoryId: string;
     name: string;
+    code?: string;
     priceCents?: number;
     costCents?: number;
+    lowStockThreshold?: number;
     initialQty?: number;
     note?: string;
     imageUrl?: string;
