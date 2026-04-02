@@ -1,5 +1,6 @@
 import { PrismaClient, MovementType, OrderStatus, PaymentMethod, PaymentStatus, ReferenceType, BranchType, ContactType } from "@prisma/client";
 import { hash } from "bcryptjs";
+import { randomUUID } from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -192,6 +193,27 @@ async function createPaymentIfAbsent(opts: {
   });
 }
 
+async function upsertContact(tenantId: string, name: string, opts: {
+  type: ContactType;
+  phone?: string;
+  address?: string;
+  creditLimitCents?: number;
+}) {
+  const existing = await prisma.contact.findFirst({ where: { tenantId, name }, select: { id: true } });
+  if (existing) return existing;
+  return prisma.contact.create({
+    data: {
+      tenantId,
+      name,
+      type: opts.type,
+      phone: opts.phone ?? null,
+      address: opts.address ?? null,
+      creditLimitCents: opts.creditLimitCents ?? 0,
+      isActive: true,
+    },
+  });
+}
+
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "admin@local.test";
   const adminPassword = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
@@ -367,20 +389,54 @@ async function main() {
     isArchived: true,
   });
 
-  // Stock for Peak Hardware
-  const hwStockCheck = await prisma.sku.findUnique({ where: { id: boltSku.id }, select: { stockOnHand: true } });
-  if ((hwStockCheck?.stockOnHand ?? 0) < 100) {
-    const hwMain = hwMainBranch.id;
-    await logMovement(hardwareTenant.id, boltSku.id,    MovementType.IN,         2000, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, washerSku.id,  MovementType.IN,         3000, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, nutSku.id,     MovementType.IN,         3000, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, cableSku.id,   MovementType.IN,          500, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, cableSku.id,   MovementType.OUT,          15, ReferenceType.MANUAL, "Sold to contractor",            undefined, hwMain);
-    await logMovement(hardwareTenant.id, extCordSku.id, MovementType.IN,           80, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, glovesSku.id,  MovementType.IN,          120, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, hardhatSku.id, MovementType.IN,           40, ReferenceType.MANUAL, "Initial stock",                 undefined, hwMain);
-    await logMovement(hardwareTenant.id, boltSku.id,    MovementType.ADJUSTMENT,  -50, ReferenceType.MANUAL, "Inventory count correction",    undefined, hwMain);
+  // Stock for Peak Hardware — each SKU has its own idempotency check
+  const hwMain = hwMainBranch.id;
+
+  const hwBoltStock = await prisma.sku.findUnique({ where: { id: boltSku.id }, select: { stockOnHand: true } });
+  if ((hwBoltStock?.stockOnHand ?? 0) < 100) {
+    await logMovement(hardwareTenant.id, boltSku.id,    MovementType.IN,  2000, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+    await logMovement(hardwareTenant.id, boltSku.id,    MovementType.ADJUSTMENT, -50, ReferenceType.MANUAL, "Inventory count correction", undefined, hwMain);
   }
+
+  const hwWasherStock = await prisma.sku.findUnique({ where: { id: washerSku.id }, select: { stockOnHand: true } });
+  if ((hwWasherStock?.stockOnHand ?? 0) < 100) {
+    await logMovement(hardwareTenant.id, washerSku.id,  MovementType.IN,  3000, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+  }
+
+  const hwNutStock = await prisma.sku.findUnique({ where: { id: nutSku.id }, select: { stockOnHand: true } });
+  if ((hwNutStock?.stockOnHand ?? 0) < 100) {
+    await logMovement(hardwareTenant.id, nutSku.id,     MovementType.IN,  3000, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+  }
+
+  const hwCableStock = await prisma.sku.findUnique({ where: { id: cableSku.id }, select: { stockOnHand: true } });
+  if ((hwCableStock?.stockOnHand ?? 0) < 50) {
+    await logMovement(hardwareTenant.id, cableSku.id,   MovementType.IN,   500, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+    await logMovement(hardwareTenant.id, cableSku.id,   MovementType.OUT,   15, ReferenceType.MANUAL, "Sold to contractor",            undefined, hwMain);
+  }
+
+  const hwExtCordStock = await prisma.sku.findUnique({ where: { id: extCordSku.id }, select: { stockOnHand: true } });
+  if ((hwExtCordStock?.stockOnHand ?? 0) < 10) {
+    await logMovement(hardwareTenant.id, extCordSku.id, MovementType.IN,    80, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+  }
+
+  const hwGlovesStock = await prisma.sku.findUnique({ where: { id: glovesSku.id }, select: { stockOnHand: true } });
+  if ((hwGlovesStock?.stockOnHand ?? 0) < 10) {
+    await logMovement(hardwareTenant.id, glovesSku.id,  MovementType.IN,   120, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+  }
+
+  const hwHardhatStock = await prisma.sku.findUnique({ where: { id: hardhatSku.id }, select: { stockOnHand: true } });
+  if ((hwHardhatStock?.stockOnHand ?? 0) < 10) {
+    await logMovement(hardwareTenant.id, hardhatSku.id, MovementType.IN,    40, ReferenceType.MANUAL, "Initial stock",               undefined, hwMain);
+  }
+
+  // Contacts — created early so contactIds are available for orders
+  const hwContactBgc     = await upsertContact(hardwareTenant.id, "BGC Construction Inc.", { type: ContactType.DISTRIBUTOR, phone: "09171234001", address: "BGC, Taguig City", creditLimitCents: 50000_00 });
+  const hwContactAyala   = await upsertContact(hardwareTenant.id, "Ayala Land Procurement", { type: ContactType.DISTRIBUTOR, phone: "09171234002", address: "Makati CBD", creditLimitCents: 100000_00 });
+  const mpsContactPalace = await upsertContact(foodTenant.id, "Pizza Palace Franchise",  { type: ContactType.DISTRIBUTOR, phone: "09181234011", address: "Cubao, Quezon City", creditLimitCents: 80000_00 });
+  const mpsContactBella  = await upsertContact(foodTenant.id, "Bella Pizza QC",          { type: ContactType.CUSTOMER,    phone: "09281234012", address: "Katipunan Ave, QC", creditLimitCents: 20000_00 });
+  const mpsContactStar   = await upsertContact(foodTenant.id, "Star Pizza Makati",       { type: ContactType.CUSTOMER,    phone: "09381234013", address: "Ayala Ave, Makati",  creditLimitCents: 15000_00 });
+  const cgsContactBhall  = await upsertContact(retailTenant.id, "Barangay Hall Canteen", { type: ContactType.CUSTOMER,    phone: "09191234021", address: "Brgy. Hall, QC",     creditLimitCents: 3000_00 });
+  const cgsContactSM     = await upsertContact(retailTenant.id, "SM Hypermarket Buyer",  { type: ContactType.DISTRIBUTOR, phone: "09291234022", address: "SM North EDSA",      creditLimitCents: 200000_00 });
 
   // Orders for Peak Hardware — create batch once (idempotent: skip if already seeded)
   const hwOrderCount = await prisma.order.count({ where: { tenantId: hardwareTenant.id } });
@@ -480,20 +536,45 @@ async function main() {
     isArchived: true,
   });
 
-  // Stock for Metro Pizza
-  const mpsStockCheck = await prisma.sku.findUnique({ where: { id: flourSku.id }, select: { stockOnHand: true } });
-  if ((mpsStockCheck?.stockOnHand ?? 0) < 20) {
-    const mpsMain = mpsCentralBranch.id;
-    await logMovement(foodTenant.id, flourSku.id,     MovementType.IN,          200, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, flourSku.id,     MovementType.OUT,           8, ReferenceType.MANUAL, "Delivered to client", undefined, mpsMain);
-    await logMovement(foodTenant.id, mozzaSku.id,     MovementType.IN,          150, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, sauceSku.id,     MovementType.IN,          120, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, sauceSku.id,     MovementType.OUT,           6, ReferenceType.MANUAL, "Sold to restaurant",  undefined, mpsMain);
-    await logMovement(foodTenant.id, yeastSku.id,     MovementType.IN,          100, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, oliveOilSku.id,  MovementType.IN,           30, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, pepperoniSku.id, MovementType.IN,          100, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, tomatoesSku.id,  MovementType.IN,          200, ReferenceType.MANUAL, "Initial stock",       undefined, mpsMain);
-    await logMovement(foodTenant.id, mozzaSku.id,     MovementType.ADJUSTMENT,   -5, ReferenceType.MANUAL, "Spoilage write-off",  undefined, mpsMain);
+  // Stock for Metro Pizza — each SKU has its own idempotency check so re-runs don't leave negative stock
+  const mpsMain = mpsCentralBranch.id;
+
+  const mpsFlourStock = await prisma.sku.findUnique({ where: { id: flourSku.id }, select: { stockOnHand: true } });
+  if ((mpsFlourStock?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, flourSku.id, MovementType.IN, 200, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
+    await logMovement(foodTenant.id, flourSku.id, MovementType.OUT, 8, ReferenceType.MANUAL, "Delivered to client", undefined, mpsMain);
+  }
+
+  const mpsMozzarellaStock = await prisma.sku.findUnique({ where: { id: mozzaSku.id }, select: { stockOnHand: true } });
+  if ((mpsMozzarellaStock?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, mozzaSku.id, MovementType.IN, 150, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
+    await logMovement(foodTenant.id, mozzaSku.id, MovementType.ADJUSTMENT, -5, ReferenceType.MANUAL, "Spoilage write-off", undefined, mpsMain);
+  }
+
+  const mpsSauceStock = await prisma.sku.findUnique({ where: { id: sauceSku.id }, select: { stockOnHand: true } });
+  if ((mpsSauceStock?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, sauceSku.id, MovementType.IN, 120, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
+    await logMovement(foodTenant.id, sauceSku.id, MovementType.OUT, 6, ReferenceType.MANUAL, "Sold to restaurant", undefined, mpsMain);
+  }
+
+  const mpsYeastStock = await prisma.sku.findUnique({ where: { id: yeastSku.id }, select: { stockOnHand: true } });
+  if ((mpsYeastStock?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, yeastSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
+  }
+
+  const mpsOliveOilStock = await prisma.sku.findUnique({ where: { id: oliveOilSku.id }, select: { stockOnHand: true } });
+  if ((mpsOliveOilStock?.stockOnHand ?? 0) < 10) {
+    await logMovement(foodTenant.id, oliveOilSku.id, MovementType.IN, 30, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
+  }
+
+  const mpsPepperoniStock = await prisma.sku.findUnique({ where: { id: pepperoniSku.id }, select: { stockOnHand: true } });
+  if ((mpsPepperoniStock?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, pepperoniSku.id, MovementType.IN, 100, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
+  }
+
+  const mpsTomatoesStock = await prisma.sku.findUnique({ where: { id: tomatoesSku.id }, select: { stockOnHand: true } });
+  if ((mpsTomatoesStock?.stockOnHand ?? 0) < 20) {
+    await logMovement(foodTenant.id, tomatoesSku.id, MovementType.IN, 200, ReferenceType.MANUAL, "Initial stock", undefined, mpsMain);
   }
 
   // Orders for Metro Pizza — create batch once (idempotent: skip if already seeded)
@@ -590,20 +671,45 @@ async function main() {
     isArchived: true,
   });
 
-  // Stock for Corner General
-  const cgsStockCheck = await prisma.sku.findUnique({ where: { id: colaSku.id }, select: { stockOnHand: true } });
-  if ((cgsStockCheck?.stockOnHand ?? 0) < 100) {
-    const cgsMain = cgsMainBranch.id;
-    await logMovement(retailTenant.id, colaSku.id,      MovementType.IN,         1440, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
-    await logMovement(retailTenant.id, colaSku.id,      MovementType.OUT,          36, ReferenceType.MANUAL, "Daily sales",    undefined, cgsMain);
-    await logMovement(retailTenant.id, chipsSku.id,     MovementType.IN,          600, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+  // Stock for Corner General — each SKU has its own idempotency check
+  const cgsMain = cgsMainBranch.id;
+
+  const cgsColaStock = await prisma.sku.findUnique({ where: { id: colaSku.id }, select: { stockOnHand: true } });
+  if ((cgsColaStock?.stockOnHand ?? 0) < 100) {
+    await logMovement(retailTenant.id, colaSku.id,      MovementType.IN,  1440, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+    await logMovement(retailTenant.id, colaSku.id,      MovementType.OUT,   36, ReferenceType.MANUAL, "Daily sales",    undefined, cgsMain);
+  }
+
+  const cgsChipsStock = await prisma.sku.findUnique({ where: { id: chipsSku.id }, select: { stockOnHand: true } });
+  if ((cgsChipsStock?.stockOnHand ?? 0) < 50) {
+    await logMovement(retailTenant.id, chipsSku.id,     MovementType.IN,         600, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
     await logMovement(retailTenant.id, chipsSku.id,     MovementType.ADJUSTMENT,  -12, ReferenceType.MANUAL, "Damaged stock",  undefined, cgsMain);
-    await logMovement(retailTenant.id, cleanerSku.id,   MovementType.IN,          240, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
-    await logMovement(retailTenant.id, waterSku.id,     MovementType.IN,         2400, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
-    await logMovement(retailTenant.id, waterSku.id,     MovementType.OUT,         144, ReferenceType.MANUAL, "Daily sales",    undefined, cgsMain);
-    await logMovement(retailTenant.id, noodlesSku.id,   MovementType.IN,          480, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
-    await logMovement(retailTenant.id, detergentSku.id, MovementType.IN,          100, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
-    await logMovement(retailTenant.id, tissueSku.id,    MovementType.IN,          120, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+  }
+
+  const cgsCleanerStock = await prisma.sku.findUnique({ where: { id: cleanerSku.id }, select: { stockOnHand: true } });
+  if ((cgsCleanerStock?.stockOnHand ?? 0) < 50) {
+    await logMovement(retailTenant.id, cleanerSku.id,   MovementType.IN,   240, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+  }
+
+  const cgsWaterStock = await prisma.sku.findUnique({ where: { id: waterSku.id }, select: { stockOnHand: true } });
+  if ((cgsWaterStock?.stockOnHand ?? 0) < 100) {
+    await logMovement(retailTenant.id, waterSku.id,     MovementType.IN,  2400, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+    await logMovement(retailTenant.id, waterSku.id,     MovementType.OUT,  144, ReferenceType.MANUAL, "Daily sales",    undefined, cgsMain);
+  }
+
+  const cgsNoodlesStock = await prisma.sku.findUnique({ where: { id: noodlesSku.id }, select: { stockOnHand: true } });
+  if ((cgsNoodlesStock?.stockOnHand ?? 0) < 50) {
+    await logMovement(retailTenant.id, noodlesSku.id,   MovementType.IN,   480, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+  }
+
+  const cgsDetergentStock = await prisma.sku.findUnique({ where: { id: detergentSku.id }, select: { stockOnHand: true } });
+  if ((cgsDetergentStock?.stockOnHand ?? 0) < 50) {
+    await logMovement(retailTenant.id, detergentSku.id, MovementType.IN,   100, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
+  }
+
+  const cgsTissueStock = await prisma.sku.findUnique({ where: { id: tissueSku.id }, select: { stockOnHand: true } });
+  if ((cgsTissueStock?.stockOnHand ?? 0) < 50) {
+    await logMovement(retailTenant.id, tissueSku.id,    MovementType.IN,   120, ReferenceType.MANUAL, "Initial stock",  undefined, cgsMain);
   }
 
   // Orders for Corner General — create batch once (idempotent: skip if already seeded)
@@ -655,43 +761,10 @@ async function main() {
   }
 
   // ===========================
-  // CONTACTS (all tenants)
+  // CONTACTS (all tenants — already created above for order linking)
   // ===========================
 
-  async function upsertContact(tenantId: string, name: string, opts: {
-    type: ContactType;
-    phone?: string;
-    address?: string;
-    creditLimitCents?: number;
-  }) {
-    const existing = await prisma.contact.findFirst({ where: { tenantId, name }, select: { id: true } });
-    if (existing) return existing;
-    return prisma.contact.create({
-      data: {
-        tenantId,
-        name,
-        type: opts.type,
-        phone: opts.phone ?? null,
-        address: opts.address ?? null,
-        creditLimitCents: opts.creditLimitCents ?? 0,
-        isActive: true,
-      },
-    });
-  }
-
-  // Peak Hardware contacts
-  const hwContactBgc     = await upsertContact(hardwareTenant.id, "BGC Construction Inc.", { type: ContactType.DISTRIBUTOR, phone: "09171234001", address: "BGC, Taguig City", creditLimitCents: 50000_00 });
-  const hwContactAyala   = await upsertContact(hardwareTenant.id, "Ayala Land Procurement", { type: ContactType.DISTRIBUTOR, phone: "09171234002", address: "Makati CBD", creditLimitCents: 100000_00 });
-  const hwContactPacific = await upsertContact(hardwareTenant.id, "Pacific Mall Stall",    { type: ContactType.CUSTOMER,    phone: "09271234003", address: "Pacific Mall, Cubao", creditLimitCents: 5000_00 });
-
-  // Metro Pizza contacts
-  const mpsContactPalace = await upsertContact(foodTenant.id, "Pizza Palace Franchise",  { type: ContactType.DISTRIBUTOR, phone: "09181234011", address: "Cubao, Quezon City", creditLimitCents: 80000_00 });
-  const mpsContactBella  = await upsertContact(foodTenant.id, "Bella Pizza QC",          { type: ContactType.CUSTOMER,    phone: "09281234012", address: "Katipunan Ave, QC", creditLimitCents: 20000_00 });
-  const mpsContactStar   = await upsertContact(foodTenant.id, "Star Pizza Makati",       { type: ContactType.CUSTOMER,    phone: "09381234013", address: "Ayala Ave, Makati",  creditLimitCents: 15000_00 });
-
-  // Corner General contacts
-  const cgsContactBhall  = await upsertContact(retailTenant.id, "Barangay Hall Canteen", { type: ContactType.CUSTOMER,    phone: "09191234021", address: "Brgy. Hall, QC",     creditLimitCents: 3000_00 });
-  const cgsContactSM     = await upsertContact(retailTenant.id, "SM Hypermarket Buyer",  { type: ContactType.DISTRIBUTOR, phone: "09291234022", address: "SM North EDSA",      creditLimitCents: 200000_00 });
+  // "Sari-sari Store Aling Nena" — created here so upsertContact is in scope
   await upsertContact(retailTenant.id, "Sari-sari Store Aling Nena", { type: ContactType.CUSTOMER, phone: "09391234023", creditLimitCents: 0 });
 
   // ===========================
@@ -721,7 +794,7 @@ async function main() {
         const sku = skus.find((s) => s.id === item.skuId);
         if (!sku || sku.stockOnHand < item.quantity) continue; // skip if insufficient stock
 
-        const pairId = `seed-${transfer.id}-${item.skuId}`;
+        const pairId = randomUUID();
         await tx.inventoryMovement.create({ data: { tenantId, skuId: item.skuId, type: MovementType.TRANSFER_OUT, quantity: item.quantity, referenceType: ReferenceType.TRANSFER, referenceId: transfer.id, branchId: fromBranchId, transferPairId: pairId, actorId: userId } });
         await tx.sku.update({ where: { id: item.skuId }, data: { stockOnHand: { decrement: item.quantity } } });
         await tx.inventoryMovement.create({ data: { tenantId, skuId: item.skuId, type: MovementType.TRANSFER_IN, quantity: item.quantity, referenceType: ReferenceType.TRANSFER, referenceId: transfer.id, branchId: toBranchId, transferPairId: pairId, actorId: userId } });
@@ -785,7 +858,7 @@ async function main() {
     await createPaymentIfAbsent({ tenantId: retailTenant.id, orderId: cgsCreditOrder2.id, amountCents: Math.floor(cgsCreditOrder2.totalCents * 0.3), status: PaymentStatus.VERIFIED });
 
     // Suppress unused variable warnings
-    void hwContactPacific; void mpsContactStar;
+    void mpsContactStar;
   }
 
   // Summary

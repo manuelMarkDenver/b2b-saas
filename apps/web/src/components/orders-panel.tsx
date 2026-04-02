@@ -162,6 +162,22 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   const [editMode, setEditMode] = React.useState(false);
   const [editCart, setEditCart] = React.useState<CartLine[]>([]);
   const [editView, setEditView] = React.useState<"products" | "cart">("products");
+
+  // Payment terms feature flag
+  const [hasPaymentTerms, setHasPaymentTerms] = React.useState(false);
+  const [paymentDueDate, setPaymentDueDate] = React.useState('');
+
+  React.useEffect(() => {
+    apiFetch(`/auth/me`, { tenantSlug })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.tenant) {
+          const features = (data.tenant as { features?: Record<string, boolean> }).features;
+          setHasPaymentTerms(features?.paymentTerms === true);
+        }
+      })
+      .catch(() => {});
+  }, [tenantSlug]);
   const [editSearch, setEditSearch] = React.useState("");
 
   const { pushToast } = useToast();
@@ -273,6 +289,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
     setNewCustomerPhone('');
     setNewCustomerType('CUSTOMER');
     setNewCustomerCreditLimit('');
+    setPaymentDueDate('');
     setNewOrderOpen(true);
   }
 
@@ -319,11 +336,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       customerRef = newContact.name;
     }
 
-    const body: { items: { skuId: string; quantity: number }[]; contactId?: string; customerRef: string } = {
+    const body: { items: { skuId: string; quantity: number }[]; contactId?: string; customerRef: string; paymentDueDate?: string } = {
       items: cart.map((l) => ({ skuId: l.skuId, quantity: l.quantity })),
       customerRef,
     };
     if (contactId) body.contactId = contactId;
+    if (paymentDueDate && hasPaymentTerms) body.paymentDueDate = paymentDueDate;
 
     const res = await apiFetch("/orders", {
       tenantSlug,
@@ -855,6 +873,18 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                     </div>
                   )}
                 </div>
+
+                {hasPaymentTerms && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Payment Due Date</label>
+                    <input
+                      type="date"
+                      className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                      value={paymentDueDate}
+                      onChange={(e) => setPaymentDueDate(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto px-5 pb-36">

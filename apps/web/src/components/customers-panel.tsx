@@ -373,13 +373,14 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
       {/* AR detail sheet */}
       <Sheet open={!!detailId} onOpenChange={(open) => { if (!open) { setDetailId(null); setSummary(null); } }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>{summaryLoading ? 'Loading…' : summary?.contact?.name ?? 'Contact'}</SheetTitle>
+          </SheetHeader>
           {summaryLoading || !summary ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">{summaryLoading ? 'Loading…' : ''}</div>
+            <div className="py-16 text-center text-muted-foreground text-sm">{summaryLoading ? '' : ''}</div>
           ) : (
             <>
-              <SheetHeader className="mb-4">
-                <SheetTitle>{summary.contact.name}</SheetTitle>
-                <SheetDescription>
+              <SheetDescription>
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[summary.contact.type]}`}>
                     {TYPE_LABELS[summary.contact.type]}
                   </span>
@@ -387,8 +388,6 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                     <span className="ml-2 text-muted-foreground">{summary.contact.phone}</span>
                   )}
                 </SheetDescription>
-              </SheetHeader>
-
               {/* AR totals */}
               <div className="grid grid-cols-3 gap-3 mb-6">
                 <div className="rounded-lg border p-3 text-center">
