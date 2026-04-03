@@ -5,7 +5,8 @@ services:
     plan: free
     # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
     # Note: Free plan does not support `preDeployCommand`, so migrations run during build.
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter api build && pnpm --filter @repo/db run migrate:deploy
+    # Render free plan build: ensure devDependencies are installed (Nest CLI is used during build)
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile --prod=false && pnpm --filter api build && pnpm --filter @repo/db run migrate:deploy
     startCommand: node apps/api/dist/main
     healthCheckPath: /health
     envVars:
