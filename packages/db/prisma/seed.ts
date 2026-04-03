@@ -233,8 +233,8 @@ async function main() {
 
   const adminTenant = await prisma.tenant.upsert({
     where: { slug: tenantSlug },
-    update: { name: tenantName, createdByUserId: admin.id },
-    create: { name: tenantName, slug: tenantSlug, createdByUserId: admin.id },
+    update: { name: tenantName, createdByUserId: admin.id, isSystem: true },
+    create: { name: tenantName, slug: tenantSlug, createdByUserId: admin.id, isSystem: true },
   });
 
   await prisma.tenantMembership.upsert({
@@ -243,24 +243,25 @@ async function main() {
     create: { tenantId: adminTenant.id, userId: admin.id, status: "ACTIVE", isOwner: true, role: "OWNER" },
   });
 
-  const defaultFeatures = { inventory: true, orders: true, payments: true, team: true, catalog: true, reports: true, marketplace: false, stockTransfers: false, paymentTerms: false };
+  // Demo tenants: multipleBranches enabled, maxBranches:3 (2 seeded + 1 slot for testing)
+  const demoFeatures = { inventory: true, orders: true, payments: true, team: true, catalog: true, reports: true, marketplace: false, stockTransfers: true, paymentTerms: true, multipleBranches: true };
 
   const hardwareTenant = await prisma.tenant.upsert({
     where: { slug: "peak-hardware" },
-    update: { name: "Peak Hardware Supply", createdByUserId: admin.id, businessType: "hardware", features: defaultFeatures },
-    create: { name: "Peak Hardware Supply", slug: "peak-hardware", createdByUserId: admin.id, businessType: "hardware", features: defaultFeatures },
+    update: { name: "Peak Hardware Supply", createdByUserId: admin.id, businessType: "hardware", features: demoFeatures, maxBranches: 3 },
+    create: { name: "Peak Hardware Supply", slug: "peak-hardware", createdByUserId: admin.id, businessType: "hardware", features: demoFeatures, maxBranches: 3 },
   });
 
   const foodTenant = await prisma.tenant.upsert({
     where: { slug: "metro-pizza-supply" },
-    update: { name: "Metro Pizza Supply", createdByUserId: admin.id, businessType: "food_beverage", features: defaultFeatures },
-    create: { name: "Metro Pizza Supply", slug: "metro-pizza-supply", createdByUserId: admin.id, businessType: "food_beverage", features: defaultFeatures },
+    update: { name: "Metro Pizza Supply", createdByUserId: admin.id, businessType: "food_beverage", features: demoFeatures, maxBranches: 3 },
+    create: { name: "Metro Pizza Supply", slug: "metro-pizza-supply", createdByUserId: admin.id, businessType: "food_beverage", features: demoFeatures, maxBranches: 3 },
   });
 
   const retailTenant = await prisma.tenant.upsert({
     where: { slug: "corner-general" },
-    update: { name: "Corner General Store", createdByUserId: admin.id, businessType: "general_retail", features: defaultFeatures },
-    create: { name: "Corner General Store", slug: "corner-general", createdByUserId: admin.id, businessType: "general_retail", features: defaultFeatures },
+    update: { name: "Corner General Store", createdByUserId: admin.id, businessType: "general_retail", features: demoFeatures, maxBranches: 3 },
+    create: { name: "Corner General Store", slug: "corner-general", createdByUserId: admin.id, businessType: "general_retail", features: demoFeatures, maxBranches: 3 },
   });
 
   // --- Users ---

@@ -15,6 +15,7 @@ type TenantFeatures = {
   reports: boolean;
   stockTransfers: boolean;
   paymentTerms: boolean;
+  multipleBranches: boolean;
 };
 
 const TENANT_SELECT = {
@@ -24,8 +25,10 @@ const TENANT_SELECT = {
   status: true,
   businessType: true,
   features: true,
+  maxBranches: true,
+  isSystem: true,
   createdAt: true,
-  _count: { select: { memberships: true } },
+  _count: { select: { memberships: true, branches: true } },
 } as const;
 
 @Injectable()
@@ -34,6 +37,7 @@ export class AdminService {
 
   listTenants() {
     return this.prisma.tenant.findMany({
+      where: { isSystem: false },
       select: TENANT_SELECT,
       orderBy: { createdAt: 'asc' },
     });
@@ -123,11 +127,22 @@ export class AdminService {
       reports: dto.reports ?? current.reports ?? false,
       stockTransfers: dto.stockTransfers ?? current.stockTransfers ?? false,
       paymentTerms: dto.paymentTerms ?? current.paymentTerms ?? false,
+      multipleBranches: dto.multipleBranches ?? current.multipleBranches ?? false,
     };
 
     return this.prisma.tenant.update({
       where: { id: tenantId },
       data: { features: updated },
+      select: TENANT_SELECT,
+    });
+  }
+
+  async updateTenantLimits(tenantId: string, maxBranches: number) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { maxBranches },
       select: TENANT_SELECT,
     });
   }

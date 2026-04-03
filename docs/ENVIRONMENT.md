@@ -57,6 +57,16 @@ API — CORS
 
 - `CORS_ALLOWED_ORIGINS` — comma-separated list of allowed origins, e.g. `https://yourplatform.vercel.app,https://yourplatform.com`
 
+API — File Storage (Cloudflare R2 / S3-compatible)
+
+- `STORAGE_TYPE` — `local` (disk) or `s3` (S3/R2). **Production: `s3`**. Local dev: `local`
+- `AWS_REGION` — **R2: `auto`**. AWS S3: your bucket region (e.g. `us-east-1`)
+- `AWS_ACCESS_KEY_ID` — R2 API token Access Key ID (or AWS IAM access key)
+- `AWS_SECRET_ACCESS_KEY` — R2 API token Secret Access Key (or AWS IAM secret key)
+- `AWS_S3_BUCKET` — bucket name, e.g. `zentral-uploads`
+- `AWS_S3_PUBLIC_URL` — public URL for the bucket. **R2: `https://pub-<account-id>.r2.dev`**. AWS S3: `https://<bucket>.s3.amazonaws.com`
+- `AWS_S3_ENDPOINT` — **R2: `https://<account-id>.r2.cloudflarestorage.com`**. AWS S3: omit (uses AWS default)
+
 ## Post-MVP
 
 API — Notifications (Messenger / WhatsApp / SMS)
@@ -73,4 +83,4 @@ API — AI Chatbot (post-MVP)
 ## Naming
 
 - Public client vars must be prefixed with `NEXT_PUBLIC_`.
-- Secrets (JWT_SECRET, SMTP_PASS, META_ACCESS_TOKEN) must NEVER be committed or logged.
+- Secrets (JWT_SECRET, SMTP_PASS, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) must NEVER be committed or logged.

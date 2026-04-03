@@ -28,4 +28,8 @@ export class UpdateTenantFlagsDto {
   @IsOptional()
   @IsBoolean()
   paymentTerms?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  multipleBranches?: boolean;
 }

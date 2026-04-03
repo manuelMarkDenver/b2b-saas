@@ -54,6 +54,15 @@ export class AdminController {
     return this.adminService.updateFeatureFlags(id, body);
   }
 
+  @Patch('tenants/:id/limits')
+  updateTenantLimits(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { maxBranches: number },
+  ) {
+    const max = Math.max(1, Math.floor(body.maxBranches ?? 1));
+    return this.adminService.updateTenantLimits(id, max);
+  }
+
   @Patch('tenants/:id/status')
   updateTenantStatus(
     @Param('id', ParseUUIDPipe) id: string,

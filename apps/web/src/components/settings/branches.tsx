@@ -38,6 +38,8 @@ interface BranchesProps {
 
 export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [maxBranches, setMaxBranches] = useState(1);
+  const [multipleBranches, setMultipleBranches] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +55,10 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
     setLoading(true);
     const res = await apiFetch('/branches', { tenantSlug });
     if (res.ok) {
-      setBranches(await res.json());
+      const d = await res.json() as { branches: Branch[]; maxBranches: number; multipleBranches: boolean };
+      setBranches(d.branches);
+      setMaxBranches(d.maxBranches);
+      setMultipleBranches(d.multipleBranches);
     } else {
       setError('Failed to load branches');
     }
@@ -125,7 +130,7 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
           <h2 className="text-base font-semibold">Branches</h2>
           <p className="text-sm text-muted-foreground">Manage locations within your business.</p>
         </div>
-        {canManage && (
+        {canManage && multipleBranches && branches.length < maxBranches && (
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"

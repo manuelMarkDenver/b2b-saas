@@ -87,7 +87,9 @@ model Tenant {
   slug               String              @unique
   status             TenantStatus        @default(ACTIVE)
   businessType       BusinessType        @default(general_retail)
-  features           Json                @default("{\"inventory\":true,\"orders\":true,\"payments\":true,\"marketplace\":false,\"stockTransfers\":false,\"paymentTerms\":false}")
+  features           Json                @default("{\"inventory\":true,\"orders\":true,\"payments\":true,\"marketplace\":false,\"stockTransfers\":false,\"paymentTerms\":false,\"multipleBranches\":false}")
+  maxBranches        Int                 @default(1)
+  isSystem           Boolean             @default(false)
   logoUrl            String?
   createdByUserId    String              @db.Uuid
   createdAt          DateTime            @default(now())

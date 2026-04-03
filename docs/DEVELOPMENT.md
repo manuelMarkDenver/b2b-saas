@@ -140,3 +140,54 @@ pnpm db:migrate
 
 Naming convention: `snake_case`, descriptive, table-prefixed where applicable.
 Examples: `add_cost_cents_to_sku`, `create_inventory_movement`, `add_features_to_tenant`
+
+---
+
+## Git & PR Workflow
+
+This project uses the **GitHub CLI (`gh`)** for all PR and branch operations. Install it once:
+
+```bash
+brew install gh   # macOS
+gh auth login     # authenticate once
+```
+
+### Typical feature cycle
+
+```bash
+# 1. Branch off main
+git checkout -b feat/your-feature
+
+# 2. Work, commit
+git add <files>
+git commit -m "feat: ..."
+
+# 3. Push and open PR
+git push -u origin feat/your-feature
+gh pr create --title "feat: ..." --body "..."
+
+# 4. Merge (squash) and delete remote branch
+gh pr merge --squash --delete-branch
+
+# 5. Sync local main and delete local branch
+git checkout main && git pull
+git branch -d feat/your-feature
+```
+
+### Branch naming
+
+| Prefix | Use for |
+|--------|---------|
+| `feat/` | New features |
+| `fix/` | Bug fixes |
+| `chore/` | Dependency updates, tooling, infra |
+| `docs/` | Documentation only |
+
+### Stale branch cleanup
+
+Old local branches (already merged or abandoned) should be deleted:
+```bash
+git branch -d branch-name       # safe delete (errors if unmerged)
+git branch -D branch-name       # force delete
+git remote prune origin         # prune remote tracking refs
+```

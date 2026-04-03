@@ -166,7 +166,10 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       if (r.ok) setCategories(await r.json() as Category[]);
     });
     apiFetch('/branches', { tenantSlug }).then(async (r) => {
-      if (r.ok) setBranches(await r.json() as Array<{ id: string; name: string }>);
+      if (r.ok) {
+        const d = await r.json() as { branches: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>;
+        setBranches(Array.isArray(d) ? d : d.branches);
+      }
     });
   }, [tenantSlug]);
 
