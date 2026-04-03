@@ -9,6 +9,14 @@ services:
     buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/db run generate && pnpm --filter api build && pnpm --filter @repo/db run migrate:deploy
     startCommand: node apps/api/dist/main
     healthCheckPath: /health
+    # Only deploy when API, DB, shared, or config files change
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/db/**
+        - packages/shared/**
+        - pnpm-lock.yaml
+        - render.yaml
     envVars:
       - key: NODE_ENV
         value: production
