@@ -259,18 +259,15 @@ export default function AdminPage() {
     const platformAdmins: AdminUser[] = [];
 
     for (const user of users) {
-      if (user.isPlatformAdmin && user.memberships.length === 0) {
+      const memberships = user.memberships ?? [];
+      if (user.isPlatformAdmin && memberships.length === 0) {
         platformAdmins.push(user);
         continue;
       }
-      for (const m of user.memberships) {
+      for (const m of memberships) {
         const tid = m.tenant.id;
         if (!groups.has(tid)) groups.set(tid, { tenant: m.tenant, members: [] });
         groups.get(tid)!.members.push({ ...user, role: m.role, isOwner: m.isOwner });
-      }
-      // platform admin who also has tenant memberships
-      if (user.isPlatformAdmin && user.memberships.length > 0) {
-        // already added to tenant groups above; skip separate platform-admin entry
       }
     }
 
