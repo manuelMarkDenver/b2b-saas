@@ -3,6 +3,7 @@ services:
     name: zentral-api
     runtime: node
     plan: free
+    region: singapore
     # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
     # Note: Free plan does not support `preDeployCommand`, so migrations run during build.
     # Render free plan build: ensure devDependencies are installed (Nest CLI is used during build)
