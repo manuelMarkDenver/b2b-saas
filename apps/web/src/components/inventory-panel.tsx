@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Archive } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { Plus, ArrowUp, ArrowDown, ArrowLeftRight, Minus, ChevronUp, ChevronDown, ChevronsUpDown, Check, Archive, MapPin } from 'lucide-react';
 import { isStaff } from '@/lib/user-role';
+import { getActiveBranchId } from '@/lib/branch';
 import { apiFetch } from '@/lib/api';
 import { formatCents } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,13 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showSkuCol, setShowSkuCol] = useState(false);
 
+  // Branch context
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
+  const activeBranchId = getActiveBranchId(tenantSlug);
+  const activeBranch = branches.find((b) => b.id === activeBranchId);
+  const branchLabel = activeBranch ? activeBranch.name : 'All Branches';
+  const isMultiBranch = branches.length > 1;
+
   // SKU list state
   const [skus, setSkus] = useState<Sku[]>([]);
   const [skuMeta, setSkuMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
@@ -152,10 +160,13 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   // Create Item modal
   const [productOpen, setProductOpen] = useState(false);
 
-  // Load categories once
+  // Load categories and branches once
   useEffect(() => {
     apiFetch('/categories', { tenantSlug }).then(async (r) => {
       if (r.ok) setCategories(await r.json() as Category[]);
+    });
+    apiFetch('/branches', { tenantSlug }).then(async (r) => {
+      if (r.ok) setBranches(await r.json() as Array<{ id: string; name: string }>);
     });
   }, [tenantSlug]);
 
@@ -439,6 +450,18 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             exportLabel="Export CSV"
           />
 
+          {isMultiBranch && (
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Viewing:</span>
+              <span className="font-medium">{branchLabel}</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground">Stock shown is total across all branches.</span>
+              <span className="text-muted-foreground">·</span>
+              <a href="#history" className="text-primary underline underline-offset-2">View branch movements in History tab</a>
+            </div>
+          )}
+
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="min-w-[440px]">
               <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -449,7 +472,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   <span>Category</span>
                   {showSkuCol && <span>SKU Code</span>}
                   <button type="button" onClick={() => toggleSkuSort('stockOnHand')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                    {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} In Stock
+                    {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Total Stock
                   </button>
                   <button type="button" onClick={() => toggleSkuSort('costCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                     {skuSortKey === 'costCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Cost
@@ -862,7 +885,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                             <span className="font-medium">{s.code}</span>
                             <span className="text-muted-foreground"> — {s.name}</span>
                           </span>
-                          <span className="shrink-0 text-xs text-muted-foreground">stock: {s.stockOnHand}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">total: {s.stockOnHand}</span>
                         </button>
                       ))}
                     {skus.filter((s) => {

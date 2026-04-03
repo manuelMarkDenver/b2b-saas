@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-03 — PR#67: order UX (credit limit warning, paymentDueDate hidden for walk-in, customer auto-search on focus), customers panel (orders col, remaining credit, branch in history, COD clarification), dashboard (branch banner, AR stat cards), transfers (pagination, actor, filters). feat/ux-polish branch: 3-col compact product grid, Terms/Overdue badges on orders + hasTerms filter, SKU archive button (OWNER/ADMIN), seeder updated (2 transfers per tenant, idempotency by note). Archive behavior documented below. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
+> Last updated: 2026-04-03 — PR#69: Inventory UI clarifications for staging readiness — stock labels now show "Total Stock (All Branches)", branch context indicator added, order creation warnings for low stock, transfer clarity explanations. Hybrid inventory model documented: staging-safe with UI labels, full branch-based validation deferred post-staging. See "Inventory Model — Staging Readiness" section. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
 
 ---
 
@@ -45,9 +45,54 @@
 | 10 | Branch stock transfer fix (MS19e) | ✅ Done | Derived branch stock from movements, transfer updates tenant-wide stock |
 | 11 | Feature flags + Catalog UI fixes (MS19f) | ✅ Done | stockTransfers/paymentTerms in Super Admin, CSV import modal, catalog width, edit sheet with 100% image |
 | 12 | Unified Create Item flow (MS19g) | ✅ Done | Single modal for Product+SKU creation, auto-SKU with override toggle, shared component across Products and Inventory tabs, backend `code` and `lowStockThreshold` support in `/products/with-stock` |
-| 13 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 13 | Inventory UI clarifications (stock labels, branch context, transfer clarity) | ✅ Done | Stock displays labeled as "Total Stock (All Branches)", branch context indicator, low-stock warnings on orders, transfer explanations |
+| 14 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
+
+### Inventory Model — Staging Readiness (2026-04-03)
+
+**Current State: HYBRID**
+
+The system uses a hybrid inventory model:
+- `Sku.stockOnHand` = tenant-wide (global) stock — used for validation and display
+- `InventoryMovement` = per-branch tracking (with `branchId`) — source of truth for movement history
+- Transfers: create `TRANSFER_OUT` (source branch) + `TRANSFER_IN` (destination branch), updates tenant-wide `stockOnHand` (net zero)
+
+**Business Truth:** Stock is per branch. HQ (QC) is just another branch.
+
+**The Mismatch:** Current system uses tenant-wide `stockOnHand` for order validation and UI display. This is operationally functional but obscures per-branch availability.
+
+**Go/No-Go Decision: GO WITH CONDITIONS**
+
+The backend is functionally stable. Data integrity is sound. The issue is purely user expectation. The following UI clarifications are implemented BEFORE staging:
+
+| # | Fix | Location | Status |
+|---|-----|----------|--------|
+| 1 | Stock labels changed to "Total Stock (All Branches)" | Inventory panel, Orders panel, Transfers dropdown | ✅ |
+| 2 | Branch context indicator added to inventory views | Inventory panel header | ✅ |
+| 3 | Order creation low-stock warning | Orders panel | ✅ |
+| 4 | Transfer clarity: explains global stock unchanged | Transfers panel, confirmation | ✅ |
+| 5 | Quick access to branch movements | Inventory movements tab | ✅ |
+
+**What These Fixes Do:**
+- Make it clear that displayed stock is TOTAL across all branches
+- Warn users when stock is low that branch availability may vary
+- Explain that transfers move stock between branches (total unchanged)
+- Provide visibility into branch-level movements
+
+**What These Fixes Do NOT Change:**
+- Backend validation logic (order confirmation still uses tenant-wide stock)
+- `stockOnHand` field semantics
+- Transfer behavior
+
+**Deferred to Post-Staging:**
+- Full branch-based order validation (orders check per-branch stock)
+- Per-branch stock display alongside totals
+- Order fulfillment assignment to specific branch
+- Dashboard per-branch low-stock alerts
+
+**Rationale:** Pre-staging focus is on stability and user comprehension. Full branch-based inventory requires clearer business rules (which branch fulfills an order?) and more extensive UI changes. The hybrid model with clear UI labels is staging-safe.
 
 ### Single-Branch vs Multi-Branch Visibility Rules
 
@@ -136,6 +181,7 @@ A PWA installed on Android/iOS home screen is indistinguishable from a native ap
 | 30 | `console.error` in bootstrap code | ❌ Open | `main.ts:59`, `env.validation.ts:39` — pino not available at startup so `console.error` is acceptable, but worth noting. |
 | 31 | `localhost` fallback in `uploads.service.ts` | ❌ Open | `uploads.service.ts:43` — `?? 'http://localhost:3001'` safety net. `APP_BASE_URL` must be set in prod; env validation already enforces it. |
 | 32 | `tenant.controller.ts` has no E2E spec | ❌ Open | `GET /tenant/context`, `PATCH /tenant/logo`, `GET /tenant/memberships` untested end-to-end. |
+| 35 | Hybrid inventory model (tenant-wide stockOnHand vs per-branch movements) | ✅ Clarified | Staging-safe with UI labels. See "Inventory Model — Staging Readiness" section. Full branch-based validation deferred post-staging. |
 
 ### ✅ Fixed This Milestone (MS9–MS12)
 
