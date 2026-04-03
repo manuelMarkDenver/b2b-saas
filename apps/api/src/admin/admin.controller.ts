@@ -85,4 +85,12 @@ export class AdminController {
   ) {
     return this.adminService.updateUser(id, body);
   }
+
+  @Patch('users/:id/status')
+  updateUserStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { status: 'ACTIVE' | 'SUSPENDED' },
+  ) {
+    return this.adminService.updateUserStatus(id, body.status);
+  }
 }

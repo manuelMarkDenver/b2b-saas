@@ -31,13 +31,26 @@ type Tenant = {
   _count: { memberships: number; branches: number };
 };
 
+type UserMembership = {
+  role: string;
+  isOwner: boolean;
+  status: string;
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    _count: { branches: number; memberships: number };
+  };
+};
+
 type AdminUser = {
   id: string;
   email: string;
   status: string;
   isPlatformAdmin: boolean;
   createdAt: string;
-  _count: { memberships: number };
+  memberships: UserMembership[];
 };
 
 const FLAG_KEYS: (keyof TenantFeatures)[] = [
@@ -55,6 +68,13 @@ const BUSINESS_TYPE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  OWNER: "Owner",
+  ADMIN: "Admin",
+  STAFF: "Staff",
+  VIEWER: "Viewer",
+};
+
 async function readApiError(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as unknown;
@@ -67,20 +87,38 @@ async function readApiError(res: Response): Promise<string> {
   return "";
 }
 
+// Collapsible sub-section within an expanded card
+function Section({
+  label,
+  children,
+  defaultOpen = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <div className="border-t border-border/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-5 py-2.5 text-left hover:bg-muted/20 transition-colors"
+      >
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="px-5 pb-3">{children}</div>}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [section, setSection] = React.useState<"tenants" | "users">("tenants");
   const [authChecked, setAuthChecked] = React.useState(false);
   const { pushToast } = useToast();
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
-
-  function toggleExpanded(id: string) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
 
   // Tenants state
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
@@ -93,8 +131,26 @@ export default function AdminPage() {
   // Users state
   const [users, setUsers] = React.useState<AdminUser[]>([]);
   const [usersLoaded, setUsersLoaded] = React.useState(false);
+  const [userSearch, setUserSearch] = React.useState("");
+  const [expandedTenantGroups, setExpandedTenantGroups] = React.useState<Set<string>>(new Set());
 
   function handleLogout() { clearToken(); router.push("/login"); }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleTenantGroup(tenantId: string) {
+    setExpandedTenantGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(tenantId)) next.delete(tenantId); else next.add(tenantId);
+      return next;
+    });
+  }
 
   React.useEffect(() => {
     if (!getToken()) { router.replace("/login"); return; }
@@ -124,7 +180,6 @@ export default function AdminPage() {
   }
 
   React.useEffect(() => { if (authChecked) loadTenants(); }, [authChecked]);
-
   React.useEffect(() => { if (authChecked && section === "users") loadUsers(); }, [authChecked, section]);
 
   async function saveMaxBranches(tenantId: string) {
@@ -175,12 +230,78 @@ export default function AdminPage() {
     setUpdating(null);
   }
 
+  async function toggleUserStatus(user: AdminUser) {
+    const next = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    setUpdating(`user-${user.id}-status`);
+    const res = await apiFetch(`/admin/users/${user.id}/status`, {
+      method: "PATCH", body: JSON.stringify({ status: next }),
+    });
+    if (!res.ok) {
+      const msg = await readApiError(res);
+      setError(`Update failed: ${res.status}${msg ? ` — ${msg}` : ""}`);
+    } else {
+      pushToast({ variant: next === "SUSPENDED" ? "error" : "success", title: `User ${next.toLowerCase()}`, message: user.email });
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, status: next } : u));
+    }
+    setUpdating(null);
+  }
+
   const filteredTenants = tenants.filter((t) => {
     const q = tenantSearch.toLowerCase();
     const matchSearch = !q || t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q);
     const matchStatus = statusFilter === "all" || t.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  // Group users by tenant for display
+  const tenantGroups = React.useMemo(() => {
+    const groups = new Map<string, { tenant: UserMembership["tenant"]; members: Array<AdminUser & { role: string; isOwner: boolean }> }>();
+    const platformAdmins: AdminUser[] = [];
+
+    for (const user of users) {
+      if (user.isPlatformAdmin && user.memberships.length === 0) {
+        platformAdmins.push(user);
+        continue;
+      }
+      for (const m of user.memberships) {
+        const tid = m.tenant.id;
+        if (!groups.has(tid)) groups.set(tid, { tenant: m.tenant, members: [] });
+        groups.get(tid)!.members.push({ ...user, role: m.role, isOwner: m.isOwner });
+      }
+      // platform admin who also has tenant memberships
+      if (user.isPlatformAdmin && user.memberships.length > 0) {
+        // already added to tenant groups above; skip separate platform-admin entry
+      }
+    }
+
+    // Sort members: owners first, then by email
+    for (const g of groups.values()) {
+      g.members.sort((a, b) => {
+        if (a.isOwner && !b.isOwner) return -1;
+        if (!a.isOwner && b.isOwner) return 1;
+        return a.email.localeCompare(b.email);
+      });
+    }
+
+    return { platformAdmins, groups: Array.from(groups.values()).sort((a, b) => a.tenant.name.localeCompare(b.tenant.name)) };
+  }, [users]);
+
+  const filteredUserGroups = React.useMemo(() => {
+    const q = userSearch.toLowerCase();
+    if (!q) return tenantGroups;
+
+    const platformAdmins = tenantGroups.platformAdmins.filter(
+      (u) => u.email.toLowerCase().includes(q)
+    );
+    const groups = tenantGroups.groups
+      .map((g) => ({
+        ...g,
+        members: g.members.filter((m) => m.email.toLowerCase().includes(q) || g.tenant.name.toLowerCase().includes(q)),
+      }))
+      .filter((g) => g.members.length > 0 || g.tenant.name.toLowerCase().includes(q));
+
+    return { platformAdmins, groups };
+  }, [tenantGroups, userSearch]);
 
   if (!authChecked) return null;
 
@@ -283,18 +404,16 @@ export default function AdminPage() {
                   </div>
                 ) : filteredTenants.map((tenant) => {
                   const isExpanded = expandedIds.has(tenant.id);
+                  const activeFlags = FLAG_KEYS.filter((f) => tenant.features[f]);
                   return (
                     <div key={tenant.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-                      {/* Always-visible header row — click to expand */}
+                      {/* Always-visible header row */}
                       <button
                         type="button"
                         onClick={() => toggleExpanded(tenant.id)}
                         className="flex w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/30 transition-colors"
                       >
-                        {/* Status dot */}
                         <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${tenant.status === "ACTIVE" ? "bg-emerald-500" : "bg-red-400"}`} />
-
-                        {/* Name + meta */}
                         <div className="min-w-0 flex-1">
                           <span className="text-sm font-semibold">{tenant.name}</span>
                           <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
@@ -302,26 +421,22 @@ export default function AdminPage() {
                             {tenant._count.memberships}m · {tenant._count.branches}/{tenant.maxBranches}br
                           </span>
                         </div>
-
-                        {/* Flag pills (summary — always visible) */}
                         <div className="hidden shrink-0 items-center gap-1 sm:flex">
-                          {FLAG_KEYS.filter((f) => tenant.features[f]).slice(0, 4).map((f) => (
+                          {activeFlags.slice(0, 4).map((f) => (
                             <span key={f} className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">{f}</span>
                           ))}
-                          {FLAG_KEYS.filter((f) => tenant.features[f]).length > 4 && (
-                            <span className="text-[10px] text-muted-foreground">+{FLAG_KEYS.filter((f) => tenant.features[f]).length - 4}</span>
+                          {activeFlags.length > 4 && (
+                            <span className="text-[10px] text-muted-foreground">+{activeFlags.length - 4}</span>
                           )}
                         </div>
-
-                        {/* Chevron */}
                         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                       </button>
 
                       {/* Expandable body */}
                       {isExpanded && (
                         <>
-                          {/* Feature flags */}
-                          <div className="border-t border-border/60 px-5 py-3">
+                          {/* Sub-section: Feature Flags */}
+                          <Section label="Feature Flags">
                             <div className="flex flex-wrap gap-1.5">
                               {FLAG_KEYS.map((flag) => {
                                 const enabled = tenant.features[flag];
@@ -344,39 +459,41 @@ export default function AdminPage() {
                                 );
                               })}
                             </div>
-                          </div>
+                          </Section>
 
-                          {/* Footer: controls */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-muted/20 px-5 py-2.5">
+                          {/* Sub-section: Branch Limit */}
+                          <Section label="Branch Limit">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Branch limit</span>
                               <input
                                 type="number"
                                 min={1}
                                 value={maxBranchesEdit[tenant.id] ?? String(tenant.maxBranches)}
                                 onChange={(e) => setMaxBranchesEdit((m) => ({ ...m, [tenant.id]: e.target.value }))}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-14 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                                className="w-16 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                               />
                               <button
                                 type="button"
                                 disabled={updating === `${tenant.id}-maxBranches`}
-                                onClick={(e) => { e.stopPropagation(); void saveMaxBranches(tenant.id); }}
+                                onClick={() => void saveMaxBranches(tenant.id)}
                                 className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                               >
                                 Save
                               </button>
                               {tenant.features.multipleBranches && tenant.maxBranches <= 1 && (
-                                <p className="text-[10px] text-amber-500 dark:text-amber-400">
+                                <span className="text-[10px] text-amber-500 dark:text-amber-400">
                                   Set limit ≥ 2 to allow adding branches.
-                                </p>
+                                </span>
                               )}
                             </div>
+                          </Section>
+
+                          {/* Footer: status action — right-aligned */}
+                          <div className="flex justify-end border-t border-border/60 bg-muted/20 px-5 py-2.5">
                             <button
                               type="button"
                               disabled={updating === `${tenant.id}-status`}
-                              onClick={(e) => { e.stopPropagation(); void toggleTenantStatus(tenant); }}
-                              className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                              onClick={() => void toggleTenantStatus(tenant)}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
                                 tenant.status === "ACTIVE"
                                   ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
                                   : "border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950"
@@ -398,44 +515,142 @@ export default function AdminPage() {
           {section === "users" && (
             <div className="space-y-4">
               <h1 className="text-lg font-semibold">Platform Users</h1>
-              <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm divide-y divide-border/60">
-                {users.length === 0 ? (
-                  <div className="px-5 py-10 text-center text-sm text-muted-foreground">Loading…</div>
-                ) : users.map((u) => (
-                  <div key={u.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {u.email[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          {u.email}
-                          {u.isPlatformAdmin && (
-                            <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                              Super Admin
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {u._count.memberships} tenant{u._count.memberships !== 1 ? "s" : ""} · joined {new Date(u.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                      u.status === "ACTIVE"
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        : "bg-muted text-muted-foreground"
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${u.status === "ACTIVE" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                      {u.status}
-                    </span>
-                  </div>
-                ))}
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search by email or tenant…"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="h-8 w-64 rounded-md border border-input bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
               </div>
+
+              {!usersLoaded ? (
+                <div className="rounded-xl border border-border bg-card px-5 py-10 text-center text-sm text-muted-foreground">Loading…</div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Platform Admins group */}
+                  {filteredUserGroups.platformAdmins.length > 0 && (
+                    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => toggleTenantGroup("__platform__")}
+                        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-muted/30 transition-colors"
+                      >
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-primary/60" />
+                        <span className="flex-1 text-sm font-semibold">Platform Admins</span>
+                        <span className="text-xs text-muted-foreground">{filteredUserGroups.platformAdmins.length}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedTenantGroups.has("__platform__") ? "rotate-180" : ""}`} />
+                      </button>
+                      {expandedTenantGroups.has("__platform__") && (
+                        <div className="divide-y divide-border/60 border-t border-border/60">
+                          {filteredUserGroups.platformAdmins.map((u) => (
+                            <UserRow key={u.id} user={u} role="Super Admin" updating={updating} onToggleStatus={toggleUserStatus} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Per-tenant groups */}
+                  {filteredUserGroups.groups.map(({ tenant, members }) => (
+                    <div key={tenant.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => toggleTenantGroup(tenant.id)}
+                        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-muted/30 transition-colors"
+                      >
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${tenant.status === "ACTIVE" ? "bg-emerald-500" : "bg-red-400"}`} />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm font-semibold">{tenant.name}</span>
+                          <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
+                          <span className="ml-3 text-xs text-muted-foreground">
+                            {tenant._count.memberships}m · {tenant._count.branches}br
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{members.length} user{members.length !== 1 ? "s" : ""}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedTenantGroups.has(tenant.id) ? "rotate-180" : ""}`} />
+                      </button>
+                      {expandedTenantGroups.has(tenant.id) && (
+                        <div className="divide-y divide-border/60 border-t border-border/60">
+                          {members.map((u) => (
+                            <UserRow key={u.id} user={u} role={ROLE_LABELS[u.role] ?? u.role} updating={updating} onToggleStatus={toggleUserStatus} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {filteredUserGroups.groups.length === 0 && filteredUserGroups.platformAdmins.length === 0 && (
+                    <div className="rounded-xl border border-border bg-card px-5 py-10 text-center text-sm text-muted-foreground">
+                      No users found.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function UserRow({
+  user,
+  role,
+  updating,
+  onToggleStatus,
+}: {
+  user: AdminUser & { role?: string; isOwner?: boolean };
+  role: string;
+  updating: string | null;
+  onToggleStatus: (user: AdminUser) => Promise<void>;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+        {user.email[0].toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium truncate">{user.email}</span>
+          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+            role === "Super Admin" || role === "Owner"
+              ? "bg-primary/10 text-primary"
+              : "bg-muted text-muted-foreground"
+          }`}>{role}</span>
+          {user.isPlatformAdmin && role !== "Super Admin" && (
+            <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Super Admin</span>
+          )}
+        </div>
+        <div className="mt-0.5 text-xs text-muted-foreground">
+          joined {new Date(user.createdAt).toLocaleDateString()}
+        </div>
+      </div>
+      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+        user.status === "ACTIVE"
+          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          : "bg-muted text-muted-foreground"
+      }`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${user.status === "ACTIVE" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+        {user.status}
+      </span>
+      <button
+        type="button"
+        disabled={updating === `user-${user.id}-status`}
+        onClick={() => void onToggleStatus(user)}
+        className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
+          user.status === "ACTIVE"
+            ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+            : "border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950"
+        }`}
+      >
+        {user.status === "ACTIVE" ? "Suspend" : "Activate"}
+      </button>
     </div>
   );
 }

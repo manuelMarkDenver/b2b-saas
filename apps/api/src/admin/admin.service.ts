@@ -155,9 +155,38 @@ export class AdminService {
         status: true,
         isPlatformAdmin: true,
         createdAt: true,
-        _count: { select: { memberships: true } },
+        memberships: {
+          where: { tenant: { isSystem: false } },
+          select: {
+            role: true,
+            isOwner: true,
+            status: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                status: true,
+                _count: { select: { branches: true, memberships: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED') {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { status },
+      select: { id: true, email: true, status: true },
     });
   }
 
