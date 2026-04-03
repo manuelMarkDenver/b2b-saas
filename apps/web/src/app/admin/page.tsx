@@ -424,7 +424,7 @@ export default function AdminPage() {
                           <span className="text-sm font-semibold">{tenant.name}</span>
                           <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
                           <span className="ml-3 text-xs text-muted-foreground">
-                            {tenant._count.memberships}m · {tenant._count.branches}/{tenant.maxBranches}br
+                            {tenant._count.memberships} members · {tenant._count.branches}/{tenant.maxBranches} branches
                           </span>
                         </div>
                         <div className="hidden shrink-0 items-center gap-1 sm:flex">
@@ -574,7 +574,7 @@ export default function AdminPage() {
                           <span className="text-sm font-semibold">{tenant.name}</span>
                           <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
                           <span className="ml-3 text-xs text-muted-foreground">
-                            {tenant._count.memberships}m · {tenant._count.branches}br
+                            {tenant._count.memberships} members · {tenant._count.branches} branches
                           </span>
                         </div>
                         <span className="text-xs text-muted-foreground">{members.length} user{members.length !== 1 ? "s" : ""}</span>
