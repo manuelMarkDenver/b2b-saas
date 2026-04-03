@@ -1,6 +1,6 @@
 {
-  "name": "B2B Platform",
-  "short_name": "B2B",
+  "name": "Zentral",
+  "short_name": "Zentral",
   "description": "Manage orders, inventory, and payments for your business.",
   "start_url": "/",
   "display": "standalone",

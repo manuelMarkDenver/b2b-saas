@@ -5,6 +5,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 
+const APP_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME ?? "Zentral";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,13 +18,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "B2B Platform",
+  title: APP_NAME,
   description: "Manage orders, inventory, and payments for your business.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "B2B Platform",
+    title: APP_NAME,
   },
 };
 
