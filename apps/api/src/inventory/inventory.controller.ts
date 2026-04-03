@@ -13,6 +13,15 @@ import { LogMovementDto } from './dto/log-movement.dto';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
+  @Get('branch-stock')
+  async getBranchStock(@Req() req: RequestWithUser) {
+    const branchId = req.headers['x-branch-id'] as string | undefined;
+    const stockMap = await this.inventoryService.getBranchStock(req.tenant!.id, branchId);
+    if (!branchId) return {};
+    const skuMap = stockMap.get(branchId) ?? new Map<string, number>();
+    return Object.fromEntries(skuMap);
+  }
+
   @Post('movements')
   logMovement(@Req() req: RequestWithUser, @Body() body: LogMovementDto) {
     const branchId = req.headers['x-branch-id'] as string | undefined;
