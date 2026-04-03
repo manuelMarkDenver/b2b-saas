@@ -89,8 +89,8 @@ export class AdminController {
   @Patch('users/:id/status')
   updateUserStatus(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { status: 'ACTIVE' | 'SUSPENDED' },
+    @Body() body: { status: string },
   ) {
-    return this.adminService.updateUserStatus(id, body.status);
+    return this.adminService.updateUserStatus(id, body.status as import('@prisma/client').UserStatus);
   }
 }

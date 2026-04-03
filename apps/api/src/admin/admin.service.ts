@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { BusinessType, TenantStatus } from '@prisma/client';
+import { BusinessType, TenantStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UpdateTenantFlagsDto } from './dto/update-tenant-flags.dto';
 
@@ -177,7 +177,7 @@ export class AdminService {
     });
   }
 
-  async updateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED') {
+  async updateUserStatus(userId: string, status: UserStatus) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
