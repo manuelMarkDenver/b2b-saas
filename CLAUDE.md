@@ -67,13 +67,24 @@ gh pr create --title "feat: ..." --body "$(cat <<'EOF'
 EOF
 )"
 
-# Merge (squash) + delete remote branch
+# Merge (squash) + delete remote branch — ONLY after user says "merge" / "lgtm" / "go"
 gh pr merge --squash --delete-branch
 
 # After merge: sync and clean local
 git checkout main && git pull
 git branch -d feat/your-feature
 ```
+
+### PR merge rule — STOP after `gh pr create`
+
+**Never merge a PR immediately after creating it.**
+
+The flow is:
+1. Push branch + `gh pr create` → return the PR URL
+2. **Stop. Wait.** The user tests the feature locally first.
+3. Only run `gh pr merge` when the user explicitly says to merge (e.g. "merge it", "lgtm", "go ahead", "merge #71").
+
+Merging before the user tests wastes a revert cycle if the UI is broken or incomplete.
 
 Branch naming: `feat/`, `fix/`, `chore/`, `docs/`
 
