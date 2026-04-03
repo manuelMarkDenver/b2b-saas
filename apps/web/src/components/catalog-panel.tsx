@@ -212,17 +212,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
     setSkuPage(1);
   }, [filters]);
 
-  async function archiveProduct(id: string, name: string) {
-    const res = await apiFetch(`/products/${id}/archive`, { tenantSlug, method: 'PATCH' });
-    if (!res.ok) {
-      const msg = await readApiError(res);
-      setStatus({ kind: 'error', text: `Archive failed: ${res.status}${msg ? ` (${msg})` : ''}` });
-      return;
-    }
-    pushToast({ variant: 'success', title: 'Product archived', message: name });
-    await loadSkus();
-  }
-
   async function archiveSku(id: string, code: string) {
     const res = await apiFetch(`/skus/${id}/archive`, { tenantSlug, method: 'PATCH' });
     if (!res.ok) {
