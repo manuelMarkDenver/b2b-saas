@@ -267,97 +267,110 @@ export default function AdminPage() {
               </div>
 
               {/* Tenant cards */}
-              <div className="rounded-lg border border-border bg-card divide-y divide-border">
+              <div className="space-y-3">
                 {filteredTenants.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-sm text-muted-foreground">No tenants found.</div>
+                  <div className="rounded-xl border border-border bg-card px-5 py-10 text-center text-sm text-muted-foreground">
+                    No tenants found.
+                  </div>
                 ) : filteredTenants.map((tenant) => (
-                  <div key={tenant.id} className="px-5 py-4 space-y-3">
-                    {/* Row 1: name + controls */}
-                    <div className="flex items-start justify-between gap-4">
+                  <div key={tenant.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                    {/* Card header */}
+                    <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{tenant.name}</span>
-                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                          <span className="text-base font-semibold">{tenant.name}</span>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
                             tenant.status === "ACTIVE"
-                              ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                              : "bg-destructive/10 text-destructive"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "bg-red-500/10 text-red-500"
                           }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === "ACTIVE" ? "bg-emerald-500" : "bg-red-500"}`} />
                             {tenant.status}
                           </span>
                         </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          /{tenant.slug} · {BUSINESS_TYPE_LABELS[tenant.businessType] ?? tenant.businessType} · {tenant._count.memberships} member{tenant._count.memberships !== 1 ? "s" : ""} · {tenant._count.branches} branch{tenant._count.branches !== 1 ? "es" : ""}
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                          <span className="font-mono">/{tenant.slug}</span>
+                          <span>·</span>
+                          <span>{BUSINESS_TYPE_LABELS[tenant.businessType] ?? tenant.businessType}</span>
+                          <span>·</span>
+                          <span>{tenant._count.memberships} member{tenant._count.memberships !== 1 ? "s" : ""}</span>
+                          <span>·</span>
+                          <span>{tenant._count.branches} / {tenant.maxBranches} branches</span>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        disabled={updating === `${tenant.id}-status`}
+                        onClick={() => toggleTenantStatus(tenant)}
+                        className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                          tenant.status === "ACTIVE"
+                            ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                            : "border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                        }`}
+                      >
+                        {tenant.status === "ACTIVE" ? "Suspend" : "Activate"}
+                      </button>
+                    </div>
 
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        {/* Max branches */}
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <span className="text-muted-foreground">Max branches:</span>
+                    {/* Feature flags */}
+                    <div className="border-t border-border/60 px-5 py-3">
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Features</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {FLAG_KEYS.map((flag) => {
+                          const enabled = tenant.features[flag];
+                          const key = `${tenant.id}-${flag}`;
+                          return (
+                            <button
+                              key={flag}
+                              type="button"
+                              disabled={updating === key}
+                              onClick={() => toggleFlag(tenant.id, flag, enabled)}
+                              className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all disabled:opacity-40 ${
+                                enabled
+                                  ? "bg-emerald-500/12 text-emerald-700 ring-1 ring-emerald-500/25 hover:bg-emerald-500/20 dark:text-emerald-400"
+                                  : "bg-muted/60 text-muted-foreground ring-1 ring-border hover:bg-muted"
+                              }`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                              {flag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Footer: branch limit control */}
+                    <div className="flex items-center justify-between border-t border-border/60 bg-muted/20 px-5 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">Branch limit</span>
+                        <div className="flex items-center gap-1.5">
                           <input
                             type="number"
                             min={1}
                             value={maxBranchesEdit[tenant.id] ?? String(tenant.maxBranches)}
                             onChange={(e) => setMaxBranchesEdit((m) => ({ ...m, [tenant.id]: e.target.value }))}
-                            className="w-14 rounded border border-input bg-background px-2 py-0.5 text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+                            className="w-14 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                           />
                           <button
                             type="button"
                             disabled={updating === `${tenant.id}-maxBranches`}
                             onClick={() => saveMaxBranches(tenant.id)}
-                            className="rounded bg-muted px-2 py-0.5 text-xs hover:bg-muted/80 disabled:opacity-50"
+                            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                           >
                             Save
                           </button>
                         </div>
-                        {/* Warning notes */}
-                        {tenant.features.multipleBranches && tenant.maxBranches <= 1 && (
-                          <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                            Multi-branch ON but max is 1 — set max ≥ 2 to allow adding branches.
-                          </p>
-                        )}
-                        {!tenant.features.multipleBranches && tenant.maxBranches > 1 && (
-                          <p className="text-[10px] text-muted-foreground">
-                            Enable multipleBranches flag to unlock branch creation.
-                          </p>
-                        )}
-                        {/* Suspend / Activate */}
-                        <button
-                          type="button"
-                          disabled={updating === `${tenant.id}-status`}
-                          onClick={() => toggleTenantStatus(tenant)}
-                          className={`rounded px-2 py-0.5 text-[11px] font-medium disabled:opacity-50 ${
-                            tenant.status === "ACTIVE"
-                              ? "text-destructive hover:bg-destructive/10"
-                              : "text-green-600 hover:bg-green-500/10 dark:text-green-400"
-                          }`}
-                        >
-                          {tenant.status === "ACTIVE" ? "Suspend" : "Activate"}
-                        </button>
                       </div>
-                    </div>
-
-                    {/* Row 2: feature flags */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {FLAG_KEYS.map((flag) => {
-                        const enabled = tenant.features[flag];
-                        const key = `${tenant.id}-${flag}`;
-                        return (
-                          <button
-                            key={flag}
-                            type="button"
-                            disabled={updating === key}
-                            onClick={() => toggleFlag(tenant.id, flag, enabled)}
-                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-50 ${
-                              enabled
-                                ? "bg-green-500/15 text-green-600 dark:text-green-400 hover:bg-green-500/25"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            }`}
-                          >
-                            {flag} {enabled ? "ON" : "OFF"}
-                          </button>
-                        );
-                      })}
+                      {tenant.features.multipleBranches && tenant.maxBranches <= 1 && (
+                        <p className="text-[10px] text-amber-500 dark:text-amber-400">
+                          Multi-branch ON — set limit ≥ 2 to allow adding branches.
+                        </p>
+                      )}
+                      {!tenant.features.multipleBranches && tenant.maxBranches > 1 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Enable multipleBranches flag to unlock branch creation.
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -369,29 +382,35 @@ export default function AdminPage() {
           {section === "users" && (
             <div className="space-y-4">
               <h1 className="text-lg font-semibold">Platform Users</h1>
-              <div className="rounded-lg border border-border bg-card divide-y divide-border">
+              <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm divide-y divide-border/60">
                 {users.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-sm text-muted-foreground">Loading…</div>
+                  <div className="px-5 py-10 text-center text-sm text-muted-foreground">Loading…</div>
                 ) : users.map((u) => (
-                  <div key={u.id} className="flex items-center justify-between px-5 py-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        {u.email}
-                        {u.isPlatformAdmin && (
-                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            Super Admin
-                          </span>
-                        )}
+                  <div key={u.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                        {u.email[0].toUpperCase()}
                       </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {u._count.memberships} tenant membership{u._count.memberships !== 1 ? "s" : ""} · joined {new Date(u.createdAt).toLocaleDateString()}
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          {u.email}
+                          {u.isPlatformAdmin && (
+                            <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                              Super Admin
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {u._count.memberships} tenant{u._count.memberships !== 1 ? "s" : ""} · joined {new Date(u.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
                       u.status === "ACTIVE"
-                        ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : "bg-muted text-muted-foreground"
                     }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${u.status === "ACTIVE" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
                       {u.status}
                     </span>
                   </div>
