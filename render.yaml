@@ -48,13 +48,13 @@ services:
 
       # ── CORS — set to your Vercel URL after first deploy ─────────────────
       - key: CORS_ALLOWED_ORIGINS
-        sync: false   # e.g. https://zentral.vercel.app,https://app.zentral.ph
+        value: https://zentral-marketing.vercel.app,https://zentral-web.vercel.app
 
       # ── URLs ─────────────────────────────────────────────────────────────
       - key: APP_BASE_URL
-        sync: false   # This service's URL: https://zentral-api.onrender.com
+        value: https://zentral-api-tucp.onrender.com
       - key: APP_FRONTEND_URL
-        sync: false   # Vercel URL: https://zentral.vercel.app
+        value: https://zentral-web.vercel.app
 
       # ── Email (Resend) ────────────────────────────────────────────────────
       - key: SMTP_HOST
