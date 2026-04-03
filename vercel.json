@@ -3,13 +3,5 @@
   "framework": "nextjs",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
   "buildCommand": "cd ../.. && pnpm --filter web build",
-  "outputDirectory": ".next",
-  "env": {
-    "NEXT_PUBLIC_API_BASE_URL": "@next_public_api_base_url",
-    "NEXT_PUBLIC_PLATFORM_NAME": "@next_public_platform_name",
-    "NEXT_PUBLIC_PLATFORM_TAGLINE": "@next_public_platform_tagline",
-    "NEXT_PUBLIC_PLATFORM_LOGO_ICON_URL": "@next_public_platform_logo_icon_url",
-    "NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL": "@next_public_platform_support_email",
-    "NEXT_PUBLIC_PLATFORM_MARKETING_URL": "@next_public_platform_marketing_url"
-  }
+  "outputDirectory": ".next"
 }
