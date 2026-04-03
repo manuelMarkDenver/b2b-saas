@@ -75,16 +75,19 @@ git checkout main && git pull
 git branch -d feat/your-feature
 ```
 
-### PR merge rule — STOP after `gh pr create`
+### PR workflow rule — commit, then STOP
 
-**Never merge a PR immediately after creating it.**
+**Never push, create a PR, or merge without explicit user approval.**
 
 The flow is:
-1. Push branch + `gh pr create` → return the PR URL
-2. **Stop. Wait.** The user tests the feature locally first.
-3. Only run `gh pr merge` when the user explicitly says to merge (e.g. "merge it", "lgtm", "go ahead", "merge #71").
+1. Make changes → `git commit`
+2. **Stop. Tell the user what was committed.** Wait for them to say "push" or "go ahead".
+3. Only then: `git push -u origin <branch>` + `gh pr create` → return the PR URL
+4. **Stop again.** The user tests the feature locally first.
+5. Only run `gh pr merge --squash --delete-branch` when the user explicitly says to merge (e.g. "merge it", "lgtm", "go ahead", "merge #XX").
+6. Then: `git checkout main && git pull && git branch -d <local-branch>`
 
-Merging before the user tests wastes a revert cycle if the UI is broken or incomplete.
+Pushing before the user is ready wastes review cycles. Merging before the user tests wastes a revert cycle.
 
 Branch naming: `feat/`, `fix/`, `chore/`, `docs/`
 
