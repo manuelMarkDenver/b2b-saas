@@ -59,16 +59,6 @@ const FLAG_KEYS: (keyof TenantFeatures)[] = [
   "marketplace", "stockTransfers", "paymentTerms", "multipleBranches",
 ];
 
-const BUSINESS_TYPE_LABELS: Record<string, string> = {
-  general_retail: "General Retail",
-  hardware: "Hardware",
-  food_beverage: "Food & Beverage",
-  pharmacy: "Pharmacy",
-  electronics: "Electronics",
-  clothing: "Clothing",
-  other: "Other",
-};
-
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Owner",
   ADMIN: "Admin",
