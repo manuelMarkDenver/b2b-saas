@@ -193,6 +193,9 @@ importers:
       '@repo/shared':
         specifier: workspace:^
         version: link:../../packages/shared
+      '@tailwindcss/postcss':
+        specifier: ^4
+        version: 4.2.2
       lucide-react:
         specifier: ^0.447.0
         version: 0.447.0(react@19.2.4)
@@ -211,10 +214,10 @@ importers:
       tailwind-merge:
         specifier: ^3.3.1
         version: 3.5.0
-    devDependencies:
-      '@tailwindcss/postcss':
+      tailwindcss:
         specifier: ^4
         version: 4.2.2
+    devDependencies:
       '@types/node':
         specifier: ^20
         version: 20.19.37
@@ -224,9 +227,6 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.2.3(@types/react@19.2.14)
-      tailwindcss:
-        specifier: ^4
-        version: 4.2.2
       typescript:
         specifier: ^5
         version: 5.9.3
