@@ -88,6 +88,16 @@ async function readApiError(res: Response): Promise<string> {
   return "";
 }
 
+function BranchCount({ current, max }: { current: number; max: number }) {
+  const over = current > max;
+  const atLimit = current === max;
+  return (
+    <span className={over ? "text-red-500 dark:text-red-400" : atLimit ? "text-amber-500 dark:text-amber-400" : ""}>
+      {current}/{max} branches{over ? " ⚠ over limit" : atLimit ? " · at limit" : ""}
+    </span>
+  );
+}
+
 // Collapsible sub-section within an expanded card
 function Section({
   label,
@@ -425,7 +435,7 @@ export default function AdminPage() {
                           <span className="text-sm font-semibold">{tenant.name}</span>
                           <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
                           <span className="ml-3 text-xs text-muted-foreground">
-                            {tenant._count.memberships} members · {tenant._count.branches}/{tenant.maxBranches} branches
+                            {tenant._count.memberships} members · <BranchCount current={tenant._count.branches} max={tenant.maxBranches} />
                           </span>
                         </div>
                         <div className="hidden shrink-0 items-center gap-1 sm:flex">
@@ -575,7 +585,7 @@ export default function AdminPage() {
                           <span className="text-sm font-semibold">{tenant.name}</span>
                           <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
                           <span className="ml-3 text-xs text-muted-foreground">
-                            {tenant._count.memberships} members · {tenant._count.branches}/{tenant.maxBranches} branches
+                            {tenant._count.memberships} members · <BranchCount current={tenant._count.branches} max={tenant.maxBranches} />
                           </span>
                         </div>
                         <span className="text-xs text-muted-foreground">{members.length} user{members.length !== 1 ? "s" : ""}</span>
