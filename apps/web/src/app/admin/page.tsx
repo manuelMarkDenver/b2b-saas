@@ -258,10 +258,16 @@ export default function AdminPage() {
     const groups = new Map<string, { tenant: UserMembership["tenant"]; members: Array<AdminUser & { role: string; isOwner: boolean }> }>();
     const platformAdmins: AdminUser[] = [];
 
+    const unassigned: AdminUser[] = [];
+
     for (const user of users) {
       const memberships = user.memberships ?? [];
       if (user.isPlatformAdmin && memberships.length === 0) {
         platformAdmins.push(user);
+        continue;
+      }
+      if (memberships.length === 0) {
+        unassigned.push(user);
         continue;
       }
       for (const m of memberships) {
@@ -280,7 +286,7 @@ export default function AdminPage() {
       });
     }
 
-    return { platformAdmins, groups: Array.from(groups.values()).sort((a, b) => a.tenant.name.localeCompare(b.tenant.name)) };
+    return { platformAdmins, unassigned, groups: Array.from(groups.values()).sort((a, b) => a.tenant.name.localeCompare(b.tenant.name)) };
   }, [users]);
 
   const filteredUserGroups = React.useMemo(() => {
@@ -290,6 +296,9 @@ export default function AdminPage() {
     const platformAdmins = tenantGroups.platformAdmins.filter(
       (u) => u.email.toLowerCase().includes(q)
     );
+    const unassigned = tenantGroups.unassigned.filter(
+      (u) => u.email.toLowerCase().includes(q)
+    );
     const groups = tenantGroups.groups
       .map((g) => ({
         ...g,
@@ -297,7 +306,7 @@ export default function AdminPage() {
       }))
       .filter((g) => g.members.length > 0 || g.tenant.name.toLowerCase().includes(q));
 
-    return { platformAdmins, groups };
+    return { platformAdmins, unassigned, groups };
   }, [tenantGroups, userSearch]);
 
   if (!authChecked) return null;
@@ -581,7 +590,30 @@ export default function AdminPage() {
                     </div>
                   ))}
 
-                  {filteredUserGroups.groups.length === 0 && filteredUserGroups.platformAdmins.length === 0 && (
+                  {/* Unassigned users (no memberships returned — API may not have restarted) */}
+                  {filteredUserGroups.unassigned.length > 0 && (
+                    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => toggleTenantGroup("__unassigned__")}
+                        className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-muted/30 transition-colors"
+                      >
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground/40" />
+                        <span className="flex-1 text-sm font-semibold text-muted-foreground">Unassigned</span>
+                        <span className="text-xs text-muted-foreground">{filteredUserGroups.unassigned.length}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedTenantGroups.has("__unassigned__") ? "rotate-180" : ""}`} />
+                      </button>
+                      {expandedTenantGroups.has("__unassigned__") && (
+                        <div className="divide-y divide-border/60 border-t border-border/60">
+                          {filteredUserGroups.unassigned.map((u) => (
+                            <UserRow key={u.id} user={u} role="—" updating={updating} onToggleStatus={toggleUserStatus} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {filteredUserGroups.groups.length === 0 && filteredUserGroups.platformAdmins.length === 0 && filteredUserGroups.unassigned.length === 0 && (
                     <div className="rounded-xl border border-border bg-card px-5 py-10 text-center text-sm text-muted-foreground">
                       No users found.
                     </div>
