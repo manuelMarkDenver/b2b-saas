@@ -2,6 +2,7 @@ services:
   - type: web
     name: zentral-api
     runtime: node
+    plan: free
     # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
     buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter api build
     startCommand: node apps/api/dist/main
