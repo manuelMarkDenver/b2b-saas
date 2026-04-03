@@ -4,10 +4,9 @@ services:
     runtime: node
     plan: free
     # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter api build
+    # Note: Free plan does not support `preDeployCommand`, so migrations run during build.
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter api build && pnpm --filter @repo/db run migrate:deploy
     startCommand: node apps/api/dist/main
-    # Runs prisma migrate deploy before every new release goes live
-    preDeployCommand: pnpm --filter @repo/db run migrate:deploy
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
