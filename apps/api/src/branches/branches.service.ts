@@ -21,16 +21,40 @@ function requireOwnerOrAdmin(role: MutatingRole) {
 export class BranchesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(tenantId: string) {
-    return this.prisma.branch.findMany({
-      where: { tenantId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-      select: { id: true, name: true, isDefault: true, status: true, type: true },
-    });
+  async list(tenantId: string) {
+    const [branches, tenant] = await Promise.all([
+      this.prisma.branch.findMany({
+        where: { tenantId },
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        select: { id: true, name: true, isDefault: true, status: true, type: true },
+      }),
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { maxBranches: true, features: true },
+      }),
+    ]);
+    const features = (tenant?.features ?? {}) as Record<string, boolean>;
+    return {
+      branches,
+      maxBranches: tenant?.maxBranches ?? 1,
+      multipleBranches: features.multipleBranches === true,
+    };
   }
 
   async create(tenantId: string, role: MutatingRole, dto: CreateBranchDto) {
     requireOwnerOrAdmin(role);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { maxBranches: true, features: true, _count: { select: { branches: true } } },
+    });
+    const features = (tenant?.features ?? {}) as Record<string, boolean>;
+    if (!features.multipleBranches) {
+      throw new ForbiddenException("Multi-branch is not enabled for this tenant");
+    }
+    if ((tenant?._count.branches ?? 0) >= (tenant?.maxBranches ?? 1)) {
+      throw new ForbiddenException(`Branch limit reached (max ${tenant?.maxBranches ?? 1})`);
+    }
 
     const nameConflict = await this.prisma.branch.findFirst({
       where: { tenantId, name: { equals: dto.name, mode: 'insensitive' } },

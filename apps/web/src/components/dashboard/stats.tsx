@@ -160,7 +160,7 @@ export function DashboardStats({ tenantSlug, brandName }: { tenantSlug: string; 
   useEffect(() => {
     apiFetch('/branches', { tenantSlug })
       .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (Array.isArray(d)) setBranches(d); else if (d?.data) setBranches(d.data as Branch[]); })
+      .then((d) => { if (Array.isArray(d)) setBranches(d); else if (d?.branches) setBranches(d.branches as Branch[]); else if (d?.data) setBranches(d.data as Branch[]); })
       .catch(() => {});
     if (!staffOnly) {
       apiFetch('/contacts/ar-overview', { tenantSlug })

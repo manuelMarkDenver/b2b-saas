@@ -76,7 +76,8 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
       if (d.meta) setMeta(d.meta);
     } else setError('Failed to load transfers');
     if (brRes.ok) {
-      const all: Branch[] = await brRes.json();
+      const d = await brRes.json() as { branches: Branch[] } | Branch[];
+      const all = Array.isArray(d) ? d : d.branches;
       setBranches(all.filter((b) => b.status === 'ACTIVE'));
     }
     if (skuRes.ok) {

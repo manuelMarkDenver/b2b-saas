@@ -118,11 +118,32 @@ Use this when the flag key is not in the `FeatureFlag` type (i.e. `shipped: fals
 | `marketplace` | ✅ | false | — | — | Phase 7, not built |
 | `stockTransfers` | ❌ Coming Soon | false | ✅ inline | ✅ shipped gate | MS21 — built but hidden from marketing |
 | `paymentTerms` | ❌ Coming Soon | false | ✅ inline | — (no nav item) | MS21 — DTO field guarded |
+| `multipleBranches` | ✅ | false | ✅ inline (branches.service) | ✅ (Add Branch hidden) | Subscription gate — see Plan Limits below |
 | `advancedAnalytics` | ❌ Not built | false | — | — | Post-Phase 5 — Key Metrics + Product/Customer Ranking |
 
 > **`stockTransfers` note:** The API and UI are built (`shipped` was temporarily set to `false` to hide from nav during pre-staging). The inline guard enforces it at the API level regardless.
 
+> **`multipleBranches` note:** The flag gates access to adding more branches. The numeric cap is `Tenant.maxBranches` (default `1`). Both must pass: flag on AND `branchCount < maxBranches`. Admin sets `maxBranches` per tenant via `/admin`. Demo seed tenants get `maxBranches: 3` with the flag on. New tenants default to flag off, `maxBranches: 1`.
+
 > **`advancedAnalytics` scope:** (1) Shopee-style Key Metrics dashboard — clickable stat cards toggle multi-line trend chart, up to 4 metrics selected, delta vs previous period shown. (2) Product ranking by revenue/units/frequency. (3) Customer ranking by spend. Full design notes in `MILESTONES.md`.
+
+---
+
+## Plan Limits
+
+Plan limits are **numeric** controls on the Tenant record — distinct from feature flags (boolean on/off). They gate *quantity*, not *capability*.
+
+| Field | Type | Default | Who sets it | Notes |
+|-------|------|---------|-------------|-------|
+| `maxBranches` | `Int` | `1` | Super Admin via `/admin` | Only meaningful when `multipleBranches` flag is `true` |
+
+**How branch creation is guarded** (`branches.service.ts:create()`):
+1. Check `tenant.features.multipleBranches === true` → 403 if not
+2. Check `branchCount < tenant.maxBranches` → 403 if at limit
+
+**Admin control:** `PATCH /admin/tenants/:id/limits` `{ maxBranches: N }` — authenticated platform admin only.
+
+**Future plan fields** (not yet implemented): `maxUsers`, `maxSkus`, `storageGb` — added here when subscription tiers are defined.
 
 ---
 

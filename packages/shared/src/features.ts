@@ -93,13 +93,12 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     shipped: true,
   },
   {
-    key: 'multi_branch',
+    key: 'multipleBranches',
     label: 'Multi-Branch Management',
     description:
       'Run multiple locations under one account. Independent stock per branch, shared catalog, consolidated reporting.',
     icon: 'GitBranch',
-    shipped: false,
-    badge: 'Coming soon',
+    shipped: true,
     phase: 'MS10',
   },
   {

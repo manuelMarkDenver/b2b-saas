@@ -58,8 +58,9 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
   function loadBranches() {
     apiFetch('/branches', { tenantSlug, branchId: null })
       .then((r) => r.json())
-      .then((data: Branch[]) => {
-        const active = data.filter((b) => b.status === 'ACTIVE');
+      .then((data: { branches: Branch[] } | Branch[]) => {
+        const raw = Array.isArray(data) ? data : data.branches;
+        const active = raw.filter((b) => b.status === 'ACTIVE');
         setBranches(active);
 
         // Restore from localStorage — but if nothing stored, stay on "All branches"

@@ -38,7 +38,10 @@ export function PageHeader({ tenantSlug, title, description }: PageHeaderProps) 
 
   useEffect(() => {
     apiFetch('/branches', { tenantSlug }).then(async (res) => {
-      if (res.ok) setBranches(await res.json());
+      if (res.ok) {
+        const d = await res.json() as { branches: Branch[] } | Branch[];
+        setBranches(Array.isArray(d) ? d : d.branches);
+      }
     });
   }, [tenantSlug]);
 
