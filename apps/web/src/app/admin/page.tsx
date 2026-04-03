@@ -40,6 +40,7 @@ type UserMembership = {
     name: string;
     slug: string;
     status: string;
+    maxBranches: number;
     _count: { branches: number; memberships: number };
   };
 };
@@ -574,7 +575,7 @@ export default function AdminPage() {
                           <span className="text-sm font-semibold">{tenant.name}</span>
                           <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
                           <span className="ml-3 text-xs text-muted-foreground">
-                            {tenant._count.memberships} members · {tenant._count.branches} branches
+                            {tenant._count.memberships} members · {tenant._count.branches}/{tenant.maxBranches} branches
                           </span>
                         </div>
                         <span className="text-xs text-muted-foreground">{members.length} user{members.length !== 1 ? "s" : ""}</span>

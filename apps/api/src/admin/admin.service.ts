@@ -167,6 +167,7 @@ export class AdminService {
                 name: true,
                 slug: true,
                 status: true,
+                maxBranches: true,
                 _count: { select: { branches: true, memberships: true } },
               },
             },
