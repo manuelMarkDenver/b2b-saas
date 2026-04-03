@@ -37,7 +37,7 @@ test.describe('PWA — static assets', () => {
 
   test('login page has correct title', async ({ page }) => {
     await page.goto('/login');
-    await expect(page).toHaveTitle(/B2B Platform/i);
+    await expect(page).toHaveTitle(/Zentral/i);
   });
 
   test('manifest link tag is in HTML head', async ({ page }) => {

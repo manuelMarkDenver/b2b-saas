@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 
+import { platformConfig } from '@/lib/platform-config';
+
 const QUOTES = [
   {
     text: 'The best businesses run on systems that scale without the chaos.',
@@ -37,7 +39,7 @@ export function AuthLayout({
               <path d="M3 3h7v7H3V3zm0 11h7v7H3v-7zm11-11h7v7h-7V3zm0 11h7v7h-7v-7z" />
             </svg>
           </div>
-          <span className="text-sm font-semibold tracking-tight">B2B Platform</span>
+          <span className="text-sm font-semibold tracking-tight">{platformConfig.name}</span>
         </div>
 
         {/* Form content */}
