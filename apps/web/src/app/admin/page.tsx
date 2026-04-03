@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Users, Search, LogOut } from "lucide-react";
+import { Building2, Users, Search, LogOut, ChevronDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { getToken, clearToken } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
@@ -72,6 +72,15 @@ export default function AdminPage() {
   const [section, setSection] = React.useState<"tenants" | "users">("tenants");
   const [authChecked, setAuthChecked] = React.useState(false);
   const { pushToast } = useToast();
+  const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   // Tenants state
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
@@ -267,113 +276,120 @@ export default function AdminPage() {
               </div>
 
               {/* Tenant cards */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {filteredTenants.length === 0 ? (
                   <div className="rounded-xl border border-border bg-card px-5 py-10 text-center text-sm text-muted-foreground">
                     No tenants found.
                   </div>
-                ) : filteredTenants.map((tenant) => (
-                  <div key={tenant.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-                    {/* Card header */}
-                    <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-base font-semibold">{tenant.name}</span>
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
-                            tenant.status === "ACTIVE"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-red-500/10 text-red-500"
-                          }`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === "ACTIVE" ? "bg-emerald-500" : "bg-red-500"}`} />
-                            {tenant.status}
-                          </span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                          <span className="font-mono">/{tenant.slug}</span>
-                          <span>·</span>
-                          <span>{BUSINESS_TYPE_LABELS[tenant.businessType] ?? tenant.businessType}</span>
-                          <span>·</span>
-                          <span>{tenant._count.memberships} member{tenant._count.memberships !== 1 ? "s" : ""}</span>
-                          <span>·</span>
-                          <span>{tenant._count.branches} / {tenant.maxBranches} branches</span>
-                        </div>
-                      </div>
+                ) : filteredTenants.map((tenant) => {
+                  const isExpanded = expandedIds.has(tenant.id);
+                  return (
+                    <div key={tenant.id} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                      {/* Always-visible header row — click to expand */}
                       <button
                         type="button"
-                        disabled={updating === `${tenant.id}-status`}
-                        onClick={() => toggleTenantStatus(tenant)}
-                        className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
-                          tenant.status === "ACTIVE"
-                            ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
-                            : "border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950"
-                        }`}
+                        onClick={() => toggleExpanded(tenant.id)}
+                        className="flex w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/30 transition-colors"
                       >
-                        {tenant.status === "ACTIVE" ? "Suspend" : "Activate"}
-                      </button>
-                    </div>
+                        {/* Status dot */}
+                        <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${tenant.status === "ACTIVE" ? "bg-emerald-500" : "bg-red-400"}`} />
 
-                    {/* Feature flags */}
-                    <div className="border-t border-border/60 px-5 py-3">
-                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Features</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {FLAG_KEYS.map((flag) => {
-                          const enabled = tenant.features[flag];
-                          const key = `${tenant.id}-${flag}`;
-                          return (
+                        {/* Name + meta */}
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm font-semibold">{tenant.name}</span>
+                          <span className="ml-2 font-mono text-xs text-muted-foreground">/{tenant.slug}</span>
+                          <span className="ml-3 text-xs text-muted-foreground">
+                            {tenant._count.memberships}m · {tenant._count.branches}/{tenant.maxBranches}br
+                          </span>
+                        </div>
+
+                        {/* Flag pills (summary — always visible) */}
+                        <div className="hidden shrink-0 items-center gap-1 sm:flex">
+                          {FLAG_KEYS.filter((f) => tenant.features[f]).slice(0, 4).map((f) => (
+                            <span key={f} className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">{f}</span>
+                          ))}
+                          {FLAG_KEYS.filter((f) => tenant.features[f]).length > 4 && (
+                            <span className="text-[10px] text-muted-foreground">+{FLAG_KEYS.filter((f) => tenant.features[f]).length - 4}</span>
+                          )}
+                        </div>
+
+                        {/* Chevron */}
+                        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {/* Expandable body */}
+                      {isExpanded && (
+                        <>
+                          {/* Feature flags */}
+                          <div className="border-t border-border/60 px-5 py-3">
+                            <div className="flex flex-wrap gap-1.5">
+                              {FLAG_KEYS.map((flag) => {
+                                const enabled = tenant.features[flag];
+                                const key = `${tenant.id}-${flag}`;
+                                return (
+                                  <button
+                                    key={flag}
+                                    type="button"
+                                    disabled={updating === key}
+                                    onClick={() => toggleFlag(tenant.id, flag, enabled)}
+                                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all disabled:opacity-40 ${
+                                      enabled
+                                        ? "bg-emerald-500/12 text-emerald-700 ring-1 ring-emerald-500/25 hover:bg-emerald-500/20 dark:text-emerald-400"
+                                        : "bg-muted/60 text-muted-foreground ring-1 ring-border hover:bg-muted"
+                                    }`}
+                                  >
+                                    <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                                    {flag}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Footer: controls */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-muted/20 px-5 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Branch limit</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={maxBranchesEdit[tenant.id] ?? String(tenant.maxBranches)}
+                                onChange={(e) => setMaxBranchesEdit((m) => ({ ...m, [tenant.id]: e.target.value }))}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-14 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                              />
+                              <button
+                                type="button"
+                                disabled={updating === `${tenant.id}-maxBranches`}
+                                onClick={(e) => { e.stopPropagation(); void saveMaxBranches(tenant.id); }}
+                                className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+                              >
+                                Save
+                              </button>
+                              {tenant.features.multipleBranches && tenant.maxBranches <= 1 && (
+                                <p className="text-[10px] text-amber-500 dark:text-amber-400">
+                                  Set limit ≥ 2 to allow adding branches.
+                                </p>
+                              )}
+                            </div>
                             <button
-                              key={flag}
                               type="button"
-                              disabled={updating === key}
-                              onClick={() => toggleFlag(tenant.id, flag, enabled)}
-                              className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all disabled:opacity-40 ${
-                                enabled
-                                  ? "bg-emerald-500/12 text-emerald-700 ring-1 ring-emerald-500/25 hover:bg-emerald-500/20 dark:text-emerald-400"
-                                  : "bg-muted/60 text-muted-foreground ring-1 ring-border hover:bg-muted"
+                              disabled={updating === `${tenant.id}-status`}
+                              onClick={(e) => { e.stopPropagation(); void toggleTenantStatus(tenant); }}
+                              className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+                                tenant.status === "ACTIVE"
+                                  ? "border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                                  : "border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950"
                               }`}
                             >
-                              <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                              {flag}
+                              {tenant.status === "ACTIVE" ? "Suspend" : "Activate"}
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Footer: branch limit control */}
-                    <div className="flex items-center justify-between border-t border-border/60 bg-muted/20 px-5 py-2.5">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">Branch limit</span>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="number"
-                            min={1}
-                            value={maxBranchesEdit[tenant.id] ?? String(tenant.maxBranches)}
-                            onChange={(e) => setMaxBranchesEdit((m) => ({ ...m, [tenant.id]: e.target.value }))}
-                            className="w-14 rounded-md border border-input bg-background px-2 py-1 text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                          />
-                          <button
-                            type="button"
-                            disabled={updating === `${tenant.id}-maxBranches`}
-                            onClick={() => saveMaxBranches(tenant.id)}
-                            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                      {tenant.features.multipleBranches && tenant.maxBranches <= 1 && (
-                        <p className="text-[10px] text-amber-500 dark:text-amber-400">
-                          Multi-branch ON — set limit ≥ 2 to allow adding branches.
-                        </p>
-                      )}
-                      {!tenant.features.multipleBranches && tenant.maxBranches > 1 && (
-                        <p className="text-[10px] text-muted-foreground">
-                          Enable multipleBranches flag to unlock branch creation.
-                        </p>
+                          </div>
+                        </>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

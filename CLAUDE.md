@@ -110,6 +110,18 @@ All staff accounts use `staff@<tenant>.test` / `Password123!`
 
 ---
 
+## UI/UX Standards
+
+All UI work must be **clean and modern**:
+- Prefer minimal, low-noise layouts — show only what's needed at a glance
+- Use collapsible / progressive disclosure for dense information (e.g. admin cards collapsed by default)
+- Rounded corners (`rounded-xl`), subtle shadows, muted backgrounds for secondary areas
+- Dot status indicators over label-only badges
+- Avoid ALL CAPS section labels — use visual hierarchy instead
+- Spacing: generous padding, consistent gap scale
+
+---
+
 ## Key Conventions
 
 - `tenantId` is always a UUID — never use slug as a FK
