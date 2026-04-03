@@ -285,7 +285,10 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
       {dialogOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 py-10">
           <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h3 className="mb-4 text-base font-semibold">New Stock Transfer</h3>
+            <h3 className="mb-1 text-base font-semibold">New Stock Transfer</h3>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Transfers move stock between branches. Total stock across all branches remains unchanged.
+            </p>
 
             <div className="space-y-3">
               <div>
@@ -340,7 +343,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                         <option value="">Select product…</option>
                         {skus.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.code} — {s.name} (stock: {s.stockOnHand})
+                            {s.code} — {s.name} (total: {s.stockOnHand})
                           </option>
                         ))}
                       </select>

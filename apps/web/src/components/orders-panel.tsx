@@ -26,6 +26,7 @@ type Sku = {
   imageUrl?: string | null;
   priceCents: number | null;
   stockOnHand: number;
+  lowStockThreshold?: number;
 };
 
 type OrderItem = {
@@ -776,7 +777,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                             <div className="mt-1 text-sm font-bold text-primary tabular-nums">
                               {formatCents(sku.priceCents ?? 0)}
                             </div>
-                            <div className="text-[10px] text-muted-foreground">Stock: {sku.stockOnHand}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Total stock: {sku.stockOnHand}
+                              {(sku.lowStockThreshold ?? 0) > 0 && sku.stockOnHand <= (sku.lowStockThreshold ?? 0) && (
+                                <span className="ml-1 text-amber-600 font-medium">· Low stock globally</span>
+                              )}
+                            </div>
 
                             {/* Controls */}
                             {inCart ? (
@@ -1279,7 +1285,12 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                                 <div className="text-[10px] font-medium text-muted-foreground leading-none">{sku.code}</div>
                                 <div className="mt-0.5 line-clamp-2 text-xs font-semibold leading-snug">{sku.name}</div>
                                 <div className="mt-1 text-sm font-bold text-primary tabular-nums">{formatCents(sku.priceCents ?? 0)}</div>
-                                <div className="text-[10px] text-muted-foreground">Stock: {sku.stockOnHand}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Total stock: {sku.stockOnHand}
+                              {(sku.lowStockThreshold ?? 0) > 0 && sku.stockOnHand <= (sku.lowStockThreshold ?? 0) && (
+                                <span className="ml-1 text-amber-600 font-medium">· Low stock globally</span>
+                              )}
+                            </div>
                                 {inCart ? (
                                   <div className="mt-1.5 flex items-center justify-between gap-0.5">
                                     <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md border border-input bg-background" onClick={() => setEditLineQty(sku.id, qty - 1)}><Minus className="h-3 w-3" /></button>
