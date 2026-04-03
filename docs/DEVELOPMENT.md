@@ -162,17 +162,20 @@ git checkout -b feat/your-feature
 git add <files>
 git commit -m "feat: ..."
 
-# 3. Push and open PR
+# 3. Push and open PR — then STOP and wait for user approval
 git push -u origin feat/your-feature
 gh pr create --title "feat: ..." --body "..."
+# ↑ Return PR URL. Do NOT merge yet.
 
-# 4. Merge (squash) and delete remote branch
+# 4. After user tests locally and says "merge":
 gh pr merge --squash --delete-branch
 
 # 5. Sync local main and delete local branch
 git checkout main && git pull
 git branch -d feat/your-feature
 ```
+
+> **Rule:** Never run `gh pr merge` immediately after `gh pr create`. The user must test locally first and explicitly confirm before merging.
 
 ### Branch naming
 

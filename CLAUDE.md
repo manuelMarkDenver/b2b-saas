@@ -67,13 +67,27 @@ gh pr create --title "feat: ..." --body "$(cat <<'EOF'
 EOF
 )"
 
-# Merge (squash) + delete remote branch
+# Merge (squash) + delete remote branch — ONLY after user says "merge" / "lgtm" / "go"
 gh pr merge --squash --delete-branch
 
 # After merge: sync and clean local
 git checkout main && git pull
 git branch -d feat/your-feature
 ```
+
+### PR workflow rule — commit, then STOP
+
+**Never push, create a PR, or merge without explicit user approval.**
+
+The flow is:
+1. Make changes → `git commit`
+2. **Stop. Tell the user what was committed.** Wait for them to say "push" or "go ahead".
+3. Only then: `git push -u origin <branch>` + `gh pr create` → return the PR URL
+4. **Stop again.** The user tests the feature locally first.
+5. Only run `gh pr merge --squash --delete-branch` when the user explicitly says to merge (e.g. "merge it", "lgtm", "go ahead", "merge #XX").
+6. Then: `git checkout main && git pull && git branch -d <local-branch>`
+
+Pushing before the user is ready wastes review cycles. Merging before the user tests wastes a revert cycle.
 
 Branch naming: `feat/`, `fix/`, `chore/`, `docs/`
 
@@ -96,6 +110,18 @@ Branch naming: `feat/`, `fix/`, `chore/`, `docs/`
 | `owner@corner-general.test` | `Password123!` | OWNER |
 
 All staff accounts use `staff@<tenant>.test` / `Password123!`
+
+---
+
+## UI/UX Standards
+
+All UI work must be **clean and modern**:
+- Prefer minimal, low-noise layouts — show only what's needed at a glance
+- Use collapsible / progressive disclosure for dense information (e.g. admin cards collapsed by default)
+- Rounded corners (`rounded-xl`), subtle shadows, muted backgrounds for secondary areas
+- Dot status indicators over label-only badges
+- Avoid ALL CAPS section labels — use visual hierarchy instead
+- Spacing: generous padding, consistent gap scale
 
 ---
 

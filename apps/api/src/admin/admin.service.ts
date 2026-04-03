@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { BusinessType, TenantStatus } from '@prisma/client';
+import { BusinessType, TenantStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UpdateTenantFlagsDto } from './dto/update-tenant-flags.dto';
 
@@ -155,9 +155,39 @@ export class AdminService {
         status: true,
         isPlatformAdmin: true,
         createdAt: true,
-        _count: { select: { memberships: true } },
+        memberships: {
+          where: { tenant: { isSystem: false } },
+          select: {
+            role: true,
+            isOwner: true,
+            status: true,
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                status: true,
+                maxBranches: true,
+                _count: { select: { branches: true, memberships: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateUserStatus(userId: string, status: UserStatus) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { status },
+      select: { id: true, email: true, status: true },
     });
   }
 
