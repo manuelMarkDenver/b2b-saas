@@ -2,6 +2,6 @@
   "version": 2,
   "framework": "nextjs",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter web build",
+  "buildCommand": "APP_PKG_NAME=$(node -p \"require('./package.json').name\") && cd ../.. && if [ \"$APP_PKG_NAME\" = \"@operix/marketing\" ]; then pnpm --filter @operix/marketing build; else pnpm --filter web build; fi",
   "outputDirectory": ".next"
 }
