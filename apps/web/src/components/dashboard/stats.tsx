@@ -136,9 +136,13 @@ export function DashboardStats({ tenantSlug, brandName }: { tenantSlug: string; 
   const [widgets, setWidgets] = useState<DashboardWidgets>(() => getDashboardWidgets(tenantSlug));
   const [arRows, setArRows] = useState<ArOverviewRow[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  // Read active branch from global sidebar state (localStorage)
-  const activeBranchId = getActiveBranchId(tenantSlug);
-  const staffOnly = isStaff(tenantSlug);
+  // localStorage is unavailable during SSR — read after mount to avoid hydration mismatch
+  const [activeBranchId, setActiveBranchId_] = useState<string | null>(null);
+  const [staffOnly, setStaffOnly] = useState(false);
+  useEffect(() => {
+    setActiveBranchId_(getActiveBranchId(tenantSlug));
+    setStaffOnly(isStaff(tenantSlug));
+  }, [tenantSlug]);
 
   function toggleWidget(key: keyof DashboardWidgets) {
     const updated = { ...widgets, [key]: !widgets[key] };

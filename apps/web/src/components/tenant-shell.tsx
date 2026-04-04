@@ -101,6 +101,7 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
       }
     }
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- router is stable; re-running on router change would cause redirect loops
   }, [tenantSlug]);
 
   function handleLogout() {

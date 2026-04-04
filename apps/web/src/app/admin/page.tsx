@@ -181,6 +181,7 @@ export default function AdminPage() {
   }
 
   React.useEffect(() => { if (authChecked) loadTenants(); }, [authChecked]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => { if (authChecked && section === "users") loadUsers(); }, [authChecked, section]);
 
   async function saveMaxBranches(tenantId: string) {

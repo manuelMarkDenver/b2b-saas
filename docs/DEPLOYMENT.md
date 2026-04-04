@@ -59,6 +59,8 @@ The API supports both local disk and S3-compatible storage (including Cloudflare
 
 These values will be set as Render env vars in the next step.
 
+**Upload path structure (S3/R2):** Files are stored at `{tenantId}/{resourceType}/{branchId?}/{timestamp}-{random}.{ext}`. Examples: `abc-123/tenant-logo/1712345678-x9k2.png`, `abc-123/sku-image/branch-456/1712345678-m3n7.jpg`. The `resourceType` is passed as a query param (`?resourceType=sku-image`) from the frontend. Old flat `uploads/...` paths remain accessible — no migration needed.
+
 ### 3. API (Render)
 
 The repo includes `render.yaml` at the root for Blueprint-based deploys.
@@ -162,9 +164,20 @@ Both Render and Vercel provide built-in CI/CD — they watch the GitHub repo and
 | Platform | Trigger | What it does |
 |---|---|---|
 | **Render** | Push to tracked branch | Runs `buildCommand`, then `preDeployCommand` (migrations), then `startCommand` |
-| **Vercel** | Push to tracked branch | Runs `buildCommand` from `vercel.json`, deploys preview or production |
+| **Vercel** | Push to tracked branch | Runs ignore check, then `buildCommand` from `vercel.json`, deploys preview or production |
 
 **No GitHub Actions, GitLab CI, or custom pipelines exist.** This is intentional for staging — the platforms handle everything.
+
+### Vercel Ignore Build Step (monorepo)
+
+Each Vercel project has an "Ignored Build Step" command in **Settings → Git → Ignored Build Step** that prevents unnecessary deploys. Use the `$VERCEL_GIT_PREVIOUS_SHA` variable (not `HEAD^`) so it catches all commits since the last deployment, not just the tip:
+
+| Project | Command |
+|---------|---------|
+| `vercel-web` | `git diff $VERCEL_GIT_PREVIOUS_SHA $VERCEL_GIT_COMMIT_SHA --quiet -- apps/web/ packages/` |
+| `vercel-marketing` | `git diff $VERCEL_GIT_PREVIOUS_SHA $VERCEL_GIT_COMMIT_SHA --quiet -- apps/marketing/ packages/` |
+
+**Important:** Set behavior to **Custom** (not "Only build if there are changes in a folder"). Vercel advances `$VERCEL_GIT_PREVIOUS_SHA` on every processed push — even cancelled ones — so using `HEAD^` will miss accumulated web changes when a non-web commit lands on top.
 
 **When to add GitHub Actions (post-staging):**
 - Run lint/typecheck/tests on every PR before merge

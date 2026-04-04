@@ -65,6 +65,7 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [tenantSlug]);
 
   function openCreate() {

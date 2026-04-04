@@ -116,6 +116,7 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => { loadOverview(); }, [tenantSlug]);
 
   async function loadSummary(id: string) {
@@ -132,6 +133,7 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (detailId) loadSummary(detailId);
   }, [detailId]);
