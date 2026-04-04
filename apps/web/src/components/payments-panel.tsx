@@ -466,8 +466,8 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
               <span className="text-center text-sm font-medium tabular-nums">{o.items?.length ?? 0}</span>
 
-              <Badge variant={ORDER_STATUS_VARIANT[o.status] ?? "muted"} className="min-w-[90px] justify-center">
-                {o.status}
+              <Badge variant={ORDER_STATUS_VARIANT[o.status] ?? "muted"}>
+                {o.status.charAt(0) + o.status.slice(1).toLowerCase()}
               </Badge>
 
               <span className="text-right font-mono tabular-nums">{formatCents(o.totalCents)}</span>
@@ -605,7 +605,7 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
 
                   <span className="text-xs text-muted-foreground">{new Date(payment.createdAt).toLocaleString()}</span>
 
-                  <Badge variant={PAYMENT_STATUS_VARIANT[payment.status]} className="min-w-[72px] justify-center">
+                  <Badge variant={PAYMENT_STATUS_VARIANT[payment.status]}>
                     {PAYMENT_STATUS_LABELS[payment.status]}
                   </Badge>
 

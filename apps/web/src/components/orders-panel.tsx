@@ -672,7 +672,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
 
                 <span className="text-center text-sm font-medium tabular-nums">{order.items.reduce((sum, i) => sum + i.quantity, 0)}</span>
 
-                <Badge variant={STATUS_VARIANT[order.status]} className="min-w-[80px] justify-center">
+                <Badge variant={STATUS_VARIANT[order.status]}>
                   {STATUS_LABELS[order.status]}
                 </Badge>
 

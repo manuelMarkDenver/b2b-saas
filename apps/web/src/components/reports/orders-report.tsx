@@ -83,9 +83,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
+  const label = status.charAt(0) + status.slice(1).toLowerCase();
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLORS[status] ?? 'bg-muted text-muted-foreground'}`}>
-      {status}
+    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${STATUS_COLORS[status] ?? 'bg-muted text-muted-foreground'}`}>
+      {label}
     </span>
   );
 }
