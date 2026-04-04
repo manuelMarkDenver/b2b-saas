@@ -1,16 +1,10 @@
 import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
 
-const withPWA = withPWAInit({
-  dest: "public",
-  disable: process.env.NODE_ENV === "development",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
-  fallbacks: {
-    document: "/offline",
-  },
-});
+// @ducanh2912/next-pwa@10.2.9 is incompatible with next@15.2.8 — causes
+// "e[o] is not a function" webpack runtime error during static page generation.
+// PWA manifest and icons are served from public/ so install-to-homescreen still
+// works. Service worker will be re-enabled when a compatible version is available.
+// TODO: re-enable once @ducanh2912/next-pwa supports next 15.2.8+
 
 const nextConfig: NextConfig = {
   images: {
@@ -28,4 +22,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default nextConfig;

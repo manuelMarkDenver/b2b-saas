@@ -18,8 +18,6 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { ImageUpload } from '@/components/image-upload';
-import { apiFetch } from '@/lib/api';
 import { isFeatureActive } from '@repo/shared';
 import { BranchSwitcher } from '@/components/branch-switcher';
 import { NotificationBell } from '@/components/notifications/bell';
@@ -88,7 +86,6 @@ interface SidebarProps {
   userRole?: string | null;
   userEmail?: string | null;
   userAvatarUrl?: string | null;
-  onLogoChange?: (url: string | null) => void;
   onLogout?: () => void;
 }
 
@@ -100,12 +97,10 @@ export function Sidebar({
   userRole,
   userEmail,
   userAvatarUrl,
-  onLogoChange,
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
   const base = `/t/${tenantSlug}`;
-  const canEditLogo = userRole === 'OWNER' || userRole === 'ADMIN';
 
   function isItemVisible(item: NavItem) {
     if (item.roles && !item.roles.includes(userRole ?? '')) return false;
@@ -123,16 +118,6 @@ export function Sidebar({
       (h) => h !== href && h.startsWith(href) && (pathname === h || pathname.startsWith(`${h}/`)),
     );
     return !moreSpecificSiblingMatches && pathname.startsWith(`${href}/`);
-  }
-
-  async function handleLogoUploaded(url: string) {
-    await apiFetch('/tenant/logo', { tenantSlug, method: 'PATCH', body: JSON.stringify({ logoUrl: url }) });
-    onLogoChange?.(url);
-  }
-
-  async function handleLogoRemoved() {
-    await apiFetch('/tenant/logo', { tenantSlug, method: 'PATCH', body: JSON.stringify({ logoUrl: null }) });
-    onLogoChange?.(null);
   }
 
   return (
@@ -160,26 +145,15 @@ export function Sidebar({
           Workspace
         </p>
         <div className="flex items-center gap-2.5">
-          {canEditLogo ? (
-            <ImageUpload
-              currentUrl={logoUrl}
-              tenantSlug={tenantSlug}
-              size={32}
-              resourceType="tenant-logo"
-              onUploaded={handleLogoUploaded}
-              onRemoved={handleLogoRemoved}
-            />
-          ) : (
-            <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-primary/10">
-              {logoUrl ? (
-                <Image src={logoUrl} alt={tenantName} fill className="object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs font-bold text-primary">
-                  {tenantName.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-            </div>
-          )}
+          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-primary/10">
+            {logoUrl ? (
+              <Image src={logoUrl} alt={tenantName} fill className="object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-primary">
+                {tenantName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+          </div>
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{tenantName}</span>
         </div>
         <div className="mt-2">

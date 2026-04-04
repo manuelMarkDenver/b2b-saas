@@ -136,7 +136,6 @@ export function TenantShell({ tenantSlug, tenantName, children }: TenantShellPro
           userRole={userRole}
           userEmail={userEmail}
           userAvatarUrl={userAvatarUrl}
-          onLogoChange={(url) => setTenantLogoUrl(url)}
           onLogout={handleLogout}
         />
       </div>
