@@ -10,5 +10,7 @@ This folder contains the working documents we reference while building the Phase
 - `docs/API_CONVENTIONS.md`: REST conventions, error shape, pagination, auth headers.
 - `docs/DATA_MODEL.md`: ERD-style notes and ownership rules (tenant scoping).
 - `docs/LOGGING_AUDIT.md`: Application logging vs audit logging expectations.
+- `docs/ONBOARDING.md`: Super Admin tenant creation flow and first-login checklist.
+- `docs/AI_WORKFLOW_ARCHITECT_IMPLEMENTOR.md`: Reusable Architect -> Implementor (human-gated) workflow templates.
 
 Keep these docs short and practical. Prefer checklists and concrete decisions over prose.
