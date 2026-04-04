@@ -660,11 +660,6 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
                         </span>
                       );
                     })()}
-                    {order.status !== 'CANCELLED' && typeof order.paidCents === 'number' && order.paidCents >= order.totalCents && order.totalCents > 0 && (
-                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        Paid
-                      </span>
-                    )}
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">
                     {order.customerRef ? `${order.customerRef} · ` : ''}
