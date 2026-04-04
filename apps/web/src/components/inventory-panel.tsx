@@ -119,6 +119,9 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   // Archive SKU
   const [archivingId, setArchivingId] = useState<string | null>(null);
 
+  // Tab state
+  const [tab, setTab] = useState('stock');
+
   // Edit product dialog
   const [editSku, setEditSku] = useState<Sku | null>(null);
   const [editForm, setEditForm] = useState({ name: '', costCents: '', priceCents: '', lowStockThreshold: '', imageUrl: '' });
@@ -429,7 +432,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
         </div>
       </div>
 
-      <Tabs defaultValue="stock">
+      <Tabs defaultValue="stock" value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="stock">Stock Levels</TabsTrigger>
           <TabsTrigger value="history" className="relative">
@@ -465,7 +468,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground">Stock shown is total across all branches.</span>
               <span className="text-muted-foreground">·</span>
-              <a href="#history" className="text-primary underline underline-offset-2">View branch movements in History tab</a>
+              <button type="button" onClick={() => setTab('history')} className="text-primary underline underline-offset-2">View branch movements in History tab</button>
             </div>
           )}
 
