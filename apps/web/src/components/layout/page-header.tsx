@@ -65,12 +65,12 @@ export function PageHeader({ tenantSlug, title, description }: PageHeaderProps) 
         {branches.length > 0 && (
           <>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeColor}`}
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium select-none ${badgeColor}`}
             >
               {badgeLabel}
             </span>
             {showBranchType && (
-              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700/40">
+              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium select-none bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700/40">
                 {TYPE_LABELS[activeBranch.type] ?? activeBranch.type}
               </span>
             )}

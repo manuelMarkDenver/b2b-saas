@@ -289,7 +289,7 @@ export function TeamSettings({ tenantSlug }: TeamSettingsProps) {
         </div>
 
         {/* Members */}
-        <div className="rounded-lg border border-border bg-card">
+        <div className="rounded-lg border border-border">
           <div className="flex items-center justify-between border-b border-border p-4 gap-3">
             <div className="flex items-center gap-3">
               <h2 className="text-base font-semibold">Members</h2>

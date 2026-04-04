@@ -469,9 +469,9 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-lg border">
             <div className="min-w-[440px]">
-              <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="border-b bg-muted/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <div className={`grid items-center gap-3 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}>
                   <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 hover:text-foreground text-left">
                     Product {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
@@ -496,7 +496,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   No products found.
                 </div>
               ) : (
-                <div className="divide-y divide-border/60">
+                <div className="divide-y">
                   {sortedSkus.map((sku) => (
                     <div
                       key={sku.id}
@@ -555,7 +555,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
               {/* Pagination */}
               {skuMeta.totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between border-t px-4 py-3">
                   <span className="text-xs text-muted-foreground">
                     Page <span className="font-medium text-foreground">{skuMeta.page}</span> of{' '}
                     <span className="font-medium text-foreground">{skuMeta.totalPages}</span>
@@ -589,10 +589,10 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
             onExport={handleExportMovements}
           />
 
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-lg border">
             <div className="min-w-[620px]">
 
-            <div className={`grid gap-0 border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${!staffMode ? 'grid-cols-[1fr_90px_60px_1fr_130px_100px_100px]' : 'grid-cols-[1fr_90px_60px_1fr_130px_110px]'}`}>
+            <div className={`grid gap-0 border-b bg-muted/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground ${!staffMode ? 'grid-cols-[1fr_90px_60px_1fr_130px_100px_100px]' : 'grid-cols-[1fr_90px_60px_1fr_130px_110px]'}`}>
               <span>Product</span>
               <button type="button" onClick={() => toggleMovSort('type')} className="flex items-center gap-1 hover:text-foreground">
                 Type {movSortKey === 'type' ? (movSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
@@ -624,7 +624,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 )}
               </div>
             ) : (
-              <div className="divide-y divide-border/60">
+              <div className="divide-y">
                 {sortedMovements.map((m) => {
                   const Icon = MOVEMENT_ICON[m.type] ?? ArrowLeftRight;
                   const color = MOVEMENT_COLOR[m.type] ?? '';
@@ -694,7 +694,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
             {/* Pagination */}
             {movMeta.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-border/60 px-4 py-3">
+              <div className="flex items-center justify-between border-t px-4 py-3">
                 <span className="text-xs text-muted-foreground">
                   Page <span className="font-medium text-foreground">{movMeta.page}</span> of{' '}
                   <span className="font-medium text-foreground">{movMeta.totalPages}</span>

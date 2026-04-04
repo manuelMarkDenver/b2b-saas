@@ -376,9 +376,9 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
           exportLabel="Export CSV"
         />
 
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-lg border">
           <div className="min-w-[440px]">
-            <div className="border-b border-border/60 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="border-b bg-muted/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               <div className="grid grid-cols-[2fr_1fr_90px_90px_100px_120px] items-center gap-3">
                 <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
                   Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
@@ -402,7 +402,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 No items found.
               </div>
             ) : (
-              <div className="divide-y divide-border/60">
+              <div className="divide-y">
                 {sortedSkus.map((s) => (
                   <div
                     key={s.id}
