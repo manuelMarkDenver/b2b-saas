@@ -456,8 +456,8 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
                                 {o.branch.name}
                               </span>
                             )}
-                            <Badge variant={o.status === 'COMPLETED' ? 'default' : o.status === 'CANCELLED' ? 'secondary' : 'outline'} className="text-[10px]">
-                              {o.status}
+                            <Badge variant={o.status === 'COMPLETED' ? 'completed' : o.status === 'CANCELLED' ? 'cancelled' : o.status === 'CONFIRMED' ? 'confirmed' : 'pending'} className="text-[10px] leading-none">
+                              {o.status.charAt(0) + o.status.slice(1).toLowerCase()}
                             </Badge>
                           </div>
                         </div>
