@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Users, Search, LogOut, ChevronDown } from "lucide-react";
+import { Building2, Users, Search, LogOut, ChevronDown, Plus, Copy, Check } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { getToken, clearToken } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 
 type TenantFeatures = {
@@ -78,6 +80,10 @@ async function readApiError(res: Response): Promise<string> {
   return "";
 }
 
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 function BranchCount({ current, max }: { current: number; max: number }) {
   const over = current > max;
   const atLimit = current === max;
@@ -134,6 +140,15 @@ export default function AdminPage() {
   const [usersLoaded, setUsersLoaded] = React.useState(false);
   const [userSearch, setUserSearch] = React.useState("");
   const [expandedTenantGroups, setExpandedTenantGroups] = React.useState<Set<string>>(new Set());
+
+  // Create tenant dialog state
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [createForm, setCreateForm] = React.useState({ name: "", slug: "", ownerEmail: "", ownerPassword: "" });
+  const [createSlugLocked, setCreateSlugLocked] = React.useState(false);
+  const [createSubmitting, setCreateSubmitting] = React.useState(false);
+  const [createError, setCreateError] = React.useState<string | null>(null);
+  const [createResult, setCreateResult] = React.useState<{ slug: string; email: string; password: string; isNewUser: boolean } | null>(null);
+  const [copied, setCopied] = React.useState(false);
 
   function handleLogout() { clearToken(); router.push("/login"); }
 
@@ -246,6 +261,71 @@ export default function AdminPage() {
       setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, status: next } : u));
     }
     setUpdating(null);
+  }
+
+  function openCreateTenant() {
+    setCreateForm({ name: "", slug: "", ownerEmail: "", ownerPassword: "" });
+    setCreateSlugLocked(false);
+    setCreateSubmitting(false);
+    setCreateError(null);
+    setCreateResult(null);
+    setCopied(false);
+    setCreateOpen(true);
+  }
+
+  function handleCreateNameChange(name: string) {
+    setCreateForm((prev) => ({ ...prev, name }));
+    if (!createSlugLocked) {
+      setCreateForm((prev) => ({ ...prev, slug: slugify(name) }));
+    }
+  }
+
+  function handleCreateSlugChange(slug: string) {
+    setCreateForm((prev) => ({ ...prev, slug }));
+    setCreateSlugLocked(true);
+  }
+
+  async function handleCreateSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    setCreateSubmitting(true);
+    try {
+      const res = await apiFetch("/admin/tenants", {
+        method: "POST",
+        body: JSON.stringify(createForm),
+      });
+      if (!res.ok) {
+        const msg = await readApiError(res);
+        setCreateError(msg || `Failed to create tenant (${res.status})`);
+        return;
+      }
+      const data = await res.json() as { tenant: { slug: string }; owner: { email: string }; isNewUser: boolean };
+      setCreateResult({
+        slug: data.tenant.slug,
+        email: data.owner.email,
+        password: createForm.ownerPassword,
+        isNewUser: data.isNewUser,
+      });
+    } catch {
+      setCreateError("Network error. Please try again.");
+    } finally {
+      setCreateSubmitting(false);
+    }
+  }
+
+  async function handleCopyPassword() {
+    if (!createResult) return;
+    try {
+      await navigator.clipboard.writeText(createResult.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard not available */ }
+  }
+
+  function handleCreateDone() {
+    setCreateOpen(false);
+    setCreateResult(null);
+    loadTenants();
   }
 
   const filteredTenants = tenants.filter((t) => {
@@ -376,6 +456,10 @@ export default function AdminPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h1 className="text-lg font-semibold">Tenants</h1>
+                <Button size="sm" onClick={openCreateTenant}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  New Tenant
+                </Button>
               </div>
 
               {/* Filters */}
@@ -625,6 +709,123 @@ export default function AdminPage() {
             </div>
           )}
         </main>
+
+        {/* ── Create Tenant Dialog ── */}
+        <Dialog open={createOpen} onOpenChange={(open) => { if (!open && !createResult) { setCreateOpen(false); } else if (!open) { handleCreateDone(); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{createResult ? "Tenant created" : "New Tenant"}</DialogTitle>
+            </DialogHeader>
+
+            {createResult ? (
+              <div className="space-y-4">
+                {!createResult.isNewUser && (
+                  <Alert variant="warning">
+                    This user already exists. Their password was not changed.
+                  </Alert>
+                )}
+
+                <div className="space-y-3 rounded-lg border bg-muted/30 p-4 text-sm">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Tenant slug</span>
+                    <div className="font-mono text-sm">{createResult.slug}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Owner email</span>
+                    <div className="font-mono text-sm">{createResult.email}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Temporary password</span>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={createResult.password}
+                        className="flex-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm font-mono"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyPassword}
+                        className="shrink-0"
+                      >
+                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <Button className="w-full" onClick={handleCreateDone}>Done</Button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateSubmit} className="space-y-4">
+                {createError && <Alert variant="error">{createError}</Alert>}
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Business name</label>
+                  <input
+                    type="text"
+                    required
+                    minLength={2}
+                    placeholder="e.g. Metro Pizza"
+                    value={createForm.name}
+                    onChange={(e) => handleCreateNameChange(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Slug
+                    {!createSlugLocked && <span className="ml-1 text-xs text-muted-foreground">(auto-generated)</span>}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    pattern="[a-z0-9-]+"
+                    placeholder="metro-pizza"
+                    value={createForm.slug}
+                    onChange={(e) => handleCreateSlugChange(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Owner email</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="owner@business.com"
+                    value={createForm.ownerEmail}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, ownerEmail: e.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Temporary password</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="At least 8 characters"
+                    value={createForm.ownerPassword}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, ownerPassword: e.target.value }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => { setCreateOpen(false); setCreateResult(null); }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={createSubmitting}>
+                    {createSubmitting ? "Creating…" : "Create Tenant"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
