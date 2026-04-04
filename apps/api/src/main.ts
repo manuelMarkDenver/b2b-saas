@@ -29,8 +29,25 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const rawOrigins = config.get<string>('corsAllowedOrigins');
+  // Browser "Origin" never includes a trailing slash; normalize config input to avoid
+  // accidental mismatches (e.g. "https://foo.vercel.app/" or "https://foo.vercel.app/login").
   const allowedOrigins = rawOrigins
-    ? rawOrigins.split(',').map((o) => o.trim())
+    ? rawOrigins
+        .split(',')
+        .map((o) => o.trim())
+        .map((o) => {
+          if (!o) return '';
+          // If a full URL is provided, reduce it to origin so paths don't break matching.
+          if (o.includes('://')) {
+            try {
+              return new URL(o).origin;
+            } catch {
+              // fall through and keep best-effort normalization
+            }
+          }
+          return o.replace(/\/+$/, '');
+        })
+        .filter(Boolean)
     : [];
   app.enableCors({
     origin:
