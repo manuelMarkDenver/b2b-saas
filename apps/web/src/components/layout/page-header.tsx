@@ -34,7 +34,9 @@ interface PageHeaderProps {
 
 export function PageHeader({ tenantSlug, title, description }: PageHeaderProps) {
   const [branches, setBranches] = useState<Branch[]>([]);
-  const activeBranchId = getActiveBranchId(tenantSlug);
+  // localStorage is unavailable during SSR — read after mount to avoid hydration mismatch
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
+  useEffect(() => { setActiveBranchId(getActiveBranchId(tenantSlug)); }, [tenantSlug]);
 
   useEffect(() => {
     apiFetch('/branches', { tenantSlug }).then(async (res) => {

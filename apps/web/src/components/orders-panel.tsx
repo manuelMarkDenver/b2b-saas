@@ -212,7 +212,6 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
       })
       .catch(() => {})
       .finally(() => setContactArLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomerId, customerType, tenantSlug]);
 
   const [editSearch, setEditSearch] = React.useState("");

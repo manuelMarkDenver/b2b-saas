@@ -134,9 +134,7 @@ export function CustomersPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  React.useEffect(() => {
-    if (detailId) loadSummary(detailId);
-  }, [detailId]);
+  React.useEffect(() => { if (detailId) loadSummary(detailId); }, [detailId]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

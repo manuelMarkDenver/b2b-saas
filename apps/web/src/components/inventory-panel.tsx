@@ -81,7 +81,9 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
 
   // Branch context
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
-  const activeBranchId = getActiveBranchId(tenantSlug);
+  // localStorage is unavailable during SSR — read after mount to avoid hydration mismatch
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
+  useEffect(() => { setActiveBranchId(getActiveBranchId(tenantSlug)); }, [tenantSlug]);
   const activeBranch = branches.find((b) => b.id === activeBranchId);
   const branchLabel = activeBranch ? activeBranch.name : 'All Branches';
   const isMultiBranch = branches.length > 1;
@@ -110,7 +112,9 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [adjustQty, setAdjustQty] = useState('1');
   const [adjustReason, setAdjustReason] = useState('');
   const [adjustSaving, setAdjustSaving] = useState(false);
-  const staffMode = isStaff(tenantSlug);
+  // localStorage is unavailable during SSR — read after mount to avoid hydration mismatch
+  const [staffMode, setStaffMode] = useState(false);
+  useEffect(() => { setStaffMode(isStaff(tenantSlug)); }, [tenantSlug]);
 
   // Archive SKU
   const [archivingId, setArchivingId] = useState<string | null>(null);
