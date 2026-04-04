@@ -543,14 +543,11 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      {/* ── Panel header ── */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium">Orders</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Create and manage orders. Confirming deducts stock automatically.
-          </div>
+    <div>
+      {/* ── Controls row ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <DateRangePicker value={dateRange} onChange={(r) => { setDateRange(r); setPage(1); }} />
         </div>
         <div className="flex gap-2">
           <button
@@ -570,12 +567,7 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       </div>
 
-      {/* ── Filter bar ── */}
-      <div className="mt-4 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <DateRangePicker value={dateRange} onChange={(r) => { setDateRange(r); setPage(1); }} />
-        </div>
-        <FilterBar
+      <FilterBar
           filters={[
             { type: 'search', key: 'search', placeholder: 'Search order ID or customer ref…' },
             {
@@ -601,7 +593,6 @@ export function OrdersPanel({ tenantSlug }: { tenantSlug: string }) {
           onChange={(v) => { setFilters(v); setPage(1); }}
           onExport={handleExport}
         />
-      </div>
 
       {pageStatus ? (
         <div className="mt-3">

@@ -311,14 +311,15 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium">Catalog</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Categories are platform-managed. Items are tenant-scoped.
-          </div>
-        </div>
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <button
+          className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          type="button"
+          onClick={() => setCreateItemOpen(true)}
+        >
+          + Create Item
+        </button>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -357,18 +358,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         </div>
       ) : null}
 
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <button
-          className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-          type="button"
-          onClick={() => setCreateItemOpen(true)}
-        >
-          + Create Item
-        </button>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        <FilterBar
+      <FilterBar
           filters={filterFields}
           values={filters}
           onChange={setFilters}
@@ -464,7 +454,6 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
             )}
           </div>
         </div>
-      </div>
 
       {/* CSV Import Modal */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>

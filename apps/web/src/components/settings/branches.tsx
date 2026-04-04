@@ -126,12 +126,8 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold">Branches</h2>
-          <p className="text-sm text-muted-foreground">Manage locations within your business.</p>
-        </div>
-        {canManage && multipleBranches && branches.length < maxBranches && (
+      {canManage && multipleBranches && branches.length < maxBranches && (
+        <div className="flex justify-end">
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -139,8 +135,8 @@ export function BranchesPanel({ tenantSlug, userRole }: BranchesProps) {
             <Plus className="h-3.5 w-3.5" />
             Add branch
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">

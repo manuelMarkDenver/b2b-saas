@@ -359,14 +359,9 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium">Payments</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Submit payments for orders. Staff verifies or rejects manually.
-          </div>
-        </div>
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div>{/* spacer */}</div>
         <button
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           onClick={() => void loadData()}
@@ -377,12 +372,12 @@ export function PaymentsPanel({ tenantSlug }: { tenantSlug: string }) {
       </div>
 
       {status ? (
-        <div className="mt-3">
+        <div className="mb-4">
           <Alert variant={status.kind === "error" ? "error" : "info"}>{status.text}</Alert>
         </div>
       ) : null}
 
-      <Tabs defaultValue="payables" className="mt-5">
+      <Tabs defaultValue="payables">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
             <TabsTrigger value="payables">Payables</TabsTrigger>

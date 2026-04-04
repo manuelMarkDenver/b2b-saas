@@ -219,16 +219,16 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
           ) : orders.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No orders in selected period.</div>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
+            <div className="overflow-x-auto rounded-lg border">
               <table className="w-full min-w-[640px]">
-                <thead className="border-b bg-muted/50">
+                <thead className="border-b bg-muted/40">
                   <tr>
                     {['Date', 'Order ID', 'Customer Ref', 'Total', 'Status', 'Items', 'Branch'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody className="divide-y">
                   {orders.map((o) => (
                     <tr key={o.id} className="hover:bg-muted/40">
                       <td className="px-4 py-2.5 text-sm">{new Date(o.createdAt).toLocaleDateString()}</td>
@@ -258,16 +258,16 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
           ) : payments.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No payments in selected period.</div>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
+            <div className="overflow-x-auto rounded-lg border">
               <table className="w-full min-w-[560px]">
-                <thead className="border-b bg-muted/50">
+                <thead className="border-b bg-muted/40">
                   <tr>
                     {['Date', 'Payment ID', 'Order ID', 'Amount', 'Status', 'Customer Ref'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody className="divide-y">
                   {payments.map((p) => (
                     <tr key={p.id} className="hover:bg-muted/40">
                       <td className="px-4 py-2.5 text-sm">{new Date(p.createdAt).toLocaleDateString()}</td>
@@ -296,16 +296,16 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
           ) : inventory.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No inventory movements in selected period.</div>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
+            <div className="overflow-x-auto rounded-lg border">
               <table className="w-full min-w-[640px]">
-                <thead className="border-b bg-muted/50">
+                <thead className="border-b bg-muted/40">
                   <tr>
                     {['Date', 'Product', 'Category', 'Type', 'Qty', 'Status', 'Note'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody className="divide-y">
                   {inventory.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/40">
                       <td className="px-4 py-2.5 text-sm">{new Date(r.createdAt).toLocaleDateString()}</td>
@@ -341,16 +341,16 @@ export function OrdersReport({ tenantSlug }: { tenantSlug: string }) {
           ) : arRows.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No contacts with orders in selected period.</div>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
+            <div className="overflow-x-auto rounded-lg border">
               <table className="w-full min-w-[700px]">
-                <thead className="border-b bg-muted/50">
+                <thead className="border-b bg-muted/40">
                   <tr>
                     {['Name', 'Type', 'Orders', 'Total Billed', 'Total Paid', 'Balance Due', 'Overdue', 'Credit Limit'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody className="divide-y">
                   {arRows.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/40">
                       <td className="px-4 py-2.5">
