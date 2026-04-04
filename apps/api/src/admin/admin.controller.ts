@@ -36,12 +36,13 @@ export class AdminController {
   }
 
   @Post('tenants')
-  createTenant(@CurrentUser() user: AuthUser, @Body() body: CreateTenantDto) {
+  async createTenant(@CurrentUser() user: AuthUser, @Body() body: CreateTenantDto) {
     return this.adminService.createTenant({
       name: body.name,
       slug: body.slug,
       businessType: body.businessType,
       ownerEmail: body.ownerEmail,
+      ownerPassword: body.ownerPassword,
       createdByUserId: user.id,
     });
   }

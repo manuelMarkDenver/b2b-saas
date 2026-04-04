@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { BusinessType, TenantStatus, UserStatus } from '@prisma/client';
+import { hash } from 'bcryptjs';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UpdateTenantFlagsDto } from './dto/update-tenant-flags.dto';
 
@@ -31,6 +32,24 @@ const TENANT_SELECT = {
   _count: { select: { memberships: true, branches: true } },
 } as const;
 
+const DEFAULT_FEATURES: TenantFeatures = {
+  inventory: true,
+  orders: true,
+  payments: true,
+  marketplace: false,
+  reports: false,
+  stockTransfers: false,
+  paymentTerms: false,
+  multipleBranches: false,
+};
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
@@ -54,46 +73,78 @@ export class AdminService {
 
   async createTenant(data: {
     name: string;
-    slug: string;
+    slug?: string;
     businessType?: BusinessType;
     ownerEmail: string;
+    ownerPassword?: string;
     createdByUserId: string;
   }) {
-    const slug = data.slug.trim().toLowerCase();
+    const slug = (data.slug ?? slugify(data.name)).trim().toLowerCase();
     const normalizedEmail = data.ownerEmail.trim().toLowerCase();
 
-    const existing = await this.prisma.tenant.findUnique({ where: { slug } });
-    if (existing) throw new ConflictException('Tenant slug already exists');
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Slug collision check (inside transaction to prevent races)
+      const existing = await tx.tenant.findUnique({ where: { slug } });
+      if (existing) throw new ConflictException('Tenant slug already exists');
 
-    // Find or create the owner user (new users set password via forgot-password flow)
-    let ownerUser = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-      select: { id: true },
-    });
-
-    if (!ownerUser) {
-      ownerUser = await this.prisma.user.create({
-        data: { email: normalizedEmail, passwordHash: '', status: 'ACTIVE' },
-        select: { id: true },
+      // 2. Find or create owner user
+      let ownerUser = await tx.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true, email: true },
       });
-    }
 
-    return this.prisma.tenant.create({
-      data: {
-        name: data.name.trim(),
-        slug,
-        businessType: data.businessType ?? 'general_retail',
-        createdByUserId: data.createdByUserId,
-        memberships: {
-          create: {
-            userId: ownerUser.id,
-            role: 'OWNER',
-            isOwner: true,
+      let isNewUser = false;
+      if (!ownerUser) {
+        const passwordHash = data.ownerPassword
+          ? await hash(data.ownerPassword, 12)
+          : '';
+        ownerUser = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash,
             status: 'ACTIVE',
           },
+          select: { id: true, email: true },
+        });
+        isNewUser = true;
+      }
+
+      // 3. Create tenant + membership + default branch atomically
+      const tenant = await tx.tenant.create({
+        data: {
+          name: data.name.trim(),
+          slug,
+          businessType: data.businessType ?? 'general_retail',
+          features: DEFAULT_FEATURES,
+          createdByUserId: data.createdByUserId,
+          memberships: {
+            create: {
+              userId: ownerUser.id,
+              role: 'OWNER',
+              isOwner: true,
+              status: 'ACTIVE',
+            },
+          },
+          branches: {
+            create: {
+              name: data.name.trim(),
+              isDefault: true,
+              type: 'STANDARD',
+              status: 'ACTIVE',
+            },
+          },
         },
-      },
-      select: TENANT_SELECT,
+        select: {
+          ...TENANT_SELECT,
+          branches: { select: { id: true, name: true, isDefault: true } },
+        },
+      });
+
+      return {
+        tenant,
+        owner: { id: ownerUser.id, email: ownerUser.email },
+        isNewUser,
+      };
     });
   }
 
