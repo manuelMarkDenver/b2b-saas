@@ -8,7 +8,7 @@ import {
   GitBranch,
   Store,
 } from 'lucide-react';
-import { featuresConfig, type FeatureCard } from '@/config/features.config';
+import { featuresConfig } from '@/config/features.config';
 import type { PlatformFeature } from '@repo/shared';
 
 /**
