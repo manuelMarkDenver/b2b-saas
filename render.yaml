@@ -7,7 +7,7 @@ services:
     # Run from monorepo root so pnpm workspace packages (@repo/db etc.) resolve correctly
     # Note: Free plan does not support `preDeployCommand`, so migrations run during build.
     # Render free plan build: ensure devDependencies are installed (Nest CLI is used during build)
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/db run generate && pnpm --filter api build && node -e 'const { spawnSync } = require("child_process"); const tries = 5; for (let i = 1; i <= tries; i++) { const r = spawnSync("pnpm", ["--filter", "@repo/db", "run", "migrate:deploy"], { stdio: "inherit" }); if (r.status === 0) process.exit(0); if (i < tries) { console.error("migrate:deploy failed; retrying", { attempt: i, status: r.status }); spawnSync("sleep", ["5"], { stdio: "inherit" }); } } process.exit(1);'
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/db run generate && pnpm --filter api build && (for i in 1 2 3 4 5; do pnpm --filter @repo/db run migrate:deploy && exit 0; echo "migrate:deploy failed (attempt $i/5); retrying in 5s"; sleep 5; done; exit 1)
     startCommand: node apps/api/dist/main
     healthCheckPath: /health
     # Only deploy when API, DB, shared, or config files change
