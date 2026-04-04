@@ -280,15 +280,17 @@ Wait for a response, then immediately trigger a manual deploy on Render. The DB 
 
 ---
 
-### Firefox Enhanced Tracking Protection (ETP) blocking API requests
+### Firefox showing CORS Failed after a CORS fix is deployed
 
-**Symptom:** Login (and all API calls) fail in Firefox with `CORS Failed` in the Network tab, even though CORS is correctly configured on the API. Works fine in Brave/Chrome and Firefox Private Window — until Firefox loads the domain from its tracker blocklist.
+**Symptom:** Login fails in regular Firefox with `CORS Failed` after a CORS-related fix is deployed. Works in Brave/Chrome and Firefox Private Window immediately. Disabling Enhanced Tracking Protection (ETP) via the shield icon does not help.
 
-**Cause:** Firefox's Enhanced Tracking Protection (ETP) may classify `*.onrender.com` as a tracker domain and block cross-origin fetch requests to it entirely. This presents as a CORS failure but is actually a network-level block by the browser. It is unrelated to the server-side CORS configuration.
+**Cause:** Firefox aggressively caches CORS preflight responses (the `OPTIONS` request). The cached entry is the *old* failed preflight from before the fix was deployed. Firefox keeps serving this cached failure until `Access-Control-Max-Age` expires — typically 30–60 minutes. ETP toggle and even cache-clear via `Ctrl+Shift+Delete` may not always evict it. Private/incognito windows use a separate preflight cache, which is why they work immediately.
 
-**Immediate workaround:** Click the **shield icon** in Firefox's address bar → "Turn off protections for this site". This is per-site and persists across sessions.
+**Resolution:** It resolves on its own once the preflight cache entry expires. No action required — users will be unblocked within ~30–60 minutes of the fix going live.
 
-**Permanent fix for production:** Add a custom domain to the Render service (e.g. `api.yourplatform.com`). Custom domains are free on Render and won't appear on browser tracking blocklists. Steps:
+**Force it immediately (if needed):** Open Firefox DevTools → Network tab → check **Disable Cache** → reload. Or fully quit and reopen Firefox.
+
+**Permanent fix for production:** Add a custom domain to the Render service (e.g. `api.yourplatform.com`). Custom domains are free on Render and remove any dependency on `*.onrender.com` browser behavior. Steps:
 1. Render dashboard → your service → **Settings** → **Custom Domains** → Add domain
 2. Follow the CNAME record instructions from Render
 3. Update `CORS_ALLOWED_ORIGINS`, `APP_BASE_URL`, and `NEXT_PUBLIC_API_BASE_URL` to use the new domain
