@@ -17,7 +17,14 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const logger = app.get<PinoLogger>(PINO);
 
-  app.use(helmet());
+  // This is an API consumed cross-origin by the web app; Helmet's default
+  // `Cross-Origin-Resource-Policy: same-origin` can cause browsers to block
+  // otherwise-correct CORS requests.
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Serve local uploads as static files (local storage only — S3 serves from CDN)
   const uploadsDir = path.join(process.cwd(), 'uploads');
