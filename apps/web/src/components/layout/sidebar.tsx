@@ -136,7 +136,7 @@ export function Sidebar({
   }
 
   return (
-    <aside suppressHydrationWarning className="flex w-64 shrink-0 flex-col border-r border-border bg-background">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-background">
       {/* Platform header — swappable for white-label via NEXT_PUBLIC_PLATFORM_* env vars */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
         {platformConfig.logoIconUrl ? (
