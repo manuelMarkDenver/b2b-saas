@@ -629,6 +629,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                     currentUrl={editSkuImageUrl}
                     tenantSlug={tenantSlug}
                     size={200}
+                    resourceType="sku-image"
                     onUploaded={(url) => setEditSkuImageUrl(url)}
                     onRemoved={() => setEditSkuImageUrl(null)}
                   />

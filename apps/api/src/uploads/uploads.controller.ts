@@ -4,6 +4,8 @@ import {
   FileTypeValidator,
   ParseFilePipe,
   Post,
+  Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -12,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
 import { UploadsService } from './uploads.service';
@@ -48,8 +51,15 @@ export class UploadsController {
       }),
     )
     file: Express.Multer.File,
+    @Req() req: Request & { tenant?: { id: string } },
+    @Query('resourceType') resourceType?: string,
+    @Query('branchId') branchId?: string,
   ) {
-    const url = await this.uploadsService.handleUpload(file);
+    const url = await this.uploadsService.handleUpload(file, {
+      tenantId: req.tenant?.id,
+      resourceType,
+      branchId,
+    });
     return { url };
   }
 }

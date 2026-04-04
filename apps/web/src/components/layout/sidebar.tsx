@@ -165,6 +165,7 @@ export function Sidebar({
               currentUrl={logoUrl}
               tenantSlug={tenantSlug}
               size={32}
+              resourceType="tenant-logo"
               onUploaded={handleLogoUploaded}
               onRemoved={handleLogoRemoved}
             />

@@ -36,9 +36,12 @@ export class UploadsService {
    *  - local: returns the public URL for the file already written to /uploads
    *  - s3: uploads the buffer to S3 and returns the public URL
    */
-  async handleUpload(file: Express.Multer.File): Promise<string> {
+  async handleUpload(
+    file: Express.Multer.File,
+    opts: { tenantId?: string; resourceType?: string; branchId?: string } = {},
+  ): Promise<string> {
     if (this.storageType === 's3') {
-      return this.uploadToS3(file);
+      return this.uploadToS3(file, opts);
     }
     return this.getLocalUrl(file);
   }
@@ -49,13 +52,23 @@ export class UploadsService {
     return `${apiBaseUrl}/uploads/${file.filename}`;
   }
 
-  private async uploadToS3(file: Express.Multer.File): Promise<string> {
+  private async uploadToS3(
+    file: Express.Multer.File,
+    opts: { tenantId?: string; resourceType?: string; branchId?: string } = {},
+  ): Promise<string> {
     if (!this.s3Client || !this.s3Bucket) {
       throw new InternalServerErrorException('S3 storage not configured');
     }
 
     const ext = path.extname(file.originalname);
-    const key = `uploads/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+    const slug = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+    const parts = [
+      opts.tenantId ?? 'uploads',
+      opts.resourceType ?? 'misc',
+      ...(opts.branchId ? [opts.branchId] : []),
+      slug,
+    ];
+    const key = parts.join('/');
 
     // Read from disk (multer diskStorage) or use buffer (memoryStorage)
     const body = file.buffer ?? fs.readFileSync(file.path);

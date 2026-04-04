@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sidebar } from '@/components/layout/sidebar';
+import dynamic from 'next/dynamic';
+
+// Skip SSR to prevent lucide-react SVG path hydration mismatch
+const Sidebar = dynamic(
+  () => import('@/components/layout/sidebar').then((m) => ({ default: m.Sidebar })),
+  { ssr: false },
+);
 import { Breadcrumbs } from '@/components/layout/breadcrumbs';
 import { apiFetch } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';

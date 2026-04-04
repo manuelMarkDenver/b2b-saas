@@ -137,6 +137,7 @@ export function CreateItemModal({
               currentUrl={form.imageUrl || null}
               tenantSlug={tenantSlug}
               size={180}
+              resourceType="sku-image"
               onUploaded={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
               onRemoved={() => setForm((f) => ({ ...f, imageUrl: "" }))}
             />

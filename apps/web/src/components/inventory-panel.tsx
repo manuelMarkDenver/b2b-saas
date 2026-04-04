@@ -813,6 +813,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   currentUrl={editForm.imageUrl || null}
                   tenantSlug={tenantSlug}
                   size={64}
+                  resourceType="sku-image"
                   onUploaded={(url) => setEditForm((f) => ({ ...f, imageUrl: url }))}
                   onRemoved={() => setEditForm((f) => ({ ...f, imageUrl: '' }))}
                 />
