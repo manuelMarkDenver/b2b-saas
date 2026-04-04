@@ -6,9 +6,10 @@ export class CreateTenantDto {
   @MinLength(2)
   name: string;
 
+  @IsOptional()
   @IsString()
   @Matches(/^[a-z0-9-]+$/, { message: 'Slug must be lowercase letters, numbers, and hyphens only' })
-  slug: string;
+  slug?: string;
 
   @IsOptional()
   @IsEnum(BusinessType)
@@ -16,4 +17,8 @@ export class CreateTenantDto {
 
   @IsEmail()
   ownerEmail: string;
+
+  @IsString()
+  @MinLength(8)
+  ownerPassword: string;
 }
