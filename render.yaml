@@ -48,13 +48,13 @@ services:
 
       # ── CORS — set to your Vercel URL after first deploy ─────────────────
       - key: CORS_ALLOWED_ORIGINS
-        value: https://zentral-marketing.vercel.app,https://zentral-web.vercel.app
+        value: https://b2b-saas-marketing.vercel.app/,https://b2b-saas-web-pi.vercel.app
 
       # ── URLs ─────────────────────────────────────────────────────────────
       - key: APP_BASE_URL
-        value: https://zentral-api-tucp.onrender.com
+        value: https://zentral-api-vxoh.onrender.com
       - key: APP_FRONTEND_URL
-        value: https://zentral-web.vercel.app
+        value: https://b2b-saas-web-pi.vercel.app
 
       # ── Email (Resend) ────────────────────────────────────────────────────
       - key: SMTP_HOST
