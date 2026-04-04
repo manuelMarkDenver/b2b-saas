@@ -1,6 +1,6 @@
 # Deployment
 
-> Last updated: 2026-04-03
+> Last updated: 2026-04-04
 
 This document covers the deployment strategy: current free-tier setup for early stage, and the path to scale as the platform grows.
 
@@ -17,9 +17,17 @@ This document covers the deployment strategy: current free-tier setup for early 
 | **Total** | | | **~$0/mo** |
 
 **Constraints on free tier:**
-- Render free tier spins down after 15min inactivity — first request takes ~30s cold start. Acceptable for early stage.
-- Neon free tier is 0.5 GB storage, 1 compute unit. Sufficient for early tenants.
+- Render free tier spins down after 15min inactivity — first request takes ~30–50s cold start. Acceptable for early stage.
+- Neon free tier suspends after 5min inactivity — slow first query; can cause P1002 advisory lock timeout during Render deploys (see [Known Issues](#known-issues--gotchas) below).
 - Vercel Hobby has 100 GB bandwidth/mo — plenty for early stage.
+
+**Keeping services warm (required for beta testing):**
+Set up a free uptime monitor to ping the API every 5 minutes. This prevents both the Render cold start and the Neon suspension:
+1. Sign up at [uptimerobot.com](https://uptimerobot.com) (free, no credit card)
+2. Add monitor → **HTTP(s)** → URL: `https://<your-render-url>/health` → interval: **5 minutes**
+3. Enable email alerts so you know if the API goes down
+
+This keeps both Render and Neon warm as long as there is at least one ping every 5 minutes.
 
 ---
 
@@ -245,6 +253,72 @@ open http://localhost:8025
 
 The API `.env.example` is pre-configured to use Mailpit (`SMTP_HOST=localhost`, `SMTP_PORT=1025`).
 No `SMTP_USER` / `SMTP_PASS` needed locally — Mailpit accepts anonymous connections.
+
+---
+
+## Known Issues & Gotchas
+
+### P1002 — Neon advisory lock timeout during Render deploy
+
+**Symptom:** Render build fails with:
+```
+Error: P1002
+Timed out trying to acquire a postgres advisory lock. Timeout: 10000ms.
+```
+
+**Cause:** Neon free tier is suspended when Render starts the build and tries to run `prisma migrate deploy`. The DB takes longer than 10 seconds to wake and respond to the advisory lock.
+
+**Fix already in place:** `render.yaml` wraps `prisma migrate deploy` in a 5-retry loop with 5-second waits between attempts. This handles most cold starts.
+
+**If it still fails:** Warm up Neon manually before triggering a redeploy:
+```bash
+curl https://<your-render-url>/health
+```
+Wait for a response, then immediately trigger a manual deploy on Render. The DB will already be warm when the build starts.
+
+**Long-term fix:** Upgrade Neon to a paid plan (disables autosuspend), or set up UptimeRobot as described above.
+
+---
+
+### Firefox Enhanced Tracking Protection (ETP) blocking API requests
+
+**Symptom:** Login (and all API calls) fail in Firefox with `CORS Failed` in the Network tab, even though CORS is correctly configured on the API. Works fine in Brave/Chrome and Firefox Private Window — until Firefox loads the domain from its tracker blocklist.
+
+**Cause:** Firefox's Enhanced Tracking Protection (ETP) may classify `*.onrender.com` as a tracker domain and block cross-origin fetch requests to it entirely. This presents as a CORS failure but is actually a network-level block by the browser. It is unrelated to the server-side CORS configuration.
+
+**Immediate workaround:** Click the **shield icon** in Firefox's address bar → "Turn off protections for this site". This is per-site and persists across sessions.
+
+**Permanent fix for production:** Add a custom domain to the Render service (e.g. `api.yourplatform.com`). Custom domains are free on Render and won't appear on browser tracking blocklists. Steps:
+1. Render dashboard → your service → **Settings** → **Custom Domains** → Add domain
+2. Follow the CNAME record instructions from Render
+3. Update `CORS_ALLOWED_ORIGINS`, `APP_BASE_URL`, and `NEXT_PUBLIC_API_BASE_URL` to use the new domain
+
+---
+
+### lucide-react version mismatch (hydration error #418)
+
+**Symptom:** React hydration error #418 on pages with icons. SVG paths differ between server and client renders.
+
+**Cause:** Multiple versions of `lucide-react` installed in the monorepo (e.g. `apps/marketing` pinned to `^0.447.0` while `apps/web` used `^1.7.0`). Next.js SSR resolves a different version than the client bundle.
+
+**Fix:** Ensure all apps in the monorepo use the same major version of `lucide-react`. After changing any `package.json`, run `pnpm install --force` to deduplicate. Verify with:
+```bash
+ls node_modules/.pnpm/ | grep lucide
+# Should show only one version
+```
+
+---
+
+### Prisma major version upgrade (6 → 7) — deferred
+
+As of 2026-04-04, Prisma shows an available upgrade from `6.x` to `7.x`. **Do not upgrade during beta testing.** This is a major version with breaking changes. See the migration guide at https://pris.ly/d/major-version-upgrade before upgrading.
+
+When ready to upgrade (post-beta):
+```bash
+npm i --save-dev prisma@latest
+npm i @prisma/client@latest
+```
+Then run `pnpm db:generate` and test all DB operations thoroughly before deploying.
 
 ---
 
