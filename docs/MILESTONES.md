@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-03 — PR#69: Inventory UI clarifications for staging readiness — stock labels now show "Total Stock (All Branches)", branch context indicator added, order creation warnings for low stock, transfer clarity explanations. Hybrid inventory model documented: staging-safe with UI labels, full branch-based validation deferred post-staging. See "Inventory Model — Staging Readiness" section. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
+> Last updated: 2026-04-04 — PR#71–#105: Staging deployment live (Render + Vercel + Neon, Singapore region). Admin panel overhaul. Brand renamed to Zentral. React Server Components CVE patched. Pre-staging UI polish: login show/hide password, order Terms/Overdue badges, compact pill badges app-wide, table container standardization (rounded-lg border / muted/40 header / divide-y), outer card wrapper removal from all panels. PWA service worker disabled (next-pwa incompatibility with Next.js 15.2.8 — manifest + install-to-homescreen preserved). All 14 pre-staging checklist items ✅ complete. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
 
 ---
 
@@ -46,7 +46,7 @@
 | 11 | Feature flags + Catalog UI fixes (MS19f) | ✅ Done | stockTransfers/paymentTerms in Super Admin, CSV import modal, catalog width, edit sheet with 100% image |
 | 12 | Unified Create Item flow (MS19g) | ✅ Done | Single modal for Product+SKU creation, auto-SKU with override toggle, shared component across Products and Inventory tabs, backend `code` and `lowStockThreshold` support in `/products/with-stock` |
 | 13 | Inventory UI clarifications (stock labels, branch context, transfer clarity) | ✅ Done | Stock displays labeled as "Total Stock (All Branches)", branch context indicator, low-stock warnings on orders, transfer explanations |
-| 14 | Staging deployment | 📋 Next | Vercel (web + marketing) + Render (API) + Neon (DB) |
+| 14 | Staging deployment | ✅ Done | Vercel (web + marketing) + Render (API, Singapore region) + Neon (DB). CORS configured. Prisma migrate deploy on Render. Brand renamed to Zentral. CVE patched. PRs #72–#101. |
 
 > **No tenant self-registration.** All tenants manually provisioned by Super Admin. Prospects book via Calendly → demo → owner creates their tenant. Self-serve signup only unlocks when a pricing model is defined.
 
@@ -833,6 +833,88 @@ Post-staging approach: Phase 1 = history-only audit trail. Phase 2 = real stock 
 
 ---
 
+### MS18 — Live Deployment ✅ Done
+
+> PRs #57–#59 (scaffold), #72–#101 (live fixes)
+> The app is live on production infrastructure. All three surfaces deployed and communicating.
+
+#### Infrastructure
+
+| Surface | Provider | Region | Status |
+|---------|----------|--------|--------|
+| Web app (`apps/web`) | Vercel | Auto (edge) | ✅ Live |
+| Marketing site (`apps/marketing`) | Vercel | Auto (edge) | ✅ Live |
+| API (`apps/api`) | Render (free plan) | Singapore (SIN) | ✅ Live |
+| Database | Neon Postgres | Auto | ✅ Live |
+| File uploads | R2 / local storage | — | ✅ Live |
+
+#### Deployment Fixes Applied (PRs #72–#101)
+
+| Fix | PR | Notes |
+|-----|----|-------|
+| Render free plan — removed `preDeployCommand` | #72–#73 | Free tier doesn't support pre-deploy hooks |
+| Generate Prisma client before build | #79 | `prisma generate` must precede `nest build` |
+| Install devDependencies during build | #78 | NestJS build tools are in devDeps |
+| Add express runtime dependency | #80 | Missing explicit dependency |
+| pnpm lockfile update | #81 | Workspace lockfile sync |
+| Vercel: remove `rootDirectory` override | #82 | Caused wrong app to build |
+| Vercel: remove secret env mappings | #83 | Caused build-time env injection failures |
+| Fix missing next-themes and tailwind-merge | #84, #88 | Peer deps not bundled |
+| React Server Components CVE | #85 | Security patch — RSC prototype pollution vulnerability |
+| Remove unused code blocking build | #86 | Dead code caused type error in prod build |
+| Brand rename: Ascendex → Zentral | #87, #92 | Product is now "Zentral by Ascendex" |
+| Build filter for targeted deploys | #89 | Prevent unnecessary rebuilds on unrelated pushes |
+| Marketing: move Tailwind to dependencies | #90 | Vercel prunes devDeps; Tailwind is needed at build |
+| Vercel: fix correct app per project root | #91 | Was building wrong workspace package |
+| Deploy to Singapore region (APAC) | #93 | Lower latency for PH users |
+| Set default CORS and app URLs | #94 | `CORS_ALLOWED_ORIGINS` + `APP_BASE_URL` configured |
+| Updated Render config | #95 | Misc YAML fixes |
+| Normalize CORS allowed origins | #98 | Multi-origin comma-separated list support |
+| Allow cross-origin resource policy | #99 | CORP header for uploaded assets |
+| Prisma migrate deploy on Render | #100 | Run migrations on deploy |
+| Render buildCommand YAML-safe | #101 | Quoted multi-command build string |
+| Tenant-scoped upload paths | #96 | Uploads stored under `tenantId/` prefix |
+| Hydration mismatches + lint warnings | #97 | SSR/client mismatch on sidebar and theme |
+
+---
+
+### MS20 — Admin Panel Overhaul ✅ Done
+
+> PRs #71, #74, #75, #77
+> Super Admin panel rebuilt: sidebar navigation, collapsible tenant cards, branch limits.
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Admin panel sidebar — Tenants + Users sections | ✅ | Dedicated sidebar with section grouping |
+| Collapsible tenant cards | ✅ | Collapsed by default; expand to see details/flags |
+| Modern card design + layout | ✅ | Rounded-xl cards, subtle shadows, muted backgrounds |
+| `multipleBranches` feature flag | ✅ | Super Admin toggle to allow a tenant to have >1 branch |
+| `maxBranches` plan limit | ✅ | Admin sets numeric cap per tenant via `PATCH /admin/tenants/:id/limits` |
+| Branch creation guarded | ✅ | `multipleBranches` must be `true` AND `branchCount < maxBranches` |
+
+---
+
+### MS21 — Pre-Staging UI Polish ✅ Done
+
+> PRs #97–#105 + local commits on 2026-04-04
+> Final round of UI/UX fixes before live client demo. No new features — polish and correctness only.
+
+| Fix | PR | Notes |
+|-----|----|-------|
+| Hydration mismatches resolved | #97 | SSR/client sync on sidebar, theme, branch switcher |
+| Login show/hide password toggle | #102 | Inline SVG toggle (avoids lucide import RSC issue); `tabIndex={-1}` |
+| Sidebar logo — display-only | #102 | Removed upload/edit; logo is read-only in sidebar |
+| PWA service worker disabled | #102 | `@ducanh2912/next-pwa@10.2.9` incompatible with `next@15.2.8`; `manifest.json` + icons preserved |
+| `manifest.json` orientation: any | #102 | Was `portrait-primary`; now allows landscape |
+| Order payment type badges | #103 | Terms (blue) / Overdue (red) only. COD orders have no badge. No "Paid" badge. |
+| Compact pill badge style app-wide | #104 | Remove `min-w-[80px]` overrides; badges size to content. Fix raw enum display in payments table. |
+| Inventory history tab link | #105 | Was `<a href="#history">` (appends URL hash only); now properly switches Tabs state |
+| Table container standardization | local | All tables: `rounded-lg border` / `bg-muted/40 px-4 py-3` header / `divide-y` rows. Applied to orders, payments, catalog, inventory, reports, branches, team panels. |
+| Outer card wrapper removal | local | Orders, payments, catalog panels had double-bordered `bg-card p-5` wrapper. Removed. Action buttons promoted to top controls row. Redundant inner panel titles removed (PageHeader already renders them). |
+| Branch badge `select-none` | local | Page header branch/type badges are display-only; `select-none` prevents accidental text selection |
+
+---
+
 ## PHASE 7 — Marketplace 🔒
 
 > Do not build yet. Unlocks after Phase 4 is stable and validated demand exists.
@@ -856,7 +938,7 @@ Post-staging approach: Phase 1 = history-only audit trail. Phase 2 = real stock 
 
 | Item | Status | Notes |
 |------|--------|-------|
-| **PWA + mobile responsive web** | ⏳ Pre-staging | `manifest.json`, service worker, responsive CSS pass on `apps/web`. Ships before staging. |
+| **PWA + mobile responsive web** | ✅ Done | `manifest.json`, icons, responsive CSS — pre-staging ✅. Service worker (`@ducanh2912/next-pwa`) disabled: incompatible with Next.js 15.2.8 (RSC module ID mismatch). Install-to-homescreen preserved. Re-enable when compatible version released. |
 | Mobile app (React Native / Expo) | 🔒 Phase 8 | Only after staging is live, real clients confirmed, and revenue validates the investment. |
 | POS + barcode scanning | 🔒 Phase 8 | Requires hardware integrations and dedicated mobile engineer. |
 
