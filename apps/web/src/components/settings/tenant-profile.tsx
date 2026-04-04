@@ -144,6 +144,7 @@ export function TenantProfileSettings({ tenantSlug }: TenantProfileSettingsProps
                     currentUrl={tenant.logoUrl}
                     tenantSlug={tenantSlug}
                     size={64}
+                    resourceType="tenant-logo"
                     onUploaded={handleLogoUploaded}
                     onRemoved={handleLogoRemoved}
                   />

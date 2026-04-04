@@ -15,6 +15,10 @@ interface ImageUploadProps {
   className?: string;
   /** "square" (default) for fixed-size, "dropzone" for full-width hero */
   variant?: "square" | "dropzone";
+  /** Passed as ?resourceType= to scope the S3 path (e.g. "tenant-logo", "sku-image") */
+  resourceType?: string;
+  /** Passed as ?branchId= when the upload is branch-scoped */
+  branchId?: string;
 }
 
 export function ImageUpload({
@@ -25,6 +29,8 @@ export function ImageUpload({
   size = 80,
   className,
   variant = "square",
+  resourceType,
+  branchId,
 }: ImageUploadProps) {
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -38,7 +44,11 @@ export function ImageUpload({
       const form = new FormData();
       form.append('file', file);
 
-      const res = await fetch(`${base}/uploads`, {
+      const params = new URLSearchParams();
+      if (resourceType) params.set('resourceType', resourceType);
+      if (branchId) params.set('branchId', branchId);
+      const qs = params.toString();
+      const res = await fetch(`${base}/uploads${qs ? `?${qs}` : ''}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken() ?? ''}`, 'x-tenant-slug': tenantSlug },
         body: form,
