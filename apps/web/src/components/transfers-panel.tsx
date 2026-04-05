@@ -10,6 +10,7 @@ type Sku = { id: string; code: string; name: string; stockOnHand: number };
 type TransferItem = { skuId: string; quantity: number; sku: { id: string; code: string; name: string } };
 type Transfer = {
   id: string;
+  status: string;
   createdAt: string;
   fromBranch: { id: string; name: string } | null;
   toBranch: { id: string; name: string };
@@ -30,6 +31,20 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'PENDING',
+  APPROVED: 'IN_TRANSIT',
+  FULFILLED: 'RECEIVED',
+  REJECTED: 'CANCELLED',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  APPROVED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  FULFILLED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  REJECTED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
 export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [meta, setMeta] = useState<Meta>({ total: 0, page: 1, limit: 20, totalPages: 1 });
@@ -38,6 +53,11 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [branchIds, setBranchIds] = useState<string[]>([]);
+
+  // Branch stock for SKU filtering
+  const [branchStock, setBranchStock] = useState<Record<string, number>>({});
 
   // Filters
   const [dateRange, setDateRange] = useState<DateRange>(() => presetToRange('30d'));
@@ -85,9 +105,14 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
       setSkus(Array.isArray(data) ? data : (data.data ?? []));
     }
     if (memRes.ok) {
-      const memberships: Array<{ role: string; tenant: { slug: string }; status: string }> = await memRes.json();
+      const memberships: Array<{ role: string; tenant: { slug: string }; status: string; userId: string; branchIds?: unknown }> = await memRes.json();
       const m = memberships.find((m) => m.tenant.slug === tenantSlug && m.status === 'ACTIVE');
-      if (m) setUserRole(m.role);
+      if (m) {
+        setUserRole(m.role);
+        setCurrentUserId(m.userId);
+        const raw = m.branchIds as string[] | null | undefined;
+        setBranchIds(Array.isArray(raw) ? raw : []);
+      }
     }
     setLoading(false);
   }
@@ -105,15 +130,34 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
   }
 
   function openDialog() {
-    // Pre-select default branch as source if available
     const defaultBranch = branches.find((b) => b.isDefault) ?? branches[0];
     setFromBranchId(defaultBranch?.id ?? '');
     setToBranchId('');
     setNote('');
     setLines([{ skuId: '', quantity: 1 }]);
     setFormError(null);
+    setBranchStock({});
     setDialogOpen(true);
   }
+
+  // Fetch branch stock when fromBranchId changes
+  useEffect(() => {
+    if (!fromBranchId || !dialogOpen) {
+      setBranchStock({});
+      return;
+    }
+    apiFetch(`/inventory/branch-stock?branchId=${fromBranchId}`, { tenantSlug })
+      .then((r) => r.json())
+      .then((d: Record<string, number>) => setBranchStock(d))
+      .catch(() => setBranchStock({}));
+  }, [fromBranchId, dialogOpen, tenantSlug]);
+
+  // Reset lines when fromBranchId changes
+  useEffect(() => {
+    if (dialogOpen && fromBranchId) {
+      setLines([{ skuId: '', quantity: 1 }]);
+    }
+  }, [fromBranchId, dialogOpen]);
 
   function setLine(idx: number, patch: Partial<LineItem>) {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -154,6 +198,55 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
     }
     setSaving(false);
   }
+
+  async function handleSend(id: string) {
+    const res = await apiFetch(`/transfers/${id}/send`, { tenantSlug, method: 'POST' });
+    if (res.ok) await load();
+    else { const d = await res.json().catch(() => ({})); setError(d.message ?? 'Failed to send transfer'); }
+  }
+
+  async function handleReceive(id: string) {
+    const res = await apiFetch(`/transfers/${id}/receive`, { tenantSlug, method: 'POST' });
+    if (res.ok) await load();
+    else { const d = await res.json().catch(() => ({})); setError(d.message ?? 'Failed to receive transfer'); }
+  }
+
+  async function handleCancel(id: string) {
+    const res = await apiFetch(`/transfers/${id}/cancel`, { tenantSlug, method: 'POST' });
+    if (res.ok) await load();
+    else { const d = await res.json().catch(() => ({})); setError(d.message ?? 'Failed to cancel transfer'); }
+  }
+
+  function canSend(t: Transfer): boolean {
+    if (t.status !== 'PENDING') return false;
+    if (userRole === 'OWNER') return true;
+    if (userRole === 'ADMIN' || userRole === 'STAFF') {
+      if (branchIds.length === 0) return true;
+      return !!t.fromBranch && branchIds.includes(t.fromBranch.id);
+    }
+    return false;
+  }
+
+  function canReceive(t: Transfer): boolean {
+    if (t.status !== 'PENDING' && t.status !== 'APPROVED') return false;
+    if (!t.fromBranch) return false;
+    if (userRole === 'OWNER') return true;
+    if (userRole === 'ADMIN' || userRole === 'STAFF') {
+      if (branchIds.length === 0) return true;
+      return branchIds.includes(t.toBranch.id);
+    }
+    return false;
+  }
+
+  function canCancel(t: Transfer): boolean {
+    if (t.status !== 'PENDING' && t.status !== 'APPROVED') return false;
+    if (userRole === 'OWNER') return true;
+    if (t.status === 'PENDING' && t.requestedBy.id === currentUserId) return true;
+    return false;
+  }
+
+  // Filtered SKUs based on branch stock
+  const availableSkus = skus.filter((s) => (branchStock[s.id] ?? 0) > 0);
 
   if (error) return <p className="text-sm text-destructive">{error}</p>;
 
@@ -232,6 +325,9 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                   <span className="truncate">{t.toBranch.name}</span>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[t.status] ?? ''}`}>
+                    {STATUS_LABELS[t.status] ?? t.status}
+                  </span>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <User className="h-3 w-3" />
                     {t.requestedBy.email.split('@')[0]}
@@ -251,6 +347,36 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                 ))}
               </div>
               {t.note && <p className="mt-2 text-xs text-muted-foreground">{t.note}</p>}
+
+              {/* Action buttons */}
+              {(canSend(t) || canReceive(t) || canCancel(t)) && (
+                <div className="mt-3 flex gap-2">
+                  {canSend(t) && (
+                    <button
+                      onClick={() => handleSend(t.id)}
+                      className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                    >
+                      Send
+                    </button>
+                  )}
+                  {canReceive(t) && (
+                    <button
+                      onClick={() => handleReceive(t.id)}
+                      className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
+                    >
+                      Receive
+                    </button>
+                  )}
+                  {canCancel(t) && (
+                    <button
+                      onClick={() => handleCancel(t.id)}
+                      className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -288,7 +414,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
           <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
             <h3 className="mb-1 text-base font-semibold">New Stock Transfer</h3>
             <p className="mb-4 text-xs text-muted-foreground">
-              Transfers move stock between branches. Total stock across all branches remains unchanged.
+              Stock moves only when the destination marks a transfer as received.
             </p>
 
             <div className="space-y-3">
@@ -342,9 +468,9 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                         onChange={(e) => setLine(idx, { skuId: e.target.value })}
                       >
                         <option value="">Select product…</option>
-                        {skus.map((s) => (
+                        {availableSkus.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.code} — {s.name} (total: {s.stockOnHand})
+                            {s.code} — {s.name} (available: {branchStock[s.id] ?? 0})
                           </option>
                         ))}
                       </select>
@@ -394,7 +520,7 @@ export function TransfersPanel({ tenantSlug }: TransfersPanelProps) {
                 disabled={saving}
                 className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {saving ? 'Transferring…' : 'Transfer stock'}
+                {saving ? 'Creating…' : 'Create transfer'}
               </button>
             </div>
           </div>

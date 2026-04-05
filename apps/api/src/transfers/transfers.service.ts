@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { MovementType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -31,7 +31,7 @@ export class TransfersService {
   }
 
   async create(tenantId: string, userId: string, dto: CreateTransferDto) {
-    if (dto.fromBranchId && dto.fromBranchId === dto.toBranchId) {
+    if (dto.fromBranchId === dto.toBranchId) {
       throw new BadRequestException('Source and destination must be different branches');
     }
 
@@ -39,10 +39,8 @@ export class TransfersService {
       throw new BadRequestException('At least one item is required');
     }
 
-    if (dto.fromBranchId) {
-      const from = await this.prisma.branch.findFirst({ where: { id: dto.fromBranchId, tenantId } });
-      if (!from) throw new NotFoundException('Source branch not found');
-    }
+    const from = await this.prisma.branch.findFirst({ where: { id: dto.fromBranchId, tenantId } });
+    if (!from) throw new NotFoundException('Source branch not found');
 
     const to = await this.prisma.branch.findFirst({ where: { id: dto.toBranchId, tenantId } });
     if (!to) throw new NotFoundException('Destination branch not found');
@@ -57,52 +55,124 @@ export class TransfersService {
       throw new NotFoundException('One or more SKUs not found');
     }
 
-    if (dto.fromBranchId) {
-      const branchStock = await this.getBranchStock(tenantId, dto.fromBranchId);
-      for (const item of dto.items) {
+    // Validate source branch stock
+    const branchStock = await this.getBranchStock(tenantId, dto.fromBranchId);
+    for (const item of dto.items) {
+      const available = branchStock.get(item.skuId) ?? 0;
+      if (available < item.quantity) {
+        const sku = skus.find((s) => s.id === item.skuId)!;
+        throw new BadRequestException(
+          `Insufficient stock at source branch for ${sku.name} (${sku.code}): available ${available}, requested ${item.quantity}`,
+        );
+      }
+    }
+
+    // Create transfer as PENDING — no movements, no stock changes
+    return this.prisma.stockTransferRequest.create({
+      data: {
+        tenantId,
+        fromBranchId: dto.fromBranchId,
+        toBranchId: dto.toBranchId,
+        status: 'PENDING',
+        requestedById: userId,
+        note: dto.note ?? null,
+        items: {
+          create: dto.items.map((i) => ({ skuId: i.skuId, quantity: i.quantity })),
+        },
+      },
+      include: {
+        fromBranch: { select: { id: true, name: true } },
+        toBranch: { select: { id: true, name: true } },
+        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+      },
+    });
+  }
+
+  async send(tenantId: string, userId: string, transferId: string, membership: { role: string; branchIds: Prisma.JsonValue }) {
+    const transfer = await this.prisma.stockTransferRequest.findFirst({
+      where: { id: transferId, tenantId },
+      include: { items: { include: { sku: { select: { id: true, code: true, name: true } } } } },
+    });
+    if (!transfer) throw new NotFoundException('Transfer not found');
+
+    if (transfer.status !== 'PENDING') {
+      throw new BadRequestException('Transfer can only be sent when PENDING');
+    }
+
+    if (!transfer.fromBranchId) {
+      throw new BadRequestException('Legacy transfers without a source branch cannot be sent');
+    }
+
+    const branchIds = (membership.branchIds as string[]) ?? [];
+    if (membership.role !== 'OWNER') {
+      if (membership.role !== 'ADMIN' && membership.role !== 'STAFF') {
+        throw new ForbiddenException('Only OWNER or members assigned to the source branch can send transfers');
+      }
+      if (branchIds.length > 0 && !branchIds.includes(transfer.fromBranchId!)) {
+        throw new ForbiddenException('Only OWNER or members assigned to the source branch can send transfers');
+      }
+    }
+
+    return this.prisma.stockTransferRequest.update({
+      where: { id: transferId },
+      data: { status: 'APPROVED', approvedById: userId },
+      include: {
+        fromBranch: { select: { id: true, name: true } },
+        toBranch: { select: { id: true, name: true } },
+        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+      },
+    });
+  }
+
+  async receive(tenantId: string, userId: string, transferId: string, membership: { role: string; branchIds: Prisma.JsonValue }) {
+    const transfer = await this.prisma.stockTransferRequest.findFirst({
+      where: { id: transferId, tenantId },
+      include: { items: { include: { sku: { select: { id: true, code: true, name: true } } } } },
+    });
+    if (!transfer) throw new NotFoundException('Transfer not found');
+
+    if (transfer.status !== 'PENDING' && transfer.status !== 'APPROVED') {
+      throw new BadRequestException('Transfer can only be received when PENDING or IN_TRANSIT');
+    }
+
+    if (!transfer.fromBranchId) {
+      throw new BadRequestException('Legacy transfers without a source branch cannot be received');
+    }
+
+    const branchIds = (membership.branchIds as string[]) ?? [];
+    if (membership.role !== 'OWNER') {
+      if (membership.role !== 'ADMIN' && membership.role !== 'STAFF') {
+        throw new ForbiddenException('Only OWNER or members assigned to the destination branch can receive transfers');
+      }
+      if (branchIds.length > 0 && !branchIds.includes(transfer.toBranchId)) {
+        throw new ForbiddenException('Only OWNER or members assigned to the destination branch can receive transfers');
+      }
+    }
+
+    // Re-validate source branch stock at receive time
+    if (transfer.fromBranchId) {
+      const branchStock = await this.getBranchStock(tenantId, transfer.fromBranchId);
+      for (const item of transfer.items) {
         const available = branchStock.get(item.skuId) ?? 0;
         if (available < item.quantity) {
-          const sku = skus.find((s) => s.id === item.skuId)!;
           throw new BadRequestException(
-            `Insufficient stock at source branch for ${sku.name} (${sku.code}): available ${available}, requested ${item.quantity}`,
-          );
-        }
-      }
-    } else {
-      for (const item of dto.items) {
-        const sku = skus.find((s) => s.id === item.skuId)!;
-        if (sku.stockOnHand < item.quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for ${sku.name} (${sku.code}): available ${sku.stockOnHand}, requested ${item.quantity}`,
+            `Insufficient stock at source branch for ${item.sku.name} (${item.sku.code}): available ${available}, required ${item.quantity}. Transfer cannot be received.`,
           );
         }
       }
     }
 
+    // Create movements and update stock in one transaction
     return this.prisma.$transaction(async (tx) => {
-      const transfer = await tx.stockTransferRequest.create({
-        data: {
-          tenantId,
-          fromBranchId: dto.fromBranchId ?? null,
-          toBranchId: dto.toBranchId,
-          status: 'FULFILLED',
-          requestedById: userId,
-          note: dto.note ?? null,
-          items: {
-            create: dto.items.map((i) => ({ skuId: i.skuId, quantity: i.quantity })),
-          },
-        },
-        include: {
-          fromBranch: { select: { id: true, name: true } },
-          toBranch: { select: { id: true, name: true } },
-          items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-        },
+      await tx.stockTransferRequest.update({
+        where: { id: transferId },
+        data: { status: 'FULFILLED' },
       });
 
-      for (const item of dto.items) {
+      for (const item of transfer.items) {
         const pairId = randomUUID();
 
-        if (dto.fromBranchId) {
+        if (transfer.fromBranchId) {
           await tx.inventoryMovement.create({
             data: {
               tenantId,
@@ -111,7 +181,7 @@ export class TransfersService {
               quantity: item.quantity,
               referenceType: 'TRANSFER',
               referenceId: transfer.id,
-              branchId: dto.fromBranchId,
+              branchId: transfer.fromBranchId,
               transferPairId: pairId,
               actorId: userId,
             },
@@ -130,7 +200,7 @@ export class TransfersService {
             quantity: item.quantity,
             referenceType: 'TRANSFER',
             referenceId: transfer.id,
-            branchId: dto.toBranchId,
+            branchId: transfer.toBranchId,
             transferPairId: pairId,
             actorId: userId,
           },
@@ -141,7 +211,45 @@ export class TransfersService {
         });
       }
 
-      return transfer;
+      return tx.stockTransferRequest.findUnique({
+        where: { id: transferId },
+        include: {
+          fromBranch: { select: { id: true, name: true } },
+          toBranch: { select: { id: true, name: true } },
+          items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+        },
+      });
+    });
+  }
+
+  async cancel(tenantId: string, userId: string, transferId: string, membership: { role: string }) {
+    const transfer = await this.prisma.stockTransferRequest.findFirst({
+      where: { id: transferId, tenantId },
+    });
+    if (!transfer) throw new NotFoundException('Transfer not found');
+
+    if (transfer.status !== 'PENDING' && transfer.status !== 'APPROVED') {
+      throw new BadRequestException('Transfer can only be cancelled when PENDING or IN_TRANSIT');
+    }
+
+    if (membership.role === 'OWNER') {
+      // OWNER can always cancel
+    } else if (transfer.status === 'PENDING' && transfer.requestedById === userId) {
+      // Requester can cancel PENDING
+    } else if (transfer.status === 'PENDING') {
+      throw new ForbiddenException('Only OWNER or the requester can cancel a pending transfer');
+    } else {
+      throw new ForbiddenException('Only OWNER can cancel an in-transit transfer');
+    }
+
+    return this.prisma.stockTransferRequest.update({
+      where: { id: transferId },
+      data: { status: 'REJECTED' },
+      include: {
+        fromBranch: { select: { id: true, name: true } },
+        toBranch: { select: { id: true, name: true } },
+        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+      },
     });
   }
 
