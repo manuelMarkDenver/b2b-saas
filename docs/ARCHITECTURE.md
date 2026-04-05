@@ -136,17 +136,26 @@ Example capabilities: `can_manage_inventory`, `can_create_orders`, `can_verify_p
 
 ### Tenant sidebar
 
+Collapsible icon-rail (56px) ↔ full sidebar (256px). State persisted in `localStorage`.
+Nav groups (Items, Inventory, Settings) expand to show sub-items when sidebar is open.
+
 ```
-Dashboard
-Inventory          (hidden if inventory feature flag disabled)
-Orders             (hidden if orders feature flag disabled)
-Payments           (hidden if payments feature flag disabled)
-Catalog
-  └── Products / SKUs
-Settings
-  ├── Tenant Profile
-  ├── Team & Permissions    ← PBAC management UI
-  └── Notifications         ← post-MVP (external channels)
+[≡] Dashboard
+[📦] Items            ▾
+     Products
+[📊] Inventory        ▾
+     Stock
+     Transfers        (stockTransfers flag, OWNER/ADMIN)
+[🛒] Orders           (orders flag)
+[👥] Customers        (OWNER/ADMIN)
+[💳] Payments         (accounting flag)
+[📈] Reports          (reports flag)
+─────────────────────
+[⚙️] Settings         ▾
+     Branches
+     Team
+     Settings
+[⬆️] Sign out
 ```
 
 ### Super Admin sidebar
@@ -154,8 +163,7 @@ Settings
 ```
 Dashboard
 Tenants            (list, provision, suspend/reactivate)
-Feature Flags      (per-tenant flag toggles)
-Notifications      (platform-level alerts only)
+Users              (platform-wide user management)
 ```
 
 ### Team & Permissions page (PBAC UI)
