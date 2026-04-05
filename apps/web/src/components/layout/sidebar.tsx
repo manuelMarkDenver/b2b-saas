@@ -77,6 +77,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Boxes,
     items: [
       { label: 'Adjustments', href: '/inventory/adjustments', featureKey: 'inventory' },
+      { label: 'Counts', href: '/inventory/counts', featureKey: 'inventory' },
       { label: 'Transfers', href: '/transfers', featureKey: 'stockTransfers', roles: ['OWNER', 'ADMIN'] },
       { label: 'History', href: '/inventory/history', featureKey: 'inventory' },
     ],
