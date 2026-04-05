@@ -67,7 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Items',
     icon: ShoppingBag,
     items: [
-      { label: 'Products', href: '/products', featureKey: 'inventory', roles: ['OWNER', 'ADMIN'] },
+      { label: 'Item list', href: '/products', featureKey: 'inventory', roles: ['OWNER', 'ADMIN'] },
     ],
   },
   {
@@ -76,8 +76,9 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Inventory',
     icon: Boxes,
     items: [
-      { label: 'Stock', href: '/inventory', featureKey: 'inventory' },
+      { label: 'Adjustments', href: '/inventory/adjustments', featureKey: 'inventory' },
       { label: 'Transfers', href: '/transfers', featureKey: 'stockTransfers', roles: ['OWNER', 'ADMIN'] },
+      { label: 'History', href: '/inventory/history', featureKey: 'inventory' },
     ],
   },
   {
@@ -199,7 +200,8 @@ export function Sidebar({
   function isPathActive(href: string): boolean {
     const full = `${base}${href}`;
     if (href === '') return pathname === base || pathname === `${base}/`;
-    return pathname === full || pathname.startsWith(`${full}/`);
+    // Exact match only — do NOT prefix-match to avoid double-highlighting sibling sub-items
+    return pathname === full;
   }
 
   function isGroupActive(group: Extract<NavGroup, { type: 'group' }>): boolean {

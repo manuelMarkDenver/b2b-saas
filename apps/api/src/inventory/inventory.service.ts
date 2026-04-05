@@ -20,7 +20,7 @@ export class InventoryService {
     const where: Record<string, unknown> = {
       tenantId,
       approvalStatus: ApprovalStatus.APPROVED,
-      type: { in: [MovementType.IN, MovementType.OUT, MovementType.TRANSFER_IN, MovementType.TRANSFER_OUT] },
+      type: { in: [MovementType.IN, MovementType.OUT, MovementType.TRANSFER_IN, MovementType.TRANSFER_OUT, MovementType.ADJUSTMENT] },
     };
     if (branchId) where.branchId = branchId;
     if (skuId) where.skuId = skuId;
@@ -72,6 +72,12 @@ export class InventoryService {
       throw new BadRequestException('Adjustment quantity cannot be zero');
     }
 
+    if ((data.type === MovementType.ADJUSTMENT || data.type === MovementType.IN)
+        && data.referenceType === ReferenceType.MANUAL
+        && !data.note?.trim()) {
+      throw new BadRequestException('Note is required for manual stock adjustments');
+    }
+
     if (data.type === MovementType.OUT && sku.stockOnHand < data.quantity) {
       throw new BadRequestException(
         `Insufficient stock: available ${sku.stockOnHand}, requested ${data.quantity}`,
@@ -82,6 +88,22 @@ export class InventoryService {
       throw new BadRequestException(
         `Adjustment would result in negative stock: current ${sku.stockOnHand}, delta ${data.quantity}`,
       );
+    }
+
+    // Branch-aware validation for decreases
+    if (branchId) {
+      const branchStockMap = await this.getBranchStock(tenantId, branchId, data.skuId);
+      const available = branchStockMap.get(branchId)?.get(data.skuId) ?? 0;
+      if (data.type === MovementType.OUT && available < data.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock: available ${available}, requested ${data.quantity}`,
+        );
+      }
+      if (data.type === MovementType.ADJUSTMENT && data.quantity < 0 && available + data.quantity < 0) {
+        throw new BadRequestException(
+          `Adjustment would result in negative stock: current ${available}, delta ${data.quantity}`,
+        );
+      }
     }
 
     const isStaff = role === 'STAFF';
@@ -161,6 +183,22 @@ export class InventoryService {
           ? -movement.quantity
           : movement.quantity;
 
+    // Branch-aware re-validation for decreases before approval
+    if (movement.branchId) {
+      const branchStockMap = await this.getBranchStock(tenantId, movement.branchId, movement.skuId);
+      const available = branchStockMap.get(movement.branchId)?.get(movement.skuId) ?? 0;
+      if (movement.type === MovementType.OUT && available < movement.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock: available ${available}, requested ${movement.quantity}`,
+        );
+      }
+      if (movement.type === MovementType.ADJUSTMENT && movement.quantity < 0 && available + movement.quantity < 0) {
+        throw new BadRequestException(
+          `Adjustment would result in negative stock: current ${available}, delta ${movement.quantity}`,
+        );
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.inventoryMovement.update({
         where: { id: movementId },
@@ -219,6 +257,7 @@ export class InventoryService {
         include: {
           sku: { select: { id: true, code: true, name: true, imageUrl: true } },
           actor: { select: { id: true, email: true } },
+          branch: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
