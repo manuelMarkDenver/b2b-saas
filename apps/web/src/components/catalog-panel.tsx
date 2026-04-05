@@ -5,6 +5,7 @@ import * as React from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { formatCents } from "@/lib/format";
+import { getActiveBranchId } from "@/lib/branch";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -13,6 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CreateItemModal } from "@/components/create-item-modal";
 import { FilterBar, FilterField, FilterValues } from "@/components/ui/filter-bar";
 import { ImageUpload } from "@/components/image-upload";
+import { useTenantFeatures } from "@/lib/tenant-features-context";
+import { isFeatureActive } from "@repo/shared";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
 async function readApiError(res: Response): Promise<string> {
   try {
@@ -144,6 +148,22 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
   const [editSaving, setEditSaving] = React.useState(false);
 
   const { pushToast } = useToast();
+  const [activeBranchId, setActiveBranchId] = React.useState<string | null>(null);
+  const [branchStock, setBranchStock] = React.useState<Record<string, number>>({});
+
+  React.useEffect(() => { setActiveBranchId(getActiveBranchId(tenantSlug)); }, [tenantSlug]);
+
+  React.useEffect(() => {
+    if (!activeBranchId) return;
+    apiFetch(`/inventory/branch-stock?branchId=${activeBranchId}`, { tenantSlug })
+      .then((r) => r.ok ? r.json() : {})
+      .then((d: Record<string, number>) => setBranchStock(d))
+      .catch(() => setBranchStock({}));
+  }, [activeBranchId, tenantSlug]);
+
+  const features = useTenantFeatures();
+  const showAccounting = isFeatureActive('accounting', features);
+  useUnsavedChanges(editOpen);
 
   async function handleImport() {
     if (!importFile) return;
@@ -248,16 +268,20 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
 
   // Export CSV
   function handleExport() {
-    const rows: string[][] = [['Name', 'SKU Code', 'Category', 'Cost', 'Price', 'Low Stock']];
+    const headers = showAccounting
+      ? ['Name', 'SKU Code', 'Category', 'Cost', 'Price', 'Low Stock']
+      : ['Name', 'SKU Code', 'Category', 'Price', 'Low Stock'];
+    const rows: string[][] = [headers];
     sortedSkus.forEach((s) => {
-      rows.push([
+      const row = [
         s.name,
         s.code,
         s.product.category.name,
-        s.costCents != null ? formatCents(s.costCents) : '',
+        ...(showAccounting ? [s.costCents != null ? formatCents(s.costCents) : ''] : []),
         s.priceCents != null ? formatCents(s.priceCents) : '',
         String(s.lowStockThreshold),
-      ]);
+      ];
+      rows.push(row);
     });
     const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -369,22 +393,25 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
         <div className="overflow-x-auto rounded-lg border">
           <div className="min-w-[440px]">
             <div className="border-b bg-muted/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              <div className="grid grid-cols-[2fr_1fr_90px_90px_100px_120px] items-center gap-3">
-                <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
-                  Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
-                </button>
-                <span>Category</span>
+            <div className={`grid items-center gap-3 ${showAccounting ? 'grid-cols-[2fr_1fr_90px_90px_100px_80px_120px]' : 'grid-cols-[2fr_1fr_90px_100px_80px_120px]'}`}>
+              <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 text-left hover:text-foreground">
+                Item {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+              </button>
+              <span>Category</span>
+              {showAccounting && (
                 <button type="button" onClick={() => toggleSkuSort('costCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                   {skuSortKey === 'costCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Cost
                 </button>
-                <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                  {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
-                </button>
-                <button type="button" onClick={() => toggleSkuSort('lowStockThreshold')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                  {skuSortKey === 'lowStockThreshold' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Low Stock
-                </button>
-                <span className="text-right">Actions</span>
-              </div>
+              )}
+              <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
+              </button>
+              <span className="text-right">In stock</span>
+              <button type="button" onClick={() => toggleSkuSort('lowStockThreshold')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                {skuSortKey === 'lowStockThreshold' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Low Stock
+              </button>
+              <span className="text-right">Actions</span>
+            </div>
             </div>
 
             {sortedSkus.length === 0 ? (
@@ -396,18 +423,23 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                 {sortedSkus.map((s) => (
                   <div
                     key={s.id}
-                    className={`grid grid-cols-[2fr_1fr_90px_90px_100px_120px] items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${s.isArchived ? "opacity-50" : ""}`}
+                    className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showAccounting ? 'grid-cols-[2fr_1fr_90px_90px_100px_80px_120px]' : 'grid-cols-[2fr_1fr_90px_100px_80px_120px]'} ${s.isArchived ? "opacity-50" : ""}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <ProductThumb src={s.imageUrl} label={`${s.code} ${s.name}`} size={40} className="rounded-md shrink-0" />
                       <span className="truncate text-sm font-medium">{s.name}</span>
                     </div>
                     <span className="truncate text-xs text-muted-foreground">{s.product.category.name}</span>
-                    <div className="text-right text-xs tabular-nums text-muted-foreground">
-                      {s.costCents != null ? formatCents(s.costCents) : '—'}
-                    </div>
+                    {showAccounting && (
+                      <div className="text-right text-xs tabular-nums text-muted-foreground">
+                        {s.costCents != null ? formatCents(s.costCents) : '—'}
+                      </div>
+                    )}
                     <div className="text-right text-xs tabular-nums text-muted-foreground">
                       {s.priceCents != null ? formatCents(s.priceCents) : '—'}
+                    </div>
+                    <div className="text-right text-xs tabular-nums font-medium">
+                      {activeBranchId ? (branchStock[s.id] ?? 0) : s.stockOnHand}
                     </div>
                     <div className="text-right text-xs tabular-nums text-muted-foreground">
                       {s.lowStockThreshold}
@@ -640,7 +672,7 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                       onChange={(e) => setEditSkuName(e.target.value)}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={`grid gap-3 ${showAccounting ? 'grid-cols-2' : ''}`}>
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Price (₱)</label>
                       <input
@@ -651,16 +683,18 @@ export function CatalogPanel({ tenantSlug }: { tenantSlug: string }) {
                         onChange={(e) => setEditSkuPrice(e.target.value)}
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Cost (₱)</label>
-                      <input
-                        className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        type="number"
-                        step="0.01"
-                        value={editSkuCost}
-                        onChange={(e) => setEditSkuCost(e.target.value)}
-                      />
-                    </div>
+                    {showAccounting && (
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Cost (₱)</label>
+                        <input
+                          className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          type="number"
+                          step="0.01"
+                          value={editSkuCost}
+                          onChange={(e) => setEditSkuCost(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Low Stock Threshold</label>

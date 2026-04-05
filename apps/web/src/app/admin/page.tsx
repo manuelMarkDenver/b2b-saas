@@ -14,6 +14,7 @@ type TenantFeatures = {
   inventory: boolean;
   orders: boolean;
   payments: boolean;
+  accounting: boolean;
   marketplace: boolean;
   reports: boolean;
   stockTransfers: boolean;
@@ -57,7 +58,7 @@ type AdminUser = {
 };
 
 const FLAG_KEYS: (keyof TenantFeatures)[] = [
-  "inventory", "orders", "payments", "reports",
+  "inventory", "orders", "payments", "accounting", "reports",
   "marketplace", "stockTransfers", "paymentTerms", "multipleBranches",
 ];
 

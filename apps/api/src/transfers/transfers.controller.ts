@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/auth/tenant.guard';
 import type { RequestWithUser } from '../common/auth/auth.types';
@@ -45,5 +45,40 @@ export class TransfersController {
       throw new ForbiddenException('Only OWNER or ADMIN can create stock transfers');
     }
     return this.transfersService.create(req.tenant!.id, req.user!.id, dto);
+  }
+
+  @Post(':id/send')
+  send(@Req() req: RequestWithUser, @Param('id') id: string) {
+    const features = req.tenant!.features as Record<string, boolean> | null;
+    if (!features?.stockTransfers) {
+      throw new ForbiddenException("Feature 'stockTransfers' is not enabled for this tenant");
+    }
+    return this.transfersService.send(req.tenant!.id, req.user!.id, id, {
+      role: req.membership!.role,
+      branchIds: req.membership!.branchIds,
+    });
+  }
+
+  @Post(':id/receive')
+  receive(@Req() req: RequestWithUser, @Param('id') id: string) {
+    const features = req.tenant!.features as Record<string, boolean> | null;
+    if (!features?.stockTransfers) {
+      throw new ForbiddenException("Feature 'stockTransfers' is not enabled for this tenant");
+    }
+    return this.transfersService.receive(req.tenant!.id, req.user!.id, id, {
+      role: req.membership!.role,
+      branchIds: req.membership!.branchIds,
+    });
+  }
+
+  @Post(':id/cancel')
+  cancel(@Req() req: RequestWithUser, @Param('id') id: string) {
+    const features = req.tenant!.features as Record<string, boolean> | null;
+    if (!features?.stockTransfers) {
+      throw new ForbiddenException("Feature 'stockTransfers' is not enabled for this tenant");
+    }
+    return this.transfersService.cancel(req.tenant!.id, req.user!.id, id, {
+      role: req.membership!.role,
+    });
   }
 }

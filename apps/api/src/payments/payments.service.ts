@@ -27,8 +27,10 @@ export class PaymentsService {
 
     if (!order) throw new NotFoundException('Order not found');
 
-    if (order.status === 'CANCELLED') {
-      throw new BadRequestException('Cannot submit payment for a cancelled order');
+    if (order.status !== 'CONFIRMED' && order.status !== 'COMPLETED') {
+      throw new BadRequestException(
+        'Payment can only be recorded for confirmed or completed orders',
+      );
     }
 
     const payment = await this.prisma.payment.create({
@@ -176,8 +178,10 @@ export class PaymentsService {
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    if (order.status === 'CANCELLED') {
-      throw new BadRequestException('Cannot record payment for a cancelled order');
+    if (order.status !== 'CONFIRMED' && order.status !== 'COMPLETED') {
+      throw new BadRequestException(
+        'Payment can only be recorded for confirmed or completed orders',
+      );
     }
 
     const paidCents = await this.prisma.payment

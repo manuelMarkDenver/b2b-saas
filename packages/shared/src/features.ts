@@ -118,6 +118,14 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
     shipped: true,
   },
   {
+    key: 'accounting',
+    label: 'Accounting & Payments',
+    description:
+      'Track payments received, verify receipts, manage AR, and view financial performance.',
+    icon: 'Receipt',
+    shipped: true,
+  },
+  {
     key: 'marketplace',
     label: 'Marketplace',
     description:

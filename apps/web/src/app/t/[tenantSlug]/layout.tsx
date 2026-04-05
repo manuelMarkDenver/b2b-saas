@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { TenantShell } from '@/components/tenant-shell';
 import { getTenantTheme } from '@/lib/tenant-theme';
 
+const PLATFORM_NAME = process.env.NEXT_PUBLIC_PLATFORM_NAME ?? 'Zentral';
+
 export const metadata: Metadata = {
-  title: 'Platform',
+  title: PLATFORM_NAME,
 };
 
 export default async function TenantLayout({
