@@ -104,6 +104,7 @@ model Tenant {
   orders             Order[]
   payments           Payment[]
   contacts           Contact[]
+  suppliers          Supplier[]
   stockTransfers     StockTransferRequest[]
 }
 
@@ -261,6 +262,26 @@ model Contact {
 
   @@index([tenantId])
   @@index([type])
+}
+
+// ─── Suppliers ────────────────────────────────────────────────────────────────
+
+model Supplier {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

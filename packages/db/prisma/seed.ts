@@ -315,6 +315,58 @@ async function main() {
   const cgsMainBranch   = await upsertBranch(retailTenant.id,   "Main Store",       true,  BranchType.STANDARD);
   const cgsAnnexBranch  = await upsertBranch(retailTenant.id,   "Annex Branch",     false, BranchType.RETAIL);
 
+  // --- Suppliers ---
+
+  async function upsertSupplier(tenantId: string, name: string, data: { contactName?: string; phone?: string; email?: string; address?: string }) {
+    return prisma.supplier.upsert({
+      where: { tenantId_name: { tenantId, name } },
+      update: {},
+      create: { tenantId, name, ...data },
+    });
+  }
+
+  // Hardware tenant suppliers
+  await upsertSupplier(hardwareTenant.id, "SteelWorks Manila", {
+    contactName: "Ricardo Santos",
+    phone: "+63 917 555 0101",
+    email: "sales@steelworks.ph",
+    address: "123 Industrial Ave, Pasig City",
+  });
+  await upsertSupplier(hardwareTenant.id, "PowerCable Distributors", {
+    contactName: "Maria Lim",
+    phone: "+63 918 555 0202",
+    email: "orders@powercable.ph",
+    address: "456 Electric St, Makati City",
+  });
+
+  // Food tenant suppliers
+  await upsertSupplier(foodTenant.id, "Golden Grain Millers", {
+    contactName: "Antonio Reyes",
+    phone: "+63 919 555 0303",
+    email: "supply@goldengrain.ph",
+    address: "789 Flour Mills Rd, Bulacan",
+  });
+  await upsertSupplier(foodTenant.id, "Dairy Fresh Co.", {
+    contactName: "Carmen Dela Cruz",
+    phone: "+63 920 555 0404",
+    email: "wholesale@dairyfresh.ph",
+    address: "321 Milk Ave, Laguna",
+  });
+
+  // Retail tenant suppliers
+  await upsertSupplier(retailTenant.id, "General Goods Wholesale", {
+    contactName: "Jose Mercado",
+    phone: "+63 921 555 0505",
+    email: "orders@gengoods.ph",
+    address: "654 Wholesale Blvd, Quezon City",
+  });
+  await upsertSupplier(retailTenant.id, "CleanPro Supplies", {
+    contactName: "Linda Tan",
+    phone: "+63 922 555 0606",
+    email: "sales@cleanpro.ph",
+    address: "987 Soap St, Manila",
+  });
+
   // --- Categories ---
 
   const categoryData = [
