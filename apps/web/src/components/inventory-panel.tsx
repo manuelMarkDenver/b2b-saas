@@ -17,7 +17,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/components/ui/toast';
 import { ProductThumb } from '@/components/product-thumb';
 import { ImageUpload } from '@/components/image-upload';
-import { CreateItemModal } from '@/components/create-item-modal';
+import { useTenantFeatures } from '@/lib/tenant-features-context';
+import { isFeatureActive } from '@repo/shared';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 
 type Category = { id: string; name: string; slug: string };
 
@@ -127,6 +129,10 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
   const [editForm, setEditForm] = useState({ name: '', costCents: '', priceCents: '', lowStockThreshold: '', imageUrl: '' });
   const [editSaving, setEditSaving] = useState(false);
 
+  const features = useTenantFeatures();
+  const showAccounting = isFeatureActive('accounting', features);
+  useUnsavedChanges(!!editSku);
+
   // Movement sort
   const [movSortKey, setMovSortKey] = useState<'createdAt' | 'quantity' | 'type'>('createdAt');
   const [movSortDir, setMovSortDir] = useState<'asc' | 'desc'>('desc');
@@ -163,9 +169,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       return dir * a.name.localeCompare(b.name);
     });
   }, [skus, skuSortKey, skuSortDir]);
-
-  // Create Item modal
-  const [productOpen, setProductOpen] = useState(false);
 
   // Load categories and branches once
   useEffect(() => {
@@ -425,10 +428,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
               Adjust Stock
             </Button>
           )}
-          <Button onClick={() => setProductOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Create Item
-          </Button>
         </div>
       </div>
 
@@ -475,23 +474,25 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           <div className="overflow-x-auto rounded-lg border">
             <div className="min-w-[440px]">
               <div className="border-b bg-muted/40 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                <div className={`grid items-center gap-3 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}>
-                  <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 hover:text-foreground text-left">
-                    Product {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
-                  </button>
-                  <span>Category</span>
-                  {showSkuCol && <span>SKU Code</span>}
-                  <button type="button" onClick={() => toggleSkuSort('stockOnHand')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                    {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Total Stock
-                  </button>
+              <div className={`grid items-center gap-3 ${showSkuCol ? (showAccounting ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_120px_80px_80px_auto]') : (showAccounting ? 'grid-cols-[2fr_1fr_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_auto]')}`}>
+                <button type="button" onClick={() => toggleSkuSort('name')} className="flex items-center gap-1 hover:text-foreground text-left">
+                  Product {skuSortKey === 'name' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                </button>
+                <span>Category</span>
+                {showSkuCol && <span>SKU Code</span>}
+                <button type="button" onClick={() => toggleSkuSort('stockOnHand')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                  {skuSortKey === 'stockOnHand' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Total Stock
+                </button>
+                {showAccounting && (
                   <button type="button" onClick={() => toggleSkuSort('costCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
                     {skuSortKey === 'costCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Cost
                   </button>
-                  <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
-                    {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
-                  </button>
-                  <span />
-                </div>
+                )}
+                <button type="button" onClick={() => toggleSkuSort('priceCents')} className="flex items-center justify-end gap-1 hover:text-foreground">
+                  {skuSortKey === 'priceCents' ? (skuSortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ChevronsUpDown className="h-3 w-3 opacity-40" />} Price
+                </button>
+                <span />
+              </div>
               </div>
 
               {skus.length === 0 ? (
@@ -503,7 +504,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                   {sortedSkus.map((sku) => (
                     <div
                       key={sku.id}
-                      className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_80px_auto]'}`}
+                      className={`grid items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${showSkuCol ? (showAccounting ? 'grid-cols-[2fr_1fr_120px_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_120px_80px_80px_auto]') : (showAccounting ? 'grid-cols-[2fr_1fr_80px_80px_80px_auto]' : 'grid-cols-[2fr_1fr_80px_80px_auto]')}`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <ProductThumb src={sku.imageUrl} label={`${sku.code} ${sku.name}`} size={36} className="rounded-lg shrink-0" />
@@ -516,9 +517,11 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                       <div className={`text-right text-sm font-bold tabular-nums ${stockColor(sku)}`}>
                         {sku.stockOnHand}
                       </div>
-                      <div className="text-right text-xs text-muted-foreground tabular-nums">
-                        {sku.costCents != null ? formatCents(sku.costCents) : '—'}
-                      </div>
+                      {showAccounting && (
+                        <div className="text-right text-xs text-muted-foreground tabular-nums">
+                          {sku.costCents != null ? formatCents(sku.costCents) : '—'}
+                        </div>
+                      )}
                       <div className="text-right text-xs text-muted-foreground tabular-nums">
                         {sku.priceCents != null ? formatCents(sku.priceCents) : '—'}
                       </div>
@@ -714,7 +717,7 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
       </Tabs>
 
       {/* Quick adjust dialog */}
-      <Dialog open={!!adjustSku} onOpenChange={(open) => { if (!open) setAdjustSku(null); }}>
+      <Dialog open={!!adjustSku} onOpenChange={(open) => { if (!open) { setAdjustSku(null); setAdjustReason(''); } }}>
         <DialogContent className="sm:max-w-xs">
           <DialogHeader>
             <DialogTitle>
@@ -741,12 +744,21 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Reason (optional)</Label>
-                <Input
-                  placeholder={adjustSku.direction === 'IN' ? 'e.g. Restocked from supplier' : 'e.g. Sold offline'}
-                  value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value)}
-                />
+                <Label>Reason</Label>
+                <Select value={adjustReason} onValueChange={setAdjustReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a reason…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RECEIVE">Receive from supplier</SelectItem>
+                    <SelectItem value="RETURN">Customer return</SelectItem>
+                    <SelectItem value="DAMAGE">Damaged / Expired</SelectItem>
+                    <SelectItem value="THEFT">Theft / Loss</SelectItem>
+                    <SelectItem value="SHRINKAGE">Shrinkage</SelectItem>
+                    <SelectItem value="CORRECTION">Stock count correction</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setAdjustSku(null)}>Cancel</Button>
@@ -781,17 +793,19 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Cost (₱)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editForm.costCents}
-                    onChange={(e) => setEditForm((f) => ({ ...f, costCents: e.target.value }))}
-                    placeholder="0.00"
-                  />
-                </div>
+                {showAccounting && (
+                  <div className="space-y-1.5">
+                    <Label>Cost (₱)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.costCents}
+                      onChange={(e) => setEditForm((f) => ({ ...f, costCents: e.target.value }))}
+                      placeholder="0.00"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label>Price (₱)</Label>
                   <Input
@@ -835,15 +849,6 @@ export function InventoryPanel({ tenantSlug }: InventoryPanelProps) {
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Create Item Modal */}
-      <CreateItemModal
-        open={productOpen}
-        onOpenChange={setProductOpen}
-        tenantSlug={tenantSlug}
-        categories={categories}
-        onCreated={() => { loadSkus(); loadMovements(); }}
-      />
 
       {/* Add movement dialog */}
       <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) { setSkuSearch(''); setSkuPickerOpen(false); } }}>
