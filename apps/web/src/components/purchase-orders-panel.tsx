@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { getActiveBranchId } from '@/lib/branch';
@@ -65,6 +65,7 @@ interface PurchaseOrdersPanelProps {
 export function PurchaseOrdersPanel({ tenantSlug, userRole }: PurchaseOrdersPanelProps) {
   const { pushToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -102,6 +103,10 @@ export function PurchaseOrdersPanel({ tenantSlug, userRole }: PurchaseOrdersPane
   useEffect(() => { setActiveBranchId(getActiveBranchId(tenantSlug)); }, [tenantSlug]);
 
   useEffect(() => {
+    if (activeBranchId && !filterBranch) setFilterBranch(activeBranchId);
+  }, [activeBranchId, filterBranch]);
+
+  useEffect(() => {
     apiFetch('/branches', { tenantSlug }).then(async (r) => {
       if (r.ok) {
         const d = await r.json() as { branches: Branch[] } | Branch[];
@@ -129,6 +134,13 @@ export function PurchaseOrdersPanel({ tenantSlug, userRole }: PurchaseOrdersPane
   }, [tenantSlug, activeBranchId, filterStatus, filterSupplier, filterBranch, search]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (!editId || dialogOpen) return;
+    const target = orders.find((po) => po.id === editId);
+    if (target) void openEdit(target);
+  }, [searchParams, orders, dialogOpen]);
 
   useEffect(() => {
     apiFetch('/suppliers?isActive=true&limit=100', { tenantSlug, branchId: null }).then(async (r) => {
@@ -357,7 +369,6 @@ export function PurchaseOrdersPanel({ tenantSlug, userRole }: PurchaseOrdersPane
             onKeyDown={(e) => { if (e.key === 'Enter') load(); }}
           />
         </div>
-        <Button size="sm" onClick={load}>Apply</Button>
         {canManage && (
           <Button size="sm" onClick={openCreate}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
