@@ -79,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Adjustments', href: '/inventory/adjustments', featureKey: 'inventory' },
       { label: 'Counts', href: '/inventory/counts', featureKey: 'inventory' },
       { label: 'Suppliers', href: '/suppliers', featureKey: 'inventory', roles: ['OWNER', 'ADMIN'] },
+      { label: 'Purchase orders', href: '/inventory/purchase-orders', featureKey: 'inventory', roles: ['OWNER', 'ADMIN'] },
       { label: 'Transfers', href: '/transfers', featureKey: 'stockTransfers', roles: ['OWNER', 'ADMIN'] },
       { label: 'History', href: '/inventory/history', featureKey: 'inventory' },
     ],
