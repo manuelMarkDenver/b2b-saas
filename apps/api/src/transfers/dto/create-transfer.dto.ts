@@ -12,8 +12,7 @@ export class TransferItemDto {
 
 export class CreateTransferDto {
   @IsUUID()
-  @IsOptional()
-  fromBranchId?: string;
+  fromBranchId: string;
 
   @IsUUID()
   toBranchId: string;
