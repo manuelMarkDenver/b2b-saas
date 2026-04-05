@@ -932,6 +932,60 @@ async function main() {
     void mpsContactStar;
   }
 
+  // --- Demo Purchase Orders ---
+
+  async function createDemoPO(tenantId: string, branchId: string, supplierName: string, createdById: string, items: Array<{ skuId: string; orderedQty: number }>) {
+    const supplier = await prisma.supplier.findFirst({ where: { tenantId, name: supplierName } });
+    if (!supplier) return;
+
+    // Find max poNumber for tenant
+    const maxPo = await prisma.purchaseOrder.aggregate({
+      where: { tenantId },
+      _max: { poNumber: true },
+    });
+    const poNumber = (maxPo._max.poNumber ?? 1000) + 1;
+
+    return prisma.purchaseOrder.create({
+      data: {
+        tenantId,
+        branchId,
+        supplierId: supplier.id,
+        poNumber,
+        status: "DRAFT",
+        createdById,
+        items: {
+          create: items.map((item) => ({ skuId: item.skuId, orderedQty: item.orderedQty })),
+        },
+      },
+    });
+  }
+
+  // Hardware tenant: 1 draft PO
+  const hwSupplier = await prisma.supplier.findFirst({ where: { tenantId: hardwareTenant.id, name: "SteelWorks Manila" } });
+  if (hwSupplier) {
+    await createDemoPO(hardwareTenant.id, hwMainBranch.id, "SteelWorks Manila", users.hardwareOwner.id, [
+      { skuId: boltSku.id, orderedQty: 200 },
+      { skuId: washerSku.id, orderedQty: 500 },
+    ]);
+  }
+
+  // Food tenant: 1 draft PO
+  const foodSupplier = await prisma.supplier.findFirst({ where: { tenantId: foodTenant.id, name: "Golden Grain Millers" } });
+  if (foodSupplier) {
+    await createDemoPO(foodTenant.id, mpsCentralBranch.id, "Golden Grain Millers", users.foodOwner.id, [
+      { skuId: flourSku.id, orderedQty: 50 },
+    ]);
+  }
+
+  // Retail tenant: 1 draft PO
+  const retailSupplier = await prisma.supplier.findFirst({ where: { tenantId: retailTenant.id, name: "General Goods Wholesale" } });
+  if (retailSupplier) {
+    await createDemoPO(retailTenant.id, cgsMainBranch.id, "General Goods Wholesale", users.retailOwner.id, [
+      { skuId: detergentSku.id, orderedQty: 30 },
+      { skuId: tissueSku.id, orderedQty: 48 },
+    ]);
+  }
+
   // Summary
   const [orderTotal, paymentTotal, skuTotal, movementTotal, branchTotal, contactTotal, transferTotal] = await Promise.all([
     prisma.order.count(),

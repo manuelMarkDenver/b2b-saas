@@ -24,6 +24,7 @@ import { ReportsModule } from './reports/reports.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -62,6 +63,7 @@ import { AppService } from './app.service';
     ContactsModule,
     TransfersModule,
     SuppliersModule,
+    PurchaseOrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
