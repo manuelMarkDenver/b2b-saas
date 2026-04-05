@@ -133,10 +133,10 @@ export function PurchaseOrderDetailClient({ tenantSlug, poId }: PurchaseOrderDet
         </Button>
         <div className="flex items-center gap-2">
           {po.status === 'DRAFT' && (
-            <Button variant="outline" size="sm" onClick={() => router.push(`/t/${tenantSlug}/inventory/purchase-orders?edit=${po.id}`)}>Edit</Button>
-          )}
-          {po.status === 'DRAFT' && (
-            <Button size="sm" onClick={handleOrder}>Mark ordered</Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/t/${tenantSlug}/inventory/purchase-orders?edit=${po.id}`)}>Edit</Button>
+              <Button size="sm" onClick={handleOrder}>Mark ordered</Button>
+            </>
           )}
           {po.status === 'ORDERED' && (
             <Button size="sm" onClick={() => setShowReceiveDialog(true)}>Receive</Button>
