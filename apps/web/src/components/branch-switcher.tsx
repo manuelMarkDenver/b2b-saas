@@ -81,9 +81,6 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
 
   useEffect(() => { loadBranches(); }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Hidden when only 1 branch — invisible at single-branch
-  if (branches.length <= 1) return null;
-
   const activeBranch = branches.find((b) => b.id === activeBranchId);
   const showSearch = branches.length > SEARCH_THRESHOLD;
   const showAccordion = branches.length > ACCORDION_THRESHOLD;
@@ -97,6 +94,8 @@ export function BranchSwitcher({ tenantSlug, compact }: BranchSwitcherProps) {
     setActiveBranchId(tenantSlug, branchId);
     window.location.reload();
   }
+
+  if (branches.length <= 1) return null;
 
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) loadBranches(); else setSearch(''); }}>

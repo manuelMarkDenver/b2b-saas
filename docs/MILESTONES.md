@@ -1,6 +1,6 @@
 # Platform Roadmap
 
-> Last updated: 2026-04-04 — PR#71–#105: Staging deployment live (Render + Vercel + Neon, Singapore region). Admin panel overhaul. Brand renamed to Zentral. React Server Components CVE patched. Pre-staging UI polish: login show/hide password, order Terms/Overdue badges, compact pill badges app-wide, table container standardization (rounded-lg border / muted/40 header / divide-y), outer card wrapper removal from all panels. PWA service worker disabled (next-pwa incompatibility with Next.js 15.2.8 — manifest + install-to-homescreen preserved). All 14 pre-staging checklist items ✅ complete. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md).
+> Last updated: 2026-04-05 — PR#71–#110: Staging deployment live. All 14 pre-staging checklist items ✅ complete. Feature flag system: [docs/FEATURE_FLAGS.md](./FEATURE_FLAGS.md). **Loyverse-aligned product pivot** — see "Product Direction" section below.
 
 ---
 
@@ -17,13 +17,132 @@
 | **Phase 7** | — | Marketplace — Customer Storefront | 🔒 Do not build yet |
 | **Phase 8** | — | Mobile + POS | 📋 PWA pre-staging; native app after revenue |
 | **Phase 9** | — | AWS Scale + Subdomain Routing | 🔒 Do not build yet |
+| **Phase B** | — | Sidebar Redesign (Loyverse-style nav) | 🔄 In progress |
+| **Phase C** | — | Transfers 2.0 (2-step flow) | 📋 Planned |
+| **Phase D** | — | Inventory Expansion (adjustments page, stocktake, suppliers) | 📋 Planned |
+| **Phase E** | — | Purchase Orders (receive stock from suppliers) | 📋 Planned |
+| **Phase F** | — | Per-Branch Availability & Pricing | 📋 Planned |
+| **Phase G** | — | Composite Items (productions, bundles) | 📋 Planned |
+| **Phase H** | — | Enhanced Reports | 📋 Planned |
 
 **Rules:**
 - MVP = Phase 1–4 (MS1–MS8). First shippable product. ✅ Complete.
 - 🔒 = architecturally designed, not yet scheduled.
 - Never pull work from a future phase into a current milestone.
+- Phases B–H = Loyverse-aligned feature parity. See "Product Direction" section below.
 
 **On mobile:** PWA + responsive web ships **second-to-last before staging** — after all functionality is stabilised and MVP market-fit is confirmed. Doing it earlier means re-doing responsive work every time a panel changes. React Native native app (Phase 8) ships only after real revenue validates the investment. See "Mobile Strategy" in the Pre-Staging Checklist section for the full rationale.
+
+---
+
+## Product Direction — Loyverse Feature Parity (2026-04-05)
+
+### Why the Pivot
+
+Zentral is pivoting to mirror Loyverse's product scope. Loyverse is the dominant SMB inventory + POS tool in the Philippine market. Our clients (and their staff) are familiar with it. Matching its feature surface means:
+- Faster onboarding (staff already know the paradigm)
+- Lower friction in demos (side-by-side comparisons favor parity)
+- Clear product roadmap (Loyverse's nav = our feature backlog)
+
+### What We Are Adopting
+
+| Feature | Phase | Notes |
+|---------|-------|-------|
+| Loyverse-style sidebar (icon-rail, collapsible groups) | B | Monochrome icons, active-state highlight — not rainbow |
+| Transfers 2.0 — 2-step PENDING → RECEIVED flow | C | Branches must explicitly receive stock |
+| Dedicated Adjustments page (`/inventory/adjustments`) | D | Separate from movements list |
+| Stocktake / Cycle Count page (`/inventory/counts`) | D | Full count vs expected |
+| Suppliers CRUD | D | Name, contact, link to POs |
+| Purchase Orders — receive stock from suppliers | E | PO → receive → IN movement |
+| Per-branch availability toggle | F | Hide items from specific branches |
+| Per-branch price override | F | Override priceCents per branch |
+| Composite items (bundles, productions) | G | isComposite SKU + CompositeComponent model |
+| Enhanced Reports (profit, movement history CSV) | H | Beyond current order CSV export |
+
+### What We Are Explicitly Skipping
+
+| Feature | Reason |
+|---------|--------|
+| POS devices / Shifts / Time clock / Kitchen printers | Full POS is a separate product surface — not ERP |
+| Integrations (QuickBooks, WooCommerce, etc.) | Out of scope — build own first |
+| Modifiers (customer-facing add-ons on orders) | Deferred — not needed for B2B use case |
+| Marketplace / Customer Storefront | Phase 7 — deferred |
+| Tenant self-registration | By design — Super Admin provisions manually |
+
+### Feature Flag Rule (updated 2026-04-05)
+
+Every new feature flag MUST update all 4 layers simultaneously:
+
+| Layer | File | What to change |
+|-------|------|---------------|
+| 1. Master registry | `packages/shared/src/features.ts` | Add entry to `PLATFORM_FEATURES` |
+| 2. Admin UI | `apps/web/src/app/admin/page.tsx` | Add key to `FLAG_KEYS` |
+| 3. Tenant shell type | `apps/web/src/app/admin/page.tsx` | Add to `TenantFeatures` type |
+| 4. Seeder | `packages/db/prisma/seed.ts` | Add to `demoFeatures` with value |
+
+Flags not in `demoFeatures` will fail silently on existing DB records — the Super Admin toggle will appear to work but the value will not persist because the JSON column does not contain the key.
+
+### Stock Integrity Decision (2026-04-05)
+
+**Rule: stock is ONLY modified via `InventoryMovement` records — never via direct field editing.**
+
+| Operation | Allowed? | How |
+|-----------|----------|-----|
+| Item creation (initial stock) | ✅ One-time bootstrap | Creates an `IN` movement at creation |
+| Manual adjustment | ✅ | `POST /inventory/movements` with type `ADJUSTMENT` and reason |
+| Transfer in/out | ✅ | `TRANSFER_IN` / `TRANSFER_OUT` movements |
+| Purchase Order receive | ✅ (Phase E) | `IN` movement on PO receipt |
+| Direct edit in item form | ❌ Never | Loyverse does this — we do not copy it |
+
+Allowing direct stock edits bypasses the audit trail. Every stock change must be traceable to a reason, actor, branch, and timestamp. The `lowStockThreshold` field on `Sku` is metadata (not stock) and CAN be edited in the item form.
+
+### B2B Applicability
+
+Zentral is product-agnostic. The two primary first clients confirm this:
+
+| Client | Business type | Key features used |
+|--------|--------------|------------------|
+| Manager's Pizza | F&B — sells food to walk-in/delivery customers | Orders, Payments, Inventory |
+| Megabox | Hardware distribution — receives boxes from suppliers, sells to businesses | Orders with customerRef, Payment terms, Multi-branch (warehouses), Purchase Orders (Phase E) |
+
+The app works for any business that: receives stock, manages inventory, sells to customers (B2C or B2B), and needs visibility across locations. The term "customer" in our data model maps to both walk-in customers and business clients with payment terms.
+
+### Phase B — Sidebar Redesign (In Progress)
+
+**Target:** Loyverse-style collapsible sidebar.
+- **Collapsed state (default):** 56px icon-rail with CSS-only tooltips
+- **Expanded state:** 256px full sidebar with labels and collapsible nav groups
+- **Persistence:** `zentral:sidebar:collapsed` in localStorage
+- **Nav groups:** Items (Products), Inventory (Stock, Transfers), Orders, Customers, Payments, Reports, Settings (Branches, Team, Settings)
+- **Icons:** Monochrome lucide-react, active-state color tint — no rainbow
+- **Feature-gated items:** Hidden when feature flag is off (checked via `TenantFeaturesContext`)
+- **Role-gated items:** Hidden when user role is insufficient (checked against `userRole` prop)
+
+**Files changed:**
+- `apps/web/src/components/tenant-shell.tsx` — adds `sidebarCollapsed` state + `handleToggleCollapse`
+- `apps/web/src/components/layout/sidebar.tsx` — full rewrite to NAV_GROUPS structure
+- `apps/web/src/components/inventory-panel.tsx` — removes inline Create Item button (moved to sidebar/page header)
+
+**Status:** Qwen confirmed understanding. Implementation in progress.
+
+### Phase C — Transfers 2.0 (Planned)
+
+**Target:** 2-step transfer flow matching real warehouse operations.
+
+**Flow:** `PENDING` → `IN_TRANSIT` → `RECEIVED` (or `CANCELLED`)
+
+**Key changes from current:**
+- Stock movements created ONLY on `RECEIVED` — not at creation time
+- `fromBranchId` is now required (cannot transfer from "general stock")
+- Branch-scoped item picker: shows only SKUs available at source branch with per-branch stock
+- Authorization: OWNER can receive any; ADMIN/STAFF can receive only if their `branchIds` includes `toBranchId`
+- New API endpoints: `POST /transfers/:id/send`, `POST /transfers/:id/receive`, `POST /transfers/:id/cancel`
+
+**Schema additions:**
+- `TransferStatus` enum: add `IN_TRANSIT`, `RECEIVED`, `CANCELLED`
+- `StockTransferRequest.sentAt DateTime?`
+- `StockTransferRequest.receivedAt DateTime?`
+- `StockTransferRequest.receivedById String?`
 
 ---
 

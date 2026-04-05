@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTenantFeatures } from "@/lib/tenant-features-context";
+import { isFeatureActive } from "@repo/shared";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 
 type Category = { id: string; name: string; slug: string };
 
@@ -31,6 +34,9 @@ export function CreateItemModal({
   defaultCategoryId,
 }: CreateItemModalProps) {
   const { pushToast } = useToast();
+  const features = useTenantFeatures();
+  const showAccounting = isFeatureActive('accounting', features);
+  useUnsavedChanges(open);
   const [saving, setSaving] = React.useState(false);
   const [autoSkuCode, setAutoSkuCode] = React.useState("");
   const [overrideSku, setOverrideSku] = React.useState(false);
@@ -203,20 +209,34 @@ export function CreateItemModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Cost (P)</Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="0.00"
-                value={form.costCents}
-                onChange={(e) => setForm((f) => ({ ...f, costCents: e.target.value }))}
-              />
+          {showAccounting ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Cost (₱)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.costCents}
+                  onChange={(e) => setForm((f) => ({ ...f, costCents: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Price (₱)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.priceCents}
+                  onChange={(e) => setForm((f) => ({ ...f, priceCents: e.target.value }))}
+                />
+              </div>
             </div>
+          ) : (
             <div className="space-y-1.5">
-              <Label>Price (P)</Label>
+              <Label>Price (₱)</Label>
               <Input
                 type="number"
                 min={0}
@@ -226,7 +246,7 @@ export function CreateItemModal({
                 onChange={(e) => setForm((f) => ({ ...f, priceCents: e.target.value }))}
               />
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

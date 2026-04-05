@@ -244,7 +244,7 @@ async function main() {
   });
 
   // Demo tenants: multipleBranches enabled, maxBranches:3 (2 seeded + 1 slot for testing)
-  const demoFeatures = { inventory: true, orders: true, payments: true, team: true, catalog: true, reports: true, marketplace: false, stockTransfers: true, paymentTerms: true, multipleBranches: true };
+  const demoFeatures = { inventory: true, orders: true, payments: true, accounting: true, team: true, catalog: true, reports: true, marketplace: false, stockTransfers: true, paymentTerms: true, multipleBranches: true };
 
   const hardwareTenant = await prisma.tenant.upsert({
     where: { slug: "peak-hardware" },
