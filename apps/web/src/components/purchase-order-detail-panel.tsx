@@ -23,6 +23,7 @@ type PODetail = {
   supplier: { id: string; name: string };
   branch: { id: string; name: string };
   createdBy: { email: string };
+  orderedBy: { email: string };
   receivedBy: { email: string } | null;
   items: POItem[];
   totalCents: number;
@@ -132,7 +133,10 @@ export function PurchaseOrderDetailClient({ tenantSlug, poId }: PurchaseOrderDet
         </Button>
         <div className="flex items-center gap-2">
           {po.status === 'DRAFT' && (
-            <Button size="sm" onClick={handleOrder}>Mark ordered</Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/t/${tenantSlug}/inventory/purchase-orders?edit=${po.id}`)}>Edit</Button>
+              <Button size="sm" onClick={handleOrder}>Mark ordered</Button>
+            </>
           )}
           {po.status === 'ORDERED' && (
             <Button size="sm" onClick={() => setShowReceiveDialog(true)}>Receive</Button>
@@ -140,6 +144,7 @@ export function PurchaseOrderDetailClient({ tenantSlug, poId }: PurchaseOrderDet
           {po.status === 'RECEIVED' && (
             <Button variant="outline" size="sm" onClick={handleClose}>Close</Button>
           )}
+          <Button variant="outline" size="sm" disabled title="Not yet implemented">Send</Button>
           {/* More menu — disabled items */}
           <div className="relative group">
             <Button variant="outline" size="icon" className="h-8 w-8">
@@ -186,6 +191,10 @@ export function PurchaseOrderDetailClient({ tenantSlug, poId }: PurchaseOrderDet
           <div>
             <span className="text-xs text-muted-foreground">Created By</span>
             <p className="font-medium">{po.createdBy.email}</p>
+          </div>
+          <div>
+            <span className="text-xs text-muted-foreground">Ordered By</span>
+            <p className="font-medium">{po.orderedBy.email}</p>
           </div>
           {po.receivedBy && (
             <div>

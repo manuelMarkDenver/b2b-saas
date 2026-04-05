@@ -125,6 +125,7 @@ export class PurchaseOrdersService {
 
     return {
       ...po,
+      orderedBy: po.createdBy,
       ...this.computeTotals(po),
     };
   }
