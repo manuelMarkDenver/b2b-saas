@@ -23,6 +23,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { TransfersModule } from './transfers/transfers.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -60,6 +61,7 @@ import { AppService } from './app.service';
     ReportsModule,
     ContactsModule,
     TransfersModule,
+    SuppliersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
