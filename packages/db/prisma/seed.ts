@@ -934,7 +934,7 @@ async function main() {
 
   // --- Demo Purchase Orders ---
 
-  async function createDemoPO(tenantId: string, branchId: string, supplierName: string, createdById: string, items: Array<{ skuId: string; orderedQty: number }>) {
+  async function createDemoPO(tenantId: string, branchId: string, supplierName: string, createdById: string, items: Array<{ skuId: string; orderedQty: number; purchaseCostCents: number }>) {
     const supplier = await prisma.supplier.findFirst({ where: { tenantId, name: supplierName } });
     if (!supplier) return;
 
@@ -951,10 +951,12 @@ async function main() {
         branchId,
         supplierId: supplier.id,
         poNumber,
+        poDate: new Date(),
+        expectedOn: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         status: "DRAFT",
         createdById,
         items: {
-          create: items.map((item) => ({ skuId: item.skuId, orderedQty: item.orderedQty })),
+          create: items.map((item) => ({ skuId: item.skuId, orderedQty: item.orderedQty, purchaseCostCents: item.purchaseCostCents })),
         },
       },
     });
@@ -964,8 +966,8 @@ async function main() {
   const hwSupplier = await prisma.supplier.findFirst({ where: { tenantId: hardwareTenant.id, name: "SteelWorks Manila" } });
   if (hwSupplier) {
     await createDemoPO(hardwareTenant.id, hwMainBranch.id, "SteelWorks Manila", users.hardwareOwner.id, [
-      { skuId: boltSku.id, orderedQty: 200 },
-      { skuId: washerSku.id, orderedQty: 500 },
+      { skuId: boltSku.id, orderedQty: 200, purchaseCostCents: 60 },
+      { skuId: washerSku.id, orderedQty: 500, purchaseCostCents: 15 },
     ]);
   }
 
@@ -973,7 +975,7 @@ async function main() {
   const foodSupplier = await prisma.supplier.findFirst({ where: { tenantId: foodTenant.id, name: "Golden Grain Millers" } });
   if (foodSupplier) {
     await createDemoPO(foodTenant.id, mpsCentralBranch.id, "Golden Grain Millers", users.foodOwner.id, [
-      { skuId: flourSku.id, orderedQty: 50 },
+      { skuId: flourSku.id, orderedQty: 50, purchaseCostCents: 4500 },
     ]);
   }
 
@@ -981,8 +983,8 @@ async function main() {
   const retailSupplier = await prisma.supplier.findFirst({ where: { tenantId: retailTenant.id, name: "General Goods Wholesale" } });
   if (retailSupplier) {
     await createDemoPO(retailTenant.id, cgsMainBranch.id, "General Goods Wholesale", users.retailOwner.id, [
-      { skuId: detergentSku.id, orderedQty: 30 },
-      { skuId: tissueSku.id, orderedQty: 48 },
+      { skuId: detergentSku.id, orderedQty: 30, purchaseCostCents: 8500 },
+      { skuId: tissueSku.id, orderedQty: 48, purchaseCostCents: 3200 },
     ]);
   }
 

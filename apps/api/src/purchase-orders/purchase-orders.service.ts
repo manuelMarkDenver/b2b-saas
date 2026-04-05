@@ -6,6 +6,12 @@ import { CreatePurchaseOrderDto } from './dto/create-po.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-po.dto';
 import { ReceivePurchaseOrderDto } from './dto/receive-po.dto';
 
+const PO_INCLUDE = {
+  supplier: { select: { id: true, name: true } },
+  branch: { select: { id: true, name: true } },
+  items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+} as const;
+
 @Injectable()
 export class PurchaseOrdersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,6 +23,12 @@ export class PurchaseOrdersService {
     }
   }
 
+  private async getAccessibleBranchIds(tenantId: string, membership: { role: string; branchIds: Prisma.JsonValue }): Promise<string[] | null> {
+    const branchIds = (membership.branchIds as string[]) ?? [];
+    if (branchIds.length === 0) return null; // all branches
+    return branchIds;
+  }
+
   private async getNextPoNumber(tenantId: string): Promise<number> {
     const maxPo = await this.prisma.purchaseOrder.aggregate({
       where: { tenantId },
@@ -25,11 +37,30 @@ export class PurchaseOrdersService {
     return (maxPo._max.poNumber ?? 1000) + 1;
   }
 
-  async list(tenantId: string, branchId: string, membership: { role: string; branchIds: Prisma.JsonValue }, page: number, limit: number, status?: string, search?: string) {
-    await this.checkBranchAccess(tenantId, branchId, membership);
+  private computeTotals(po: { items: Array<{ orderedQty: number; receivedQty: number; purchaseCostCents: number }> }) {
+    let totalCents = 0;
+    let ordered = 0;
+    let received = 0;
+    for (const item of po.items) {
+      totalCents += item.orderedQty * item.purchaseCostCents;
+      ordered += item.orderedQty;
+      received += item.receivedQty;
+    }
+    return { totalCents, receivedProgress: { received, ordered } };
+  }
 
-    const where: Prisma.PurchaseOrderWhereInput = { tenantId, branchId };
+  async list(tenantId: string, membership: { role: string; branchIds: Prisma.JsonValue }, page: number, limit: number, status?: string, search?: string, supplierId?: string, branchId?: string) {
+    const accessibleBranchIds = await this.getAccessibleBranchIds(tenantId, membership);
+
+    const where: Prisma.PurchaseOrderWhereInput = { tenantId };
+    if (branchId) {
+      where.branchId = branchId;
+      await this.checkBranchAccess(tenantId, branchId, membership);
+    } else if (accessibleBranchIds) {
+      where.branchId = { in: accessibleBranchIds };
+    }
     if (status) where.status = status as PurchaseOrderStatus;
+    if (supplierId) where.supplierId = supplierId;
     if (search) {
       where.OR = [
         { poNumber: { equals: parseInt(search, 10) || -1 } },
@@ -42,6 +73,7 @@ export class PurchaseOrdersService {
         where,
         include: {
           supplier: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
           items: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -52,8 +84,48 @@ export class PurchaseOrdersService {
     ]);
 
     return {
-      data: data.map((po) => ({ ...po, itemsCount: po.items.length })),
+      data: data.map((po) => ({
+        id: po.id,
+        poNumber: po.poNumber,
+        status: po.status,
+        note: po.note,
+        poDate: po.poDate,
+        expectedOn: po.expectedOn,
+        createdAt: po.createdAt,
+        orderedAt: po.orderedAt,
+        receivedAt: po.receivedAt,
+        closedAt: po.closedAt,
+        supplier: po.supplier,
+        branch: po.branch,
+        ...this.computeTotals(po),
+        itemsCount: po.items.length,
+      })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async detail(tenantId: string, membership: { role: string; branchIds: Prisma.JsonValue }, id: string) {
+    const accessibleBranchIds = await this.getAccessibleBranchIds(tenantId, membership);
+    const where: Prisma.PurchaseOrderWhereInput = { id, tenantId };
+    if (accessibleBranchIds) {
+      where.branchId = { in: accessibleBranchIds };
+    }
+
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where,
+      include: {
+        supplier: { select: { id: true, name: true } },
+        branch: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, email: true } },
+        receivedBy: { select: { id: true, email: true } },
+        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+      },
+    });
+    if (!po) throw new NotFoundException('Purchase order not found');
+
+    return {
+      ...po,
+      ...this.computeTotals(po),
     };
   }
 
@@ -74,7 +146,6 @@ export class PurchaseOrdersService {
     const skus = await this.prisma.sku.findMany({ where: { id: { in: skuIds }, tenantId }, select: { id: true } });
     if (skus.length !== skuIds.length) throw new NotFoundException('One or more items not found');
 
-    // Generate poNumber with retry on conflict
     for (let attempt = 0; attempt < 2; attempt++) {
       const poNumber = await this.getNextPoNumber(tenantId);
       try {
@@ -85,20 +156,19 @@ export class PurchaseOrdersService {
             supplierId: dto.supplierId,
             poNumber,
             status: 'DRAFT',
+            poDate: new Date(dto.poDate),
+            expectedOn: dto.expectedOn ? new Date(dto.expectedOn) : null,
             note: dto.note ?? null,
             createdById: userId,
             items: {
-              create: dto.items.map((i) => ({ skuId: i.skuId, orderedQty: i.orderedQty })),
+              create: dto.items.map((i) => ({ skuId: i.skuId, orderedQty: i.orderedQty, purchaseCostCents: i.purchaseCostCents })),
             },
           },
-          include: {
-            supplier: { select: { id: true, name: true } },
-            items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-          },
+          include: PO_INCLUDE,
         });
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002' && attempt === 0) {
-          continue; // retry
+          continue;
         }
         throw e;
       }
@@ -132,7 +202,6 @@ export class PurchaseOrdersService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Delete existing items if updating
       if (dto.items) {
         await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
       }
@@ -141,17 +210,16 @@ export class PurchaseOrdersService {
         where: { id },
         data: {
           ...(dto.supplierId && { supplierId: dto.supplierId }),
+          ...(dto.poDate && { poDate: new Date(dto.poDate) }),
+          ...(dto.expectedOn !== undefined && { expectedOn: dto.expectedOn ? new Date(dto.expectedOn) : null }),
           ...(dto.note !== undefined && { note: dto.note }),
           ...(dto.items && {
             items: {
-              create: dto.items.map((i) => ({ skuId: i.skuId, orderedQty: i.orderedQty })),
+              create: dto.items.map((i) => ({ skuId: i.skuId, orderedQty: i.orderedQty, purchaseCostCents: i.purchaseCostCents })),
             },
           }),
         },
-        include: {
-          supplier: { select: { id: true, name: true } },
-          items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-        },
+        include: PO_INCLUDE,
       });
     });
   }
@@ -169,10 +237,7 @@ export class PurchaseOrdersService {
     return this.prisma.purchaseOrder.update({
       where: { id },
       data: { status: 'ORDERED', orderedAt: new Date() },
-      include: {
-        supplier: { select: { id: true, name: true } },
-        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-      },
+      include: PO_INCLUDE,
     });
   }
 
@@ -184,12 +249,14 @@ export class PurchaseOrdersService {
 
     const po = await this.prisma.purchaseOrder.findFirst({
       where: { id, tenantId, branchId },
-      include: { items: { include: { sku: { select: { id: true, code: true, name: true } } } } },
+      include: {
+        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
+        supplier: { select: { id: true, name: true } },
+      },
     });
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.status !== 'ORDERED') throw new BadRequestException('Purchase order can only be received when ORDERED');
 
-    // Validate received items
     const poItemMap = new Map(po.items.map((item) => [item.skuId, item]));
     for (const receiveItem of dto.items) {
       const poItem = poItemMap.get(receiveItem.skuId);
@@ -200,13 +267,11 @@ export class PurchaseOrdersService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Update PO
       await tx.purchaseOrder.update({
         where: { id },
         data: { status: 'RECEIVED', receivedAt: new Date(), receivedById: userId },
       });
 
-      // Update items and create movements
       for (const receiveItem of dto.items) {
         const poItem = poItemMap.get(receiveItem.skuId);
         if (!poItem) continue;
@@ -227,7 +292,7 @@ export class PurchaseOrdersService {
               referenceType: 'MANUAL',
               referenceId: id,
               reason: `Purchase order PO${po.poNumber}`,
-              note: `PO${po.poNumber}`,
+              note: `PO${po.poNumber} — ${po.supplier.name}`,
               branchId,
               actorId: userId,
               transferPairId: pairId,
@@ -242,10 +307,7 @@ export class PurchaseOrdersService {
 
       return tx.purchaseOrder.findUnique({
         where: { id },
-        include: {
-          supplier: { select: { id: true, name: true } },
-          items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-        },
+        include: PO_INCLUDE,
       });
     });
   }
@@ -263,10 +325,7 @@ export class PurchaseOrdersService {
     return this.prisma.purchaseOrder.update({
       where: { id },
       data: { status: 'CLOSED', closedAt: new Date() },
-      include: {
-        supplier: { select: { id: true, name: true } },
-        items: { include: { sku: { select: { id: true, code: true, name: true } } } },
-      },
+      include: PO_INCLUDE,
     });
   }
 }

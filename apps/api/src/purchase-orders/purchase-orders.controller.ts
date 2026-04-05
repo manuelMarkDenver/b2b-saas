@@ -21,14 +21,21 @@ export class PurchaseOrdersController {
     @Query('limit') limit = '20',
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('branchId') branchId?: string,
   ) {
-    const branchId = req.headers['x-branch-id'] as string | undefined;
-    if (!branchId) throw new ForbiddenException('Branch is required');
-
-    return this.purchaseOrders.list(req.tenant!.id, branchId, {
+    return this.purchaseOrders.list(req.tenant!.id, {
       role: req.membership!.role,
       branchIds: req.membership!.branchIds,
-    }, +page, +limit, status, search);
+    }, +page, +limit, status, search, supplierId, branchId);
+  }
+
+  @Get(':id')
+  detail(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.purchaseOrders.detail(req.tenant!.id, {
+      role: req.membership!.role,
+      branchIds: req.membership!.branchIds,
+    }, id);
   }
 
   @Post()

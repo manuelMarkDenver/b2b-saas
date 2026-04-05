@@ -306,6 +306,8 @@ model PurchaseOrder {
   supplierId    String               @db.Uuid
   status        PurchaseOrderStatus  @default(DRAFT)
   poNumber      Int
+  poDate        DateTime
+  expectedOn    DateTime?
   note          String?
   createdById   String               @db.Uuid
   receivedById  String?              @db.Uuid
@@ -335,6 +337,7 @@ model PurchaseOrderItem {
   skuId           String        @db.Uuid
   orderedQty      Int
   receivedQty     Int           @default(0)
+  purchaseCostCents Int         @default(0)
 
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   sku             Sku           @relation(fields: [skuId], references: [id])
